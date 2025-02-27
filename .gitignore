@@ -14,3 +14,4 @@ todo
 # Pliki testowe (opcjonalnie)
 test_plc_write.py
 main.py
+git_help.txt
