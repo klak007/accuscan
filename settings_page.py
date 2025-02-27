@@ -65,7 +65,7 @@ class SettingsPage(ctk.CTkFrame):
             self.tree.delete(item)
         
         self.tree.insert("", "end", values=(
-            "-", "<Brak połączenia z bazą>", "Funkcje edycji niedostępne", "-", "-", "-", "-", "-", "-"
+            "-", "<Brak połączenia z bazą>", "Funkcje edycji niedostępne", "-", "-", "-", "-", "-", "-", "-"
         ))
 
     def _create_top_bar(self):
@@ -174,8 +174,18 @@ class SettingsPage(ctk.CTkFrame):
         self.table_container.grid_rowconfigure(0, weight=1)
         self.table_container.grid_columnconfigure(0, weight=1)
         # Definiujemy kolumny – przykładowo:
-        columns = ("id", "recipe_name", "product_nr", "preset_diameter", "diameter_over_tol",
-                   "diameter_under_tol", "lump_threshold", "neck_threshold", "created_at")
+        columns = (
+            "id",
+            "recipe_name",
+            "product_nr",
+            "preset_diameter",
+            "diameter_over_tol",
+            "diameter_under_tol",
+            "lump_threshold",
+            "neck_threshold",
+            "flaw_window",
+            "created_at"
+        )
         self.tree = ttk.Treeview(self.table_container, columns=columns, show="headings", selectmode="browse")
         for col in columns:
             self.tree.heading(col, text=col.replace("_", " ").title())
@@ -221,7 +231,7 @@ class SettingsPage(ctk.CTkFrame):
                 sql = """
                     SELECT `Id Settings` AS id_settings, `Recipe name`, `Product nr`, `Preset Diameter`, 
                         `Diameter Over tolerance`, `Diameter Under tolerance`, `Lump threshold`, 
-                        `Neck threshold`, `created_at` 
+                        `Neck threshold`, `Flaw Window`, `created_at` 
                     FROM settings 
                     ORDER BY id_settings DESC
                 """
@@ -239,6 +249,7 @@ class SettingsPage(ctk.CTkFrame):
                 diameter_under_tol = row.get("Diameter Under tolerance") or 0
                 lump_threshold = row.get("Lump threshold") or 0
                 neck_threshold = row.get("Neck threshold") or 0
+                flaw_window = row.get("Flaw Window") or 0
                 created_at = row.get("created_at")
                 
                 if created_at:
@@ -249,7 +260,7 @@ class SettingsPage(ctk.CTkFrame):
                 self.tree.insert("", "end", values=(
                     id_val, recipe_name, product_nr, preset_diameter,
                     diameter_over_tol, diameter_under_tol, lump_threshold,
-                    neck_threshold, created_at
+                    neck_threshold, flaw_window, created_at
                  ))
             
             if connection and connection.is_connected():

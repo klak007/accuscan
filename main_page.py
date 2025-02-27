@@ -438,6 +438,12 @@ class MainPage(ctk.CTkFrame):
         )
         self.btn_neck_thres_inc_05.grid(row=0, column=4, padx=2, pady=2)
 
+        self.label_flaw_window = ctk.CTkLabel(self.left_panel, text="Flaw window [m]:")
+        self.label_flaw_window.grid(row=row_start+12, column=0, padx=5, pady=(10,2), sticky="w")
+
+        self.entry_flaw_window = ctk.CTkEntry(self.left_panel, placeholder_text="2.0", width=80)
+        self.entry_flaw_window.grid(row=row_start+13, column=0, padx=5, pady=2)
+
     def _adjust_diameter(self, delta: float):
         val_str = self.entry_diameter_setpoint.get() or "0"
         try:
@@ -500,6 +506,7 @@ class MainPage(ctk.CTkFrame):
         tolerance_minus_str = self.entry_tolerance_minus.get() or "0.5"
         lump_threshold_str = self.entry_lump_threshold.get() or "0.3"
         neck_threshold_str = self.entry_neck_threshold.get() or "0.3"
+        flaw_window_str = self.entry_flaw_window.get() or "2.0"
 
         # Konwersje na float
         diameter_setpoint = float(diameter_setpoint_str)
@@ -507,6 +514,7 @@ class MainPage(ctk.CTkFrame):
         tolerance_minus = float(tolerance_minus_str)
         lump_threshold = float(lump_threshold_str)
         neck_threshold = float(neck_threshold_str)
+        flaw_window = float(flaw_window_str)
 
         # 2. Zbuduj słownik do zapisu w bazie, używając kluczy zgodnych z tymi oczekiwanymi przez db_helper:
         settings_data = {
@@ -517,11 +525,11 @@ class MainPage(ctk.CTkFrame):
             "diameter_under_tol": tolerance_minus,
             "lump_threshold": lump_threshold,
             "neck_threshold": neck_threshold,
+            "flaw_window": flaw_window,
             # Dodatkowe wartości – możesz je ustawić na stałe lub odczytać z innych pól,
             # jeżeli są dostępne w interfejsie użytkownika:
             "diameter_window": 0.0,
             "diameter_std_dev": 0.0,
-            "flaw_window": 0.0,
             "num_scans": 128,
             "diameter_histeresis": 0.0,
             "lump_histeresis": 0.0,
@@ -590,6 +598,8 @@ class MainPage(ctk.CTkFrame):
         self.entry_lump_threshold.insert(0, "0.1")
         self.entry_neck_threshold.delete(0, "end")
         self.entry_neck_threshold.insert(0, "0.1")
+        self.entry_flaw_window.delete(0, "end")
+        self.entry_flaw_window.insert(0, "2.0")
 
     # ---------------------------------------------------------------------------------
     # 3. Środkowa kolumna (row=1, col=1) – parametry symulacji
