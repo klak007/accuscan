@@ -6,7 +6,7 @@ import time
 from tkinter import messagebox
 # Import modułów
 import config
-from plc_helper import read_accuscan_data
+from plc_helper import read_accuscan_data, connect_plc
 from db_helper import init_database, save_measurement_sample, check_database
 from data_manager import DataManager
 from logic import MeasurementLogic
@@ -107,8 +107,7 @@ class App(ctk.CTk):
         if self.run_measurement:
             # Check PLC connection and retry if needed:
             if not (hasattr(self.logic, "plc_client") and self.logic.plc_client.get_connected()):
-                # ...existing retry logic...
-                pass
+                self._try_reconnect_plc()
 
             # Only read if PLC is connected:
             if hasattr(self.logic, "plc_client") and self.logic.plc_client.get_connected():
@@ -149,6 +148,19 @@ class App(ctk.CTk):
                     self.logic.plc_client.disconnect()
         # Schedule the next update exactly after 32 ms
         self.after(32, self._update_data)
+    
+    def _try_reconnect_plc(self):
+        print("[App] Recreating PLC connection...")
+        if hasattr(self.logic, "plc_client"):
+            try:
+                self.logic.plc_client.disconnect()
+            except:
+                pass
+        try:
+            self.logic.plc_client = connect_plc("192.168.50.90")
+            print("[App] PLC Reconnection successful.")
+        except Exception as e:
+            print(f"[App] PLC Reconnection failed: {e}")
     
     def _on_closing(self):
         """Zamykanie aplikacji – rozłączenie z PLC, zamknięcie okna."""

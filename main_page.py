@@ -110,6 +110,9 @@ class MainPage(ctk.CTkFrame):
         )
         self.btn_exit.pack(side="right", padx=5)
 
+        self.ind_plc = ctk.CTkLabel(self.top_bar, text="PLC: Unknown")
+        self.ind_plc.pack(side="right", padx=5)
+
     def _on_pomiary_click(self):
         print("[GUI] Kliknięto przycisk 'pomiary'.")
 
@@ -1077,4 +1080,12 @@ class MainPage(ctk.CTkFrame):
         if not df.empty:
             data = df.iloc[-1].to_dict()  # select the most recent row as a dict
             self.update_readings(data)
+
+    def update_connection_indicators(self):
+        import plc_helper
+        plc_connected = plc_helper.is_plc_connected(self.controller.logic)
+        if plc_connected:
+            self.ind_plc.configure(text="PLC: OK", text_color="green")
+        else:
+            self.ind_plc.configure(text="PLC: OFF", text_color="red")
 
