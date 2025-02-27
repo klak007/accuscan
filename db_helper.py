@@ -162,7 +162,8 @@ def save_settings(db_params: dict, settings_data: dict) -> int:
                 `Neck threshold`=%s, `Flaw Window`=%s,
                 `Number of scans for gauge to average`=%s,
                 `Diameter histeresis`=%s, `Lump histeresis`=%s,
-                `Neck histeresis`=%s
+                `Neck histeresis`=%s, `Max lumps in flaw window`=%s, 
+                `Max necks in flaw window`=%s
             WHERE `Id Settings`=%s
             """
             cursor.execute(
@@ -182,6 +183,8 @@ def save_settings(db_params: dict, settings_data: dict) -> int:
                     settings_data.get("diameter_histeresis", 0.0),
                     settings_data.get("lump_histeresis", 0.0),
                     settings_data.get("neck_histeresis", 0.0),
+                    settings_data.get("max_lumps_in_flaw_window", 3),
+                    settings_data.get("max_necks_in_flaw_window", 3),
                     settings_data["id_settings"]
                 )
             )
@@ -195,9 +198,10 @@ def save_settings(db_params: dict, settings_data: dict) -> int:
                 `Neck threshold`, `Flaw Window`,
                 `Number of scans for gauge to average`,
                 `Diameter histeresis`, `Lump histeresis`,
-                `Neck histeresis`
+                `Neck histeresis`, `Max lumps in flaw window`, 
+                `Max necks in flaw window`
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             cursor.execute(
                 sql,
@@ -216,6 +220,8 @@ def save_settings(db_params: dict, settings_data: dict) -> int:
                     settings_data.get("diameter_histeresis", 0.0),
                     settings_data.get("lump_histeresis", 0.0),
                     settings_data.get("neck_histeresis", 0.0),
+                    settings_data.get("max_lumps_in_flaw_window", 3),
+                    settings_data.get("max_necks_in_flaw_window", 3),
                 )
             )
             row_id = cursor.lastrowid
@@ -239,6 +245,8 @@ def save_settings(db_params: dict, settings_data: dict) -> int:
             "diameter_histeresis": settings_data.get("diameter_histeresis", 0.0),
             "lump_histeresis": settings_data.get("lump_histeresis", 0.0),
             "neck_histeresis": settings_data.get("neck_histeresis", 0.0),
+            "max_lumps_in_flaw_window": settings_data.get("max_lumps_in_flaw_window", 3),
+            "max_necks_in_flaw_window": settings_data.get("max_necks_in_flaw_window", 3),
         }
         save_settings_history(db_params, history_data)
         return row_id
@@ -272,9 +280,10 @@ def save_settings_history(db_params: dict, settings_data: dict) -> bool:
             `Lump threshold`, `Neck threshold`, `Flaw Window`,
             `Number of scans for gauge to average`,
             `Diameter histeresis`, `Lump histeresis`,
-            `Neck histeresis`
+            `Neck histeresis`, `Max lumps in flaw window`,
+            `Max necks in flaw window`
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         cursor.execute(
             sql,
@@ -294,6 +303,8 @@ def save_settings_history(db_params: dict, settings_data: dict) -> bool:
                 settings_data.get("diameter_histeresis", 0.0),
                 settings_data.get("lump_histeresis", 0.0),
                 settings_data.get("neck_histeresis", 0.0),
+                settings_data.get("max_lumps_in_flaw_window", 3),
+                settings_data.get("max_necks_in_flaw_window", 3),
             )
         )
         connection.commit()

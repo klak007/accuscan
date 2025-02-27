@@ -225,37 +225,37 @@ class MainPage(ctk.CTkFrame):
         # )
         # self.btn_simulation.grid(row=6, column=0, padx=5, pady=5, sticky="ew")
 
-        # Indykatory lumps/necks
-        self.indicator_frame = ctk.CTkFrame(self.left_panel)
-        self.indicator_frame.grid(row=7, column=0, padx=5, pady=5, sticky="ew")
+        # # Indykatory lumps/necks
+        # self.indicator_frame = ctk.CTkFrame(self.left_panel)
+        # self.indicator_frame.grid(row=7, column=0, padx=5, pady=5, sticky="ew")
         
-        # Create a frame for indicators and counters
-        indicator_content = ctk.CTkFrame(self.indicator_frame)
-        indicator_content.pack(fill="x", expand=True)
+        # # Create a frame for indicators and counters
+        # indicator_content = ctk.CTkFrame(self.indicator_frame)
+        # indicator_content.pack(fill="x", expand=True)
         
-        # Left side - Lump indicator and counter
-        lump_frame = ctk.CTkFrame(indicator_content)
-        lump_frame.pack(side="left", padx=5)
-        self.label_lump_indicator = ctk.CTkLabel(lump_frame, text="Lump: Off")
-        self.label_lump_indicator.pack(pady=2)
-        self.lumps_count_label = ctk.CTkLabel(lump_frame, text="Count: 0")
-        self.lumps_count_label.pack(pady=2)
+        # # Left side - Lump indicator and counter
+        # lump_frame = ctk.CTkFrame(indicator_content)
+        # lump_frame.pack(side="left", padx=5)
+        # self.label_lump_indicator = ctk.CTkLabel(lump_frame, text="Lump: Off")
+        # self.label_lump_indicator.pack(pady=2)
+        # self.lumps_count_label = ctk.CTkLabel(lump_frame, text="Count: 0")
+        # self.lumps_count_label.pack(pady=2)
         
-        # Right side - Neck indicator and counter
-        neck_frame = ctk.CTkFrame(indicator_content)
-        neck_frame.pack(side="left", padx=5)
-        self.label_neck_indicator = ctk.CTkLabel(neck_frame, text="Neck: Off")
-        self.label_neck_indicator.pack(pady=2)
-        self.necks_count_label = ctk.CTkLabel(neck_frame, text="Count: 0")
-        self.necks_count_label.pack(pady=2)
+        # # Right side - Neck indicator and counter
+        # neck_frame = ctk.CTkFrame(indicator_content)
+        # neck_frame.pack(side="left", padx=5)
+        # self.label_neck_indicator = ctk.CTkLabel(neck_frame, text="Neck: Off")
+        # self.label_neck_indicator.pack(pady=2)
+        # self.necks_count_label = ctk.CTkLabel(neck_frame, text="Count: 0")
+        # self.necks_count_label.pack(pady=2)
 
-        # Right side - Diameter tolerance indicator
-        diameter_frame = ctk.CTkFrame(indicator_content)
-        diameter_frame.pack(side="left", padx=5)
-        self.label_diameter_indicator = ctk.CTkLabel(diameter_frame, text="Diameter: OK")
-        self.label_diameter_indicator.pack(pady=2)
-        self.diameter_deviation_label = ctk.CTkLabel(diameter_frame, text="Dev: 0.00 mm")
-        self.diameter_deviation_label.pack(pady=2)
+        # # Right side - Diameter tolerance indicator
+        # diameter_frame = ctk.CTkFrame(indicator_content)
+        # diameter_frame.pack(side="left", padx=5)
+        # self.label_diameter_indicator = ctk.CTkLabel(diameter_frame, text="Diameter: OK")
+        # self.label_diameter_indicator.pack(pady=2)
+        # self.diameter_deviation_label = ctk.CTkLabel(diameter_frame, text="Dev: 0.00 mm")
+        # self.diameter_deviation_label.pack(pady=2)
 
         # =============================
         # NOWE POLE NASTAW DLA RECEPTURY
@@ -444,6 +444,53 @@ class MainPage(ctk.CTkFrame):
         self.entry_flaw_window = ctk.CTkEntry(self.left_panel, placeholder_text="2.0", width=80)
         self.entry_flaw_window.grid(row=row_start+13, column=0, padx=5, pady=2)
 
+        # Add new UI elements for max lumps/necks in flaw window
+        self.label_max_lumps = ctk.CTkLabel(self.left_panel, text="Max lumps in flaw window:")
+        self.label_max_lumps.grid(row=row_start+14, column=0, padx=5, pady=(10,2), sticky="w")
+
+        max_lumps_frame = ctk.CTkFrame(self.left_panel)
+        max_lumps_frame.grid(row=row_start+15, column=0, sticky="w")
+
+        self.btn_max_lumps_dec = ctk.CTkButton(
+            max_lumps_frame, text="-", width=30,
+            command=lambda: self._adjust_max_lumps(-1)
+        )
+        self.btn_max_lumps_dec.grid(row=0, column=0, padx=2, pady=2)
+
+        self.entry_max_lumps = ctk.CTkEntry(
+            max_lumps_frame, placeholder_text="3", width=80
+        )
+        self.entry_max_lumps.grid(row=0, column=1, padx=2, pady=2)
+
+        self.btn_max_lumps_inc = ctk.CTkButton(
+            max_lumps_frame, text="+", width=30,
+            command=lambda: self._adjust_max_lumps(1)
+        )
+        self.btn_max_lumps_inc.grid(row=0, column=2, padx=2, pady=2)
+
+        self.label_max_necks = ctk.CTkLabel(self.left_panel, text="Max necks in flaw window:")
+        self.label_max_necks.grid(row=row_start+16, column=0, padx=5, pady=(10,2), sticky="w")
+
+        max_necks_frame = ctk.CTkFrame(self.left_panel)
+        max_necks_frame.grid(row=row_start+17, column=0, sticky="w")
+
+        self.btn_max_necks_dec = ctk.CTkButton(
+            max_necks_frame, text="-", width=30,
+            command=lambda: self._adjust_max_necks(-1)
+        )
+        self.btn_max_necks_dec.grid(row=0, column=0, padx=2, pady=2)
+
+        self.entry_max_necks = ctk.CTkEntry(
+            max_necks_frame, placeholder_text="3", width=80
+        )
+        self.entry_max_necks.grid(row=0, column=1, padx=2, pady=2)
+
+        self.btn_max_necks_inc = ctk.CTkButton(
+            max_necks_frame, text="+", width=30,
+            command=lambda: self._adjust_max_necks(1)
+        )
+        self.btn_max_necks_inc.grid(row=0, column=2, padx=2, pady=2)
+
     def _adjust_diameter(self, delta: float):
         val_str = self.entry_diameter_setpoint.get() or "0"
         try:
@@ -494,6 +541,28 @@ class MainPage(ctk.CTkFrame):
         self.entry_neck_threshold.delete(0, "end")
         self.entry_neck_threshold.insert(0, f"{new_val:.1f}")
 
+    def _adjust_max_lumps(self, delta: int):
+        """Adjust the max lumps in flaw window value"""
+        val_str = self.entry_max_lumps.get() or "0"
+        try:
+            val = int(val_str)
+        except ValueError:
+            val = 0
+        new_val = max(0, val + delta)  # Ensure the value is not negative
+        self.entry_max_lumps.delete(0, "end")
+        self.entry_max_lumps.insert(0, f"{new_val}")
+
+    def _adjust_max_necks(self, delta: int):
+        """Adjust the max necks in flaw window value"""
+        val_str = self.entry_max_necks.get() or "0"
+        try:
+            val = int(val_str)
+        except ValueError:
+            val = 0
+        new_val = max(0, val + delta)  # Ensure the value is not negative
+        self.entry_max_necks.delete(0, "end")
+        self.entry_max_necks.insert(0, f"{new_val}")
+
     def _save_settings(self):
         """
         Zczytuje wartości z entry i zapisuje do bazy (settings + settings_register),
@@ -507,14 +576,18 @@ class MainPage(ctk.CTkFrame):
         lump_threshold_str = self.entry_lump_threshold.get() or "0.3"
         neck_threshold_str = self.entry_neck_threshold.get() or "0.3"
         flaw_window_str = self.entry_flaw_window.get() or "2.0"
+        max_lumps_str = self.entry_max_lumps.get() or "3"
+        max_necks_str = self.entry_max_necks.get() or "3"
 
-        # Konwersje na float
+        # Konwersje na float lub int
         diameter_setpoint = float(diameter_setpoint_str)
         tolerance_plus = float(tolerance_plus_str)
         tolerance_minus = float(tolerance_minus_str)
         lump_threshold = float(lump_threshold_str)
         neck_threshold = float(neck_threshold_str)
         flaw_window = float(flaw_window_str)
+        max_lumps = int(max_lumps_str)
+        max_necks = int(max_necks_str)
 
         # 2. Zbuduj słownik do zapisu w bazie, używając kluczy zgodnych z tymi oczekiwanymi przez db_helper:
         settings_data = {
@@ -526,6 +599,8 @@ class MainPage(ctk.CTkFrame):
             "lump_threshold": lump_threshold,
             "neck_threshold": neck_threshold,
             "flaw_window": flaw_window,
+            "max_lumps_in_flaw_window": max_lumps,
+            "max_necks_in_flaw_window": max_necks,
             # Dodatkowe wartości – możesz je ustawić na stałe lub odczytać z innych pól,
             # jeżeli są dostępne w interfejsie użytkownika:
             "diameter_window": 0.0,
@@ -581,13 +656,13 @@ class MainPage(ctk.CTkFrame):
     def _on_typowy_click(self):
         import datetime
         now = datetime.datetime.now()
-        hh_mm = f"{now.hour:02d}_{now.minute:02d}"
+        date_time_str = f"{now.day:02d}_{now.month:02d}_{now.hour:02d}_{now.minute:02d}"  # Format: dd_MM_HH_mm
         self.entry_batch.delete(0, "end")
-        self.entry_batch.insert(0, f"btch_{hh_mm}")
+        self.entry_batch.insert(0, f"btch_{date_time_str}")
         self.entry_product.delete(0, "end")
-        self.entry_product.insert(0, f"prdct_{hh_mm}")
+        self.entry_product.insert(0, f"prdct_{date_time_str}")
         self.entry_recipe_name.delete(0, "end")
-        self.entry_recipe_name.insert(0, f"recipe_{hh_mm}")
+        self.entry_recipe_name.insert(0, f"recipe_{date_time_str}")
         self.entry_diameter_setpoint.delete(0, "end")
         self.entry_diameter_setpoint.insert(0, "39")
         self.entry_tolerance_plus.delete(0, "end")
@@ -600,6 +675,10 @@ class MainPage(ctk.CTkFrame):
         self.entry_neck_threshold.insert(0, "0.1")
         self.entry_flaw_window.delete(0, "end")
         self.entry_flaw_window.insert(0, "2.0")
+        self.entry_max_lumps.delete(0, "end")
+        self.entry_max_lumps.insert(0, "30")
+        self.entry_max_necks.delete(0, "end")
+        self.entry_max_necks.insert(0, "7")
 
     # ---------------------------------------------------------------------------------
     # 3. Środkowa kolumna (row=1, col=1) – parametry symulacji
@@ -609,15 +688,11 @@ class MainPage(ctk.CTkFrame):
         self.middle_panel.grid(row=1, column=1, sticky="nsew", padx=10, pady=10)
         self.middle_panel.grid_columnconfigure(0, weight=1)
 
-        # Add readings frame at the top of middle panel (row=0)
+        # Dodaj ramkę odczytów u góry middle panel (row=0)
         self.readings_frame = ctk.CTkFrame(self.middle_panel)
         self.readings_frame.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
         
-        # # Create single column for all readings
-        # readings_frame = ctk.CTkFrame(self.readings_frame)
-        # readings_frame.pack(expand=True, fill="both", padx=10)
-        
-        # Add all readings in a single column
+        # Dodaj etykiety odczytów - wszystkie w jednej kolumnie
         self.label_d1 = ctk.CTkLabel(self.readings_frame, text="D1 [mm]: --")
         self.label_d2 = ctk.CTkLabel(self.readings_frame, text="D2 [mm]: --")
         self.label_d3 = ctk.CTkLabel(self.readings_frame, text="D3 [mm]: --")
@@ -630,7 +705,7 @@ class MainPage(ctk.CTkFrame):
         self.label_xcoord = ctk.CTkLabel(self.readings_frame, text="xCoord [m]: --")
         self.label_speed = ctk.CTkLabel(self.readings_frame, text="Speed [m/min]: --")
         
-        # Pack all labels in sequence
+        # Pakowanie etykiet odczytów
         self.label_d1.pack(anchor="w", pady=2)
         self.label_d2.pack(anchor="w", pady=2)
         self.label_d3.pack(anchor="w", pady=2)
@@ -642,6 +717,30 @@ class MainPage(ctk.CTkFrame):
         self.label_dov.pack(anchor="w", pady=2)
         self.label_xcoord.pack(anchor="w", pady=2)
         self.label_speed.pack(anchor="w", pady=2)
+        
+        
+        
+        
+        
+        # Dodaj etykiety wskaźników bezpośrednio do readings_frame
+        # Wskaźnik Lump i licznik
+        self.label_lump_indicator = ctk.CTkLabel(self.readings_frame, text="Lump: Off")
+        self.label_lump_indicator.pack(anchor="w", pady=2)
+        self.lumps_count_label = ctk.CTkLabel(self.readings_frame, text="Count: 0")
+        self.lumps_count_label.pack(anchor="w", pady=2)
+        
+        # Wskaźnik Neck i licznik
+        self.label_neck_indicator = ctk.CTkLabel(self.readings_frame, text="Neck: Off")
+        self.label_neck_indicator.pack(anchor="w", pady=2)
+        self.necks_count_label = ctk.CTkLabel(self.readings_frame, text="Count: 0")
+        self.necks_count_label.pack(anchor="w", pady=2)
+        
+        # Wskaźnik średnicy i odchylenie
+        self.label_diameter_indicator = ctk.CTkLabel(self.readings_frame, text="Diameter: OK")
+        self.label_diameter_indicator.pack(anchor="w", pady=2)
+        self.diameter_deviation_label = ctk.CTkLabel(self.readings_frame, text="Dev: 0.00 mm")
+        self.diameter_deviation_label.pack(anchor="w", pady=2)
+
 
         # Simulation parameters frame - now at row=1
         self.sim_frame = ctk.CTkFrame(self.middle_panel, fg_color="transparent") 
@@ -797,8 +896,8 @@ class MainPage(ctk.CTkFrame):
         # Adjust grid: row 0 for buttons, rows 1-3 for plots
         self.right_panel.grid_rowconfigure(0, weight=0)  # buttons
         self.right_panel.grid_rowconfigure(1, weight=1)  # status plot
-        self.right_panel.grid_rowconfigure(2, weight=1)  # FFT plot
-        self.right_panel.grid_rowconfigure(3, weight=1)  # diameter plot
+        self.right_panel.grid_rowconfigure(2, weight=1)  # diameter plot (was FFT plot)
+        self.right_panel.grid_rowconfigure(3, weight=1)  # FFT plot (was diameter plot)
         self.right_panel.grid_columnconfigure(0, weight=1)
 
         self.plot_frame = ctk.CTkFrame(self.right_panel)
@@ -809,16 +908,9 @@ class MainPage(ctk.CTkFrame):
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.plot_frame)
         self.canvas.get_tk_widget().pack(side="top", fill="both", expand=True)
         
-        self.fft_frame = ctk.CTkFrame(self.right_panel)
-        self.fft_frame.grid(row=2, column=0, sticky="nsew", padx=5, pady=5)
-
-        self.fig_fft = plt.Figure(figsize=(5, 2), dpi=100)
-        self.ax_fft = self.fig_fft.add_subplot(111)
-        self.canvas_fft = FigureCanvasTkAgg(self.fig_fft, master=self.fft_frame)
-        self.canvas_fft.get_tk_widget().pack(side="top", fill="both", expand=True)
-
+        # Swap the order - diameter plot comes before FFT plot
         self.diameter_frame = ctk.CTkFrame(self.right_panel)
-        self.diameter_frame.grid(row=3, column=0, sticky="nsew", padx=5, pady=5)
+        self.diameter_frame.grid(row=2, column=0, sticky="nsew", padx=5, pady=5)
 
         self.fig_diameter = plt.Figure(figsize=(5, 2), dpi=100)
         self.ax_diameter = self.fig_diameter.add_subplot(111)
@@ -829,6 +921,15 @@ class MainPage(ctk.CTkFrame):
         self.ax_diameter.set_xlabel("Sample")
         self.ax_diameter.set_ylabel("Diameter [mm]")
         self.ax_diameter.grid(True)
+
+        # FFT plot is now last
+        self.fft_frame = ctk.CTkFrame(self.right_panel)
+        self.fft_frame.grid(row=3, column=0, sticky="nsew", padx=5, pady=5)
+
+        self.fig_fft = plt.Figure(figsize=(5, 2), dpi=100)
+        self.ax_fft = self.fig_fft.add_subplot(111)
+        self.canvas_fft = FigureCanvasTkAgg(self.fig_fft, master=self.fft_frame)
+        self.canvas_fft.get_tk_widget().pack(side="top", fill="both", expand=True)
 
         # Initialize plots
         self.ax.set_title("Lumps/Necks vs X-Coord")

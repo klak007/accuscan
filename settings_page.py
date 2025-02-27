@@ -65,7 +65,7 @@ class SettingsPage(ctk.CTkFrame):
             self.tree.delete(item)
         
         self.tree.insert("", "end", values=(
-            "-", "<Brak połączenia z bazą>", "Funkcje edycji niedostępne", "-", "-", "-", "-", "-", "-", "-"
+            "-", "<Brak połączenia z bazą>", "Funkcje edycji niedostępne", "-", "-", "-", "-", "-", "-", "-", "-", "-"
         ))
 
     def _create_top_bar(self):
@@ -184,6 +184,8 @@ class SettingsPage(ctk.CTkFrame):
             "lump_threshold",
             "neck_threshold",
             "flaw_window",
+            "max_lumps_in_flaw_window",
+            "max_necks_in_flaw_window",
             "created_at"
         )
         self.tree = ttk.Treeview(self.table_container, columns=columns, show="headings", selectmode="browse")
@@ -231,7 +233,8 @@ class SettingsPage(ctk.CTkFrame):
                 sql = """
                     SELECT `Id Settings` AS id_settings, `Recipe name`, `Product nr`, `Preset Diameter`, 
                         `Diameter Over tolerance`, `Diameter Under tolerance`, `Lump threshold`, 
-                        `Neck threshold`, `Flaw Window`, `created_at` 
+                        `Neck threshold`, `Flaw Window`, `Max lumps in flaw window`, 
+                        `Max necks in flaw window`, `created_at` 
                     FROM settings 
                     ORDER BY id_settings DESC
                 """
@@ -250,6 +253,8 @@ class SettingsPage(ctk.CTkFrame):
                 lump_threshold = row.get("Lump threshold") or 0
                 neck_threshold = row.get("Neck threshold") or 0
                 flaw_window = row.get("Flaw Window") or 0
+                max_lumps_in_flaw_window = row.get("Max lumps in flaw window") or 3
+                max_necks_in_flaw_window = row.get("Max necks in flaw window") or 3
                 created_at = row.get("created_at")
                 
                 if created_at:
@@ -260,7 +265,8 @@ class SettingsPage(ctk.CTkFrame):
                 self.tree.insert("", "end", values=(
                     id_val, recipe_name, product_nr, preset_diameter,
                     diameter_over_tol, diameter_under_tol, lump_threshold,
-                    neck_threshold, flaw_window, created_at
+                    neck_threshold, flaw_window, max_lumps_in_flaw_window,
+                    max_necks_in_flaw_window, created_at
                  ))
             
             if connection and connection.is_connected():
@@ -362,7 +368,7 @@ class SettingsPage(ctk.CTkFrame):
             modal.title("Nowa Receptura")
         else:
             modal.title("Klonuj Recepturę" if clone else "Edytuj Recepturę")
-        modal.geometry("400x500")
+        modal.geometry("400x600")  # Increased height for new fields
         modal.resizable(False, False)
         fields = [
             ("Nazwa receptury", "recipe_name"),
@@ -371,7 +377,10 @@ class SettingsPage(ctk.CTkFrame):
             ("Diameter Over tolerance", "diameter_over_tol"),
             ("Diameter Under tolerance", "diameter_under_tol"),
             ("Lump threshold", "lump_threshold"),
-            ("Neck threshold", "neck_threshold")
+            ("Neck threshold", "neck_threshold"),
+            ("Flaw Window", "flaw_window"),
+            ("Max lumps in flaw window", "max_lumps_in_flaw_window"),
+            ("Max necks in flaw window", "max_necks_in_flaw_window")
         ]
         entries = {}
         for label_text, key in fields:
@@ -388,6 +397,9 @@ class SettingsPage(ctk.CTkFrame):
                     "diameter_under_tol": values[5],
                     "lump_threshold": values[6],
                     "neck_threshold": values[7],
+                    "flaw_window": values[8],
+                    "max_lumps_in_flaw_window": values[9],
+                    "max_necks_in_flaw_window": values[10],
                 }
                 if key in mapping:
                     ent.insert(0, str(mapping[key]))
@@ -403,9 +415,11 @@ class SettingsPage(ctk.CTkFrame):
                     "diameter_under_tol": float(entries["diameter_under_tol"].get()),
                     "lump_threshold": float(entries["lump_threshold"].get()),
                     "neck_threshold": float(entries["neck_threshold"].get()),
+                    "flaw_window": float(entries["flaw_window"].get()),
+                    "max_lumps_in_flaw_window": int(entries["max_lumps_in_flaw_window"].get()),
+                    "max_necks_in_flaw_window": int(entries["max_necks_in_flaw_window"].get()),
                     "diameter_window": 0.0,
                     "diameter_std_dev": 0.0,
-                    "flaw_window": 0.0,
                     "num_scans": 128,
                     "diameter_histeresis": 0.0,
                     "lump_histeresis": 0.0,
@@ -427,8 +441,9 @@ class SettingsPage(ctk.CTkFrame):
                         `Diameter Under tolerance`, `Diameter window`, `Diameter standard deviation`,
                         `Lump threshold`, `Neck threshold`, `Flaw Window`,
                         `Number of scans for gauge to average`, `Diameter histeresis`,
-                        `Lump histeresis`, `Neck histeresis`
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        `Lump histeresis`, `Neck histeresis`, `Max lumps in flaw window`,
+                        `Max necks in flaw window`
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """
                     cursor.execute(sql, (
                         new_data["recipe_name"],
@@ -445,6 +460,8 @@ class SettingsPage(ctk.CTkFrame):
                         new_data["diameter_histeresis"],
                         new_data["lump_histeresis"],
                         new_data["neck_histeresis"],
+                        new_data["max_lumps_in_flaw_window"],
+                        new_data["max_necks_in_flaw_window"],
                     ))
                 else:
                     setting_id = values[0]
@@ -454,7 +471,8 @@ class SettingsPage(ctk.CTkFrame):
                         `Diameter Under tolerance`=%s, `Diameter window`=%s, `Diameter standard deviation`=%s,
                         `Lump threshold`=%s, `Neck threshold`=%s, `Flaw Window`=%s,
                         `Number of scans for gauge to average`=%s, `Diameter histeresis`=%s,
-                        `Lump histeresis`=%s, `Neck histeresis`=%s
+                        `Lump histeresis`=%s, `Neck histeresis`=%s, `Max lumps in flaw window`=%s,
+                        `Max necks in flaw window`=%s
                     WHERE `Id Settings`=%s
                     """
                     cursor.execute(sql, (
@@ -472,6 +490,8 @@ class SettingsPage(ctk.CTkFrame):
                         new_data["diameter_histeresis"],
                         new_data["lump_histeresis"],
                         new_data["neck_histeresis"],
+                        new_data["max_lumps_in_flaw_window"],
+                        new_data["max_necks_in_flaw_window"],
                         setting_id
                     ))
                 connection.commit()
