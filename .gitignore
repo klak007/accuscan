@@ -1,0 +1,16 @@
+# Pliki środowiskowe
+.vscode/
+.conda/
+__pycache__/
+
+# Pliki zależności (jeśli używasz tylko requirements.txt)
+environment.yml
+
+# Pliki tymczasowe i logi
+wynik.prof
+todo
+*.log
+
+# Pliki testowe (opcjonalnie)
+test_plc_write.py
+main.py
