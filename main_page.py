@@ -37,7 +37,7 @@ class MainPage(ctk.CTkFrame):
         self.lumps_history = []
         self.necks_history = []
         self.x_history = []
-        self.MAX_POINTS = 500
+        self.MAX_POINTS = 1024  # Increased to 1024 samples
         self.display_range = 10  # ile „metrów” pokazywać na wykresie
         self.production_speed = 50
         self.last_update_time = None
@@ -1064,20 +1064,22 @@ class MainPage(ctk.CTkFrame):
             self.flaw_necks_coords.pop(0)
             self.flaw_necks_count -= 1
 
-        # Utrzymujemy ograniczenie historii
+        # Utrzymujemy ograniczenie historii do maksymalnie MAX_POINTS próbek
+        # Nawet jeśli historia jest obcinana, zachowujemy współrzędne X dla poprawnego wykresu
         while len(self.lumps_history) > self.MAX_POINTS:
             self.lumps_history.pop(0)
+            if len(self.x_history) > self.MAX_POINTS:
+                self.x_history.pop(0)
+                
         while len(self.necks_history) > self.MAX_POINTS:
             self.necks_history.pop(0)
-        while len(self.x_history) > self.MAX_POINTS:
-            self.x_history.pop(0)
 
         # Add to diameter history with x-coordinate
         self.diameter_history.append(davg)
         self.diameter_x.append(self.current_x)
         
-        # Keep only points within display range
-        while self.diameter_x and self.diameter_x[0] < (self.current_x - self.display_range):
+        # Keep only MAX_POINTS samples in diameter history
+        while len(self.diameter_history) > self.MAX_POINTS:
             self.diameter_x.pop(0)
             self.diameter_history.pop(0)
         data_update_time = time.perf_counter() - data_update_start
@@ -1129,15 +1131,18 @@ class MainPage(ctk.CTkFrame):
     
             # Ustawienia osi i tytuł z informacją o batchu
             current_batch = self.entry_batch.get() or "NO BATCH"
-            self.ax.set_title(f"Last {self.display_range}m - Batch: {current_batch}")
+            self.ax.set_title(f"Last {self.MAX_POINTS} samples - Batch: {current_batch}")
             self.ax.set_xlabel("X-Coord [m]")
             self.ax.set_ylabel("Błędy w cyklu")
-            self.ax.set_xlim(self.current_x - self.display_range, self.current_x)
+            
+            # Calculate the x-axis limits based on available data
+            if self.x_history:
+                x_min = self.x_history[0] if self.x_history else self.current_x - self.display_range
+                x_max = self.current_x
+                self.ax.set_xlim(x_min, x_max)
     
-            # OPTIMIZATION: Pre-filter data before plotting
-            min_x = self.current_x - self.display_range
-            # Use list comprehension for faster filtering
-            filtered_indices = [i for i, x in enumerate(self.x_history) if x >= min_x]
+            # Use all collected data points (up to MAX_POINTS) rather than filtering by distance
+            filtered_indices = list(range(len(self.x_history)))
             
             if filtered_indices:
                 # Only plot visible data
@@ -1176,19 +1181,10 @@ class MainPage(ctk.CTkFrame):
             diameter_start = time.perf_counter()
             self.ax_diameter.clear()
             if self.diameter_history:
-                self.ax_diameter.set_title("Average Diameter History")
+                self.ax_diameter.set_title(f"Average Diameter History - Last {self.MAX_POINTS} samples")
                 
-                # OPTIMIZATION: Plot fewer points by resampling for large datasets
-                if len(self.diameter_history) > 500:
-                    # Simple downsampling - plot every nth point
-                    n = len(self.diameter_history) // 500 + 1
-                    x_plot = self.diameter_x[::n]
-                    y_plot = self.diameter_history[::n]
-                else:
-                    x_plot = self.diameter_x
-                    y_plot = self.diameter_history
-                
-                self.ax_diameter.plot(x_plot, y_plot, 'g-', label='Actual')
+                # Plot all diameter points directly - no downsampling needed
+                self.ax_diameter.plot(self.diameter_x, self.diameter_history, 'g-', label='Actual')
                 
                 # Horizontal target line
                 diameter_preset = float(self.entry_diameter_setpoint.get() or 0.0)
@@ -1198,13 +1194,18 @@ class MainPage(ctk.CTkFrame):
                 self.ax_diameter.set_ylabel("Diameter [mm]")
                 
                 # Optimize y-axis limits
-                y_min = min(min(self.diameter_history[-100:]), diameter_preset)
-                y_max = max(max(self.diameter_history[-100:]), diameter_preset)
+                y_min = min(min(self.diameter_history), diameter_preset)
+                y_max = max(max(self.diameter_history), diameter_preset)
                 margin = (y_max - y_min) * 0.2
                 lower_bound = max(y_min - margin, 0)
                 upper_bound = y_max + margin
                 self.ax_diameter.set_ylim(lower_bound, upper_bound)
-                self.ax_diameter.set_xlim(self.current_x - self.display_range, self.current_x)
+                
+                # Set x-axis limits to match the data window
+                if self.diameter_x:
+                    x_min = self.diameter_x[0]
+                    x_max = self.current_x
+                    self.ax_diameter.set_xlim(x_min, x_max)
                 self.ax_diameter.grid(True)
                 self.ax_diameter.legend()
             diameter_time = time.perf_counter() - diameter_start
