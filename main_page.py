@@ -46,6 +46,7 @@ class MainPage(ctk.CTkFrame):
         self.diameter_history = []  # Values
         self.diameter_x = []        # X-coordinates for diameter values
         self.last_plot_update = None  # <-- new attribute for plot update frequency
+        self.plc_sample_time = 0.0  # Time taken to retrieve a sample from PLC
         
         # Counters for flaws in the window
         self.flaw_lumps_count = 0  # Lumps in the current flaw window
@@ -978,6 +979,13 @@ class MainPage(ctk.CTkFrame):
 
         # Performance timing
         update_start = time.perf_counter()
+        
+        # Store PLC sample time if available
+        if "plc_sample_time" in data:
+            self.plc_sample_time = data.get("plc_sample_time", 0.0)
+        # Alternatively calculate from time difference if not provided directly
+        elif "timestamp" in data and self.last_update_time is not None:
+            self.plc_sample_time = (data["timestamp"] - self.last_update_time).total_seconds()
 
         # Retrieve diameters and calculate statistics
         d1 = data.get("D1", 0)
@@ -1131,13 +1139,14 @@ class MainPage(ctk.CTkFrame):
     
             # Ustawienia osi i tytuł z informacją o batchu
             current_batch = self.entry_batch.get() or "NO BATCH"
-            self.ax.set_title(f"Last {self.MAX_POINTS} samples - Batch: {current_batch}")
+            sample_time_ms = self.plc_sample_time * 1000  # Convert to milliseconds
+            self.ax.set_title(f"Last {len(self.x_history)} samples - Batch: {current_batch} - PLC: {sample_time_ms:.1f}ms")
             self.ax.set_xlabel("X-Coord [m]")
             self.ax.set_ylabel("Błędy w cyklu")
             
-            # Calculate the x-axis limits based on available data
+            # Use x-coord in meters from our sample history
             if self.x_history:
-                x_min = self.x_history[0] if self.x_history else self.current_x - self.display_range
+                x_min = self.x_history[0]
                 x_max = self.current_x
                 self.ax.set_xlim(x_min, x_max)
     
@@ -1181,7 +1190,7 @@ class MainPage(ctk.CTkFrame):
             diameter_start = time.perf_counter()
             self.ax_diameter.clear()
             if self.diameter_history:
-                self.ax_diameter.set_title(f"Average Diameter History - Last {self.MAX_POINTS} samples")
+                # Title will be updated after we set the x-axis limits
                 
                 # Plot all diameter points directly - no downsampling needed
                 self.ax_diameter.plot(self.diameter_x, self.diameter_history, 'g-', label='Actual')
@@ -1201,11 +1210,17 @@ class MainPage(ctk.CTkFrame):
                 upper_bound = y_max + margin
                 self.ax_diameter.set_ylim(lower_bound, upper_bound)
                 
-                # Set x-axis limits to match the data window
+                # Set x-axis limits to match the data window - show all collected samples
                 if self.diameter_x:
                     x_min = self.diameter_x[0]
                     x_max = self.current_x
                     self.ax_diameter.set_xlim(x_min, x_max)
+                    
+                    # Update the title to show sample count as well
+                    sample_count = len(self.diameter_history)
+                    sample_time_ms = self.plc_sample_time * 1000
+                    meters_covered = x_max - x_min
+                    self.ax_diameter.set_title(f"Avg Diameter - {sample_count} samples, {meters_covered:.1f}m - PLC: {sample_time_ms:.1f}ms")
                 self.ax_diameter.grid(True)
                 self.ax_diameter.legend()
             diameter_time = time.perf_counter() - diameter_start
