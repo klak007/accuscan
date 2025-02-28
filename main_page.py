@@ -747,6 +747,35 @@ class MainPage(ctk.CTkFrame):
         self.label_diameter_indicator.pack(anchor="w", pady=2)
         self.diameter_deviation_label = ctk.CTkLabel(self.readings_frame, text="Dev: 0.00 mm")
         self.diameter_deviation_label.pack(anchor="w", pady=2)
+        
+        # Production speed control frame
+        self.speed_control_frame = ctk.CTkFrame(self.readings_frame)
+        self.speed_control_frame.pack(anchor="w", pady=10, fill="x", expand=True)
+        
+        # Speed slider
+        self.prod_speed_label = ctk.CTkLabel(self.speed_control_frame, text="Production Speed [m/min]:")
+        self.prod_speed_label.pack(anchor="w", pady=2)
+        
+        slider_frame = ctk.CTkFrame(self.speed_control_frame)
+        slider_frame.pack(fill="x", expand=True, pady=2)
+        
+        self.prod_speed_slider = ctk.CTkSlider(slider_frame, from_=0, to=100, command=self._on_prod_speed_change)
+        self.prod_speed_slider.set(self.production_speed)
+        self.prod_speed_slider.pack(side="left", fill="x", expand=True, padx=5)
+        
+        self.prod_speed_value = ctk.CTkLabel(slider_frame, text=f"{self.production_speed:.1f}")
+        self.prod_speed_value.pack(side="right", padx=5)
+        
+        # Speed fluctuation
+        fluct_frame = ctk.CTkFrame(self.speed_control_frame)
+        fluct_frame.pack(fill="x", expand=True, pady=2)
+        
+        self.fluct_label = ctk.CTkLabel(fluct_frame, text="Speed Fluctuation (%):")
+        self.fluct_label.pack(side="left", padx=5)
+        
+        self.speed_fluct_entry = ctk.CTkEntry(fluct_frame, width=50)
+        self.speed_fluct_entry.insert(0, "5.0")
+        self.speed_fluct_entry.pack(side="right", padx=5)
 
 
         # Simulation parameters frame - now at row=1
@@ -1011,9 +1040,21 @@ class MainPage(ctk.CTkFrame):
         self.label_dsd.configure(text=f"dSD [mm]: {dsd:.3f}")
         self.label_dov.configure(text=f"dOV [%]: {dov:.2f}")
 
-        # Update xCoord and speed labels
+        # Update xCoord and speed labels (showing actual fluctuating speed)
         self.label_xcoord.configure(text=f"xCoord [m]: {self.current_x:.1f}")
-        self.label_speed.configure(text=f"Speed [m/min]: {self.production_speed:.1f}")
+        try:
+            current_speed = self.production_speed
+            fluctuation_percent = float(self.speed_fluct_entry.get() or "0")
+            if fluctuation_percent > 0:
+                # Show the current actual speed including fluctuation
+                import random
+                fluctuation_factor = 1.0 + random.uniform(-fluctuation_percent/100, fluctuation_percent/100)
+                current_speed = self.production_speed * fluctuation_factor
+                self.label_speed.configure(text=f"Speed [m/min]: {current_speed:.1f} (±{fluctuation_percent}%)")
+            else:
+                self.label_speed.configure(text=f"Speed [m/min]: {self.production_speed:.1f}")
+        except ValueError:
+            self.label_speed.configure(text=f"Speed [m/min]: {self.production_speed:.1f}")
 
         # Indicators - this is fast
         lumps = data.get("lumps", 0)
@@ -1041,7 +1082,21 @@ class MainPage(ctk.CTkFrame):
         current_time = data.get("timestamp", datetime.now())
         dt = 0 if self.last_update_time is None else (current_time - self.last_update_time).total_seconds()
         self.last_update_time = current_time
-        speed_mps = self.production_speed / 60.0
+        
+        # Apply fluctuation to speed if enabled
+        try:
+            fluctuation_percent = float(self.speed_fluct_entry.get() or "0")
+            if fluctuation_percent > 0:
+                # Calculate random fluctuation between -fluctuation_percent and +fluctuation_percent
+                import random
+                fluctuation_factor = 1.0 + random.uniform(-fluctuation_percent/100, fluctuation_percent/100)
+                current_speed = self.production_speed * fluctuation_factor
+            else:
+                current_speed = self.production_speed
+        except ValueError:
+            current_speed = self.production_speed
+            
+        speed_mps = current_speed / 60.0  # Convert from m/min to m/s
         self.current_x += dt * speed_mps
         self.x_history.append(self.current_x)
         
@@ -1243,6 +1298,11 @@ class MainPage(ctk.CTkFrame):
     def _on_speed_change(self, value: float):
         self.production_speed = float(value)
         self.speed_value_label.configure(text=f"Speed: {self.production_speed:.1f}")
+        
+    def _on_prod_speed_change(self, value: float):
+        """Handle production speed slider change"""
+        self.production_speed = float(value)
+        self.prod_speed_value.configure(text=f"{self.production_speed:.1f}")
 
     def update_data(self):
         df = self.controller.data_mgr.get_current_data()
