@@ -908,6 +908,9 @@ class MainPage(ctk.CTkFrame):
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.plot_frame)
         self.canvas.get_tk_widget().pack(side="top", fill="both", expand=True)
         
+        # Adjust figure layout to make room for x-axis labels
+        self.fig.subplots_adjust(bottom=0.2)
+        
         # Swap the order - diameter plot comes before FFT plot
         self.diameter_frame = ctk.CTkFrame(self.right_panel)
         self.diameter_frame.grid(row=2, column=0, sticky="nsew", padx=5, pady=5)
@@ -916,6 +919,9 @@ class MainPage(ctk.CTkFrame):
         self.ax_diameter = self.fig_diameter.add_subplot(111)
         self.canvas_diameter = FigureCanvasTkAgg(self.fig_diameter, master=self.diameter_frame)
         self.canvas_diameter.get_tk_widget().pack(side="top", fill="both", expand=True)
+        
+        # Adjust figure layout to make room for x-axis labels
+        self.fig_diameter.subplots_adjust(bottom=0.2)
         
         self.ax_diameter.set_title("Average Diameter History")
         self.ax_diameter.set_xlabel("Sample")
@@ -930,6 +936,9 @@ class MainPage(ctk.CTkFrame):
         self.ax_fft = self.fig_fft.add_subplot(111)
         self.canvas_fft = FigureCanvasTkAgg(self.fig_fft, master=self.fft_frame)
         self.canvas_fft.get_tk_widget().pack(side="top", fill="both", expand=True)
+        
+        # Adjust figure layout to make room for x-axis labels
+        self.fig_fft.subplots_adjust(bottom=0.2)
 
         # Initialize plots
         self.ax.set_title("Lumps/Necks vs X-Coord")
