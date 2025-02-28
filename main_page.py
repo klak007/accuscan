@@ -448,7 +448,7 @@ class MainPage(ctk.CTkFrame):
         self.label_flaw_window = ctk.CTkLabel(self.left_panel, text="Flaw window [m]:")
         self.label_flaw_window.grid(row=row_start+12, column=0, padx=5, pady=(10,2), sticky="w")
 
-        self.entry_flaw_window = ctk.CTkEntry(self.left_panel, placeholder_text="2.0", width=80)
+        self.entry_flaw_window = ctk.CTkEntry(self.left_panel, placeholder_text="0.5", width=80)
         self.entry_flaw_window.grid(row=row_start+13, column=0, padx=5, pady=2)
 
         # Add new UI elements for max lumps/necks in flaw window
@@ -681,11 +681,15 @@ class MainPage(ctk.CTkFrame):
         self.entry_neck_threshold.delete(0, "end")
         self.entry_neck_threshold.insert(0, "0.1")
         self.entry_flaw_window.delete(0, "end")
-        self.entry_flaw_window.insert(0, "2.0")
+        self.entry_flaw_window.insert(0, "0.5")  # Changed from 2.0 to 0.5 meters
         self.entry_max_lumps.delete(0, "end")
         self.entry_max_lumps.insert(0, "30")
         self.entry_max_necks.delete(0, "end")
         self.entry_max_necks.insert(0, "7")
+        
+        # Set speed fluctuation to default 2%
+        self.speed_fluct_entry.delete(0, "end")
+        self.speed_fluct_entry.insert(0, "2.0")
 
     # ---------------------------------------------------------------------------------
     # 3. Środkowa kolumna (row=1, col=1) – parametry symulacji
@@ -774,7 +778,7 @@ class MainPage(ctk.CTkFrame):
         self.fluct_label.pack(side="left", padx=5)
         
         self.speed_fluct_entry = ctk.CTkEntry(fluct_frame, width=50)
-        self.speed_fluct_entry.insert(0, "5.0")
+        self.speed_fluct_entry.insert(0, "2.0")  # Changed default from 5% to 2%
         self.speed_fluct_entry.pack(side="right", padx=5)
 
 
@@ -1103,9 +1107,9 @@ class MainPage(ctk.CTkFrame):
         # Tracking lumps and necks in flaw window
         # Get flaw window size from user input
         try:
-            flaw_window_size = float(self.entry_flaw_window.get() or "2.0")
+            flaw_window_size = float(self.entry_flaw_window.get() or "0.5")
         except ValueError:
-            flaw_window_size = 2.0
+            flaw_window_size = 0.5
             
         # If there's a lump in current reading, add it to tracked lumps with current position
         if lumps > 0:
