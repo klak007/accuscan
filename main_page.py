@@ -46,6 +46,12 @@ class MainPage(ctk.CTkFrame):
         self.diameter_history = []  # Values
         self.diameter_x = []        # X-coordinates for diameter values
         self.last_plot_update = None  # <-- new attribute for plot update frequency
+        
+        # Counters for flaws in the window
+        self.flaw_lumps_count = 0  # Lumps in the current flaw window
+        self.flaw_necks_count = 0  # Necks in the current flaw window
+        self.flaw_lumps_coords = []  # Coordinates of lumps for flaw window tracking
+        self.flaw_necks_coords = []  # Coordinates of necks for flaw window tracking
 
         # Performance optimization
         self.plot_update_interval = 1.0  # Update plots every 1 second
@@ -1030,6 +1036,33 @@ class MainPage(ctk.CTkFrame):
         speed_mps = self.production_speed / 60.0
         self.current_x += dt * speed_mps
         self.x_history.append(self.current_x)
+        
+        # Tracking lumps and necks in flaw window
+        # Get flaw window size from user input
+        try:
+            flaw_window_size = float(self.entry_flaw_window.get() or "2.0")
+        except ValueError:
+            flaw_window_size = 2.0
+            
+        # If there's a lump in current reading, add it to tracked lumps with current position
+        if lumps > 0:
+            self.flaw_lumps_coords.append(self.current_x)
+            self.flaw_lumps_count += 1
+            
+        # If there's a neck in current reading, add it to tracked necks with current position
+        if necks > 0:
+            self.flaw_necks_coords.append(self.current_x)
+            self.flaw_necks_count += 1
+            
+        # Remove lumps that are outside the flaw window (too old)
+        while self.flaw_lumps_coords and self.flaw_lumps_coords[0] < (self.current_x - flaw_window_size):
+            self.flaw_lumps_coords.pop(0)
+            self.flaw_lumps_count -= 1
+            
+        # Remove necks that are outside the flaw window (too old)
+        while self.flaw_necks_coords and self.flaw_necks_coords[0] < (self.current_x - flaw_window_size):
+            self.flaw_necks_coords.pop(0)
+            self.flaw_necks_count -= 1
 
         # Utrzymujemy ograniczenie historii
         while len(self.lumps_history) > self.MAX_POINTS:
@@ -1077,8 +1110,8 @@ class MainPage(ctk.CTkFrame):
 
         # Show counter updates
         counters = self.controller.logic.get_counters()
-        self.lumps_count_label.configure(text=f"Count: {counters['lumps_count']}")
-        self.necks_count_label.configure(text=f"Count: {counters['necks_count']}")
+        self.lumps_count_label.configure(text=f"Count: {counters['lumps_count']} (Window: {self.flaw_lumps_count})")
+        self.necks_count_label.configure(text=f"Count: {counters['necks_count']} (Window: {self.flaw_necks_count})")
         
         # Performance logging (only for slow updates)
         total_update_time = time.perf_counter() - update_start
