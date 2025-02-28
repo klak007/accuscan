@@ -16,3 +16,4 @@ test_plc_write.py
 main.py
 git_help.txt
 push.sh
+pull.sh
