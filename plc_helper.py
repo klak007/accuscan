@@ -11,14 +11,13 @@ class PLCConnectionError(Exception):
     """Wyjątek rzucany, gdy nie uda się nawiązać lub utrzymać połączenia z PLC."""
     pass
 
-def connect_plc(ip: str, rack: int = 0, slot: int = 1, retries: int = 3, delay: int = 2) -> snap7.client.Client:
+def connect_plc(ip: str, rack: int = 0, slot: int = 1, delay: int = 2) -> snap7.client.Client:
     """
     Łączy się z PLC za pomocą Snap7.
-    Próbujemy nawiązać połączenie do retries razy, czekając delay sekund między próbami.
+    Próbujemy nawiązać połączenie w nieskończoność, czekając delay sekund między próbami.
     """
-    last_exception = None
-
-    for attempt in range(1, retries + 1):
+    attempt = 1
+    while True:
         try:
             subprocess.run(["ping", "-n", "1", ip], timeout=3)
             sleep(1)
@@ -29,12 +28,9 @@ def connect_plc(ip: str, rack: int = 0, slot: int = 1, retries: int = 3, delay: 
             return client
 
         except Exception as e:
-            last_exception = e
             print(f"Attempt {attempt} failed: {e}. Retrying in {delay} seconds...")
+            attempt += 1
             sleep(delay)
-
-    # After retries, raise the last exception encountered.
-    raise last_exception
 
 def read_accuscan_data(client: snap7.client.Client, db_number: int = 2) -> dict:
     """
