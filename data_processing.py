@@ -14,7 +14,7 @@ class WindowProcessor:
     Keeps track of sample history and calculates derived data.
     """
     
-    def __init__(self, max_samples=1024):
+    def __init__(self, max_samples=32):
         """
         Initialize the WindowProcessor.
         
