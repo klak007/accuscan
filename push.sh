@@ -4,19 +4,21 @@
 current_branch=$(git rev-parse --abbrev-ref HEAD)
 echo "🔹 Aktualnie programujesz w branchu: $current_branch"
 
-# Pobranie listy branchy i znalezienie najnowszego `app-X.Y.Z`
-git fetch origin
-latest_version=$(git branch -r | grep -Eo 'app-[0-9]+\.[0-9]+\.[0-9]+' | sed 's/origin\///' | sort -t '-' -k2,2nr -k3,3nr -k4,4nr | head -n 1)
+# Pobranie pełnej listy branchy z GitHuba (lokalne + zdalne)
+git fetch --all --prune
+latest_version=$(git branch -r | grep -Eo 'app-[0-9]+\.[0-9]+\.[0-9]+' | sed 's/origin\///' | sort -V | tail -n 1)
 
+# Jeśli nie znaleziono żadnego brancha, ustaw domyślną wersję
 if [[ -z "$latest_version" ]]; then
     latest_version="app-1.0.0"
 fi
+
 echo "📌 Najnowsza wersja aplikacji: $latest_version"
 
-# Pobranie tylko numeru wersji
+# Pobranie numeru wersji
 version_number=$(echo "$latest_version" | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+')
 
-# Rozbicie wersji na części
+# Rozbicie wersji na MAJOR, MINOR, PATCH
 major=$(echo "$version_number" | cut -d. -f1)
 minor=$(echo "$version_number" | cut -d. -f2)
 patch=$(echo "$version_number" | cut -d. -f3)
@@ -31,7 +33,7 @@ read -p "Wybierz (1/2/3): " change_type
 # Domyślna wiadomość commita
 commit_message=""
 
-# Aktualizacja numeru wersji i ustawienie domyślnej wiadomości commita
+# Aktualizacja numeru wersji na podstawie wyboru
 case $change_type in
     1) ((major++)); minor=0; patch=0; commit_message="🔥 Duża aktualizacja oprogramowania" ;;
     2) ((minor++)); commit_message="✨ Nowe funkcjonalności" ;;
@@ -41,8 +43,15 @@ esac
 
 # Generowanie nowej nazwy brancha
 new_version="app-$major.$minor.$patch"
-echo "📂 Tworzę nowy branch: $new_version"
-git checkout -b "$new_version"
+
+# Sprawdzenie, czy branch już istnieje lokalnie
+if git show-ref --verify --quiet refs/heads/"$new_version"; then
+    echo "⚠️ Branch '$new_version' już istnieje! Przełączam się na niego."
+    git checkout "$new_version"
+else
+    echo "📂 Tworzę nowy branch: $new_version"
+    git checkout -b "$new_version"
+fi
 
 # Pokazanie statusu repozytorium
 echo "🟡 Aktualny status repozytorium:"
