@@ -1,11 +1,18 @@
 #!/bin/bash
 
+# Definicje kolorów
+YELLOW='\e[33m'
+GREEN='\e[32m'
+RED='\e[31m'
+BLUE='\e[34m'
+NC='\e[0m' # Resetowanie koloru
+
 # Pobranie aktualnej wersji (brancha)
 current_branch=$(git rev-parse --abbrev-ref HEAD)
-echo "🔹 Aktualnie używasz wersji: $current_branch"
+echo -e "${BLUE}🔹 Aktualnie używasz wersji:${NC} ${YELLOW}$current_branch${NC}"
 
 # Pobranie najnowszych danych z repozytorium
-echo "🔄 Pobieram listę wersji oprogramowania z GitHub..."
+echo -e "${BLUE}🔄 Pobieram listę wersji oprogramowania z GitHub...${NC}"
 git fetch --all --prune
 
 # Pobranie listy zdalnych wersji w formacie `app-X.Y.Z`
@@ -16,30 +23,30 @@ if [[ -z "$latest_version" ]]; then
     latest_version="app-1.0.0"
 fi
 
-echo "📌 Najnowsza dostępna wersja oprogramowania: $latest_version"
+echo -e "${BLUE}📌 Najnowsza dostępna wersja oprogramowania:${NC} ${GREEN}$latest_version${NC}"
 
 # Pobranie nazwy wersji do pobrania (propozycja: najnowsza wersja)
-read -p "Podaj wersję oprogramowania do pobrania (ENTER = '$latest_version'): " selected_version
+read -p "$(echo -e "${BLUE}Podaj wersję oprogramowania do pobrania${NC} (ENTER = '${GREEN}$latest_version${NC}'): ")" selected_version
 
 # Jeśli użytkownik nie podał wersji, wybieramy najnowszą
 if [[ -z "$selected_version" ]]; then
     selected_version="$latest_version"
-    echo "🔄 Używam najnowszej wersji: $selected_version"
+    echo -e "${BLUE}🔄 Używam najnowszej wersji:${NC} ${GREEN}$selected_version${NC}"
 fi
 
 # Sprawdzenie, czy wersja istnieje lokalnie
 if git show-ref --verify --quiet refs/heads/"$selected_version"; then
-    echo "🟡 Przełączanie na wersję '$selected_version'..."
+    echo -e "${YELLOW}🟡 Przełączanie na wersję:${NC} $selected_version..."
     git checkout "$selected_version"
 else
-    echo "🟡 Tworzenie nowej wersji '$selected_version' na podstawie zdalnego repozytorium..."
+    echo -e "${YELLOW}🟡 Tworzenie nowej wersji:${NC} $selected_version na podstawie zdalnego repozytorium..."
     git checkout -b "$selected_version" origin/"$selected_version"
 fi
 
 # Pytanie o pobranie zmian
-read -p "Czy chcesz pobrać najnowsze zmiany dla tej wersji? (Y/n): " confirm
+read -p "$(echo -e "${BLUE}Czy chcesz pobrać najnowsze zmiany dla tej wersji?${NC} (Y/n): ")" confirm
 if [[ "$confirm" != "Y" && "$confirm" != "y" ]]; then
-    echo "❌ Anulowano operację."
+    echo -e "${RED}❌ Anulowano operację.${NC}"
     exit 0
 fi
 
@@ -47,7 +54,7 @@ fi
 git pull origin "$selected_version"
 
 # Pokazanie aktualnego statusu repozytorium
-echo "🟢 Aktualny status repozytorium po pobraniu zmian:"
+echo -e "${GREEN}🟢 Aktualny status repozytorium po pobraniu zmian:${NC}"
 git status
 
-echo "✅ Wersja '$selected_version' została pobrana i przełączona!"
+echo -e "${GREEN}✅ Wersja '$selected_version' została pobrana i przełączona!${NC}"
