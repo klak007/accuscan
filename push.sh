@@ -16,7 +16,7 @@ echo "📌 Najnowsza wersja aplikacji: $latest_version"
 # Pobranie tylko numeru wersji
 version_number=$(echo "$latest_version" | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+')
 
-# Rozbicie wersji na części (bez ograniczeń)
+# Rozbicie wersji na części
 major=$(echo "$version_number" | cut -d. -f1)
 minor=$(echo "$version_number" | cut -d. -f2)
 patch=$(echo "$version_number" | cut -d. -f3)
@@ -28,11 +28,14 @@ echo "2) ✨ Średnia (MINOR) – nowe funkcje"
 echo "3) 🛠️  Mała (PATCH) – poprawki"
 read -p "Wybierz (1/2/3): " change_type
 
-# Aktualizacja numeru wersji
+# Domyślna wiadomość commita
+commit_message=""
+
+# Aktualizacja numeru wersji i ustawienie domyślnej wiadomości commita
 case $change_type in
-    1) ((major++)); minor=0; patch=0 ;;  # Resetujemy MINOR i PATCH po zmianie MAJOR
-    2) ((minor++)); patch=0 ;;  # Resetujemy PATCH po zmianie MINOR
-    3) ((patch++)) ;;  # Zwiększamy PATCH
+    1) ((major++)); minor=0; patch=0; commit_message="🔥 Duża aktualizacja oprogramowania" ;;
+    2) ((minor++)); commit_message="✨ Nowe funkcjonalności" ;;
+    3) ((patch++)); commit_message="🛠️  Łatanie błędów, drobne poprawki" ;;
     *) echo "❌ Niepoprawny wybór!"; exit 1 ;;
 esac
 
@@ -55,9 +58,9 @@ fi
 # Dodanie wszystkich zmian
 git add .
 
-# Pobranie opisu commita (domyślnie "Małe poprawki" jeśli puste)
-read -p "Podaj opis commita (ENTER = Małe poprawki): " commit_message
-commit_message=${commit_message:-"Małe poprawki"}
+# Pobranie opisu commita od użytkownika (ENTER = domyślny commit)
+read -p "Podaj opis commita (ENTER = '$commit_message'): " user_commit
+commit_message=${user_commit:-$commit_message}
 
 # Wykonanie commita
 git commit -m "$commit_message"
