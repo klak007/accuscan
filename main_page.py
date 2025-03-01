@@ -13,6 +13,11 @@ import plc_helper
 from window_fft_analysis import analyze_window_fft
 import time
 
+# Import new modules
+from visualization import PlotManager
+from data_processing import WindowProcessor
+from flaw_detection import FlawDetector
+
 class MainPage(ctk.CTkFrame):
     """
     Główna strona aplikacji z:
@@ -68,6 +73,20 @@ class MainPage(ctk.CTkFrame):
         self._create_left_panel()
         self._create_middle_panel()
         self._create_right_panel()
+        
+        # Initialize new components after right panel is created
+        self.window_processor = WindowProcessor(max_samples=self.MAX_POINTS)
+        self.flaw_detector = FlawDetector(flaw_window_size=0.5)
+        
+        # Initialize the plot manager and pass the figures
+        self.plot_manager = PlotManager(
+            figures_dict={
+                'status': (self.fig, self.ax),
+                'diameter': (self.fig_diameter, self.ax_diameter),
+                'fft': (self.fig_fft, self.ax_fft)
+            }, 
+            min_update_interval=self.min_plot_interval
+        )
 
     # ---------------------------------------------------------------------------------
     # 1. Górna belka nawigacji (row=0, col=0..2)
@@ -1043,14 +1062,30 @@ class MainPage(ctk.CTkFrame):
         self.label_dmax.configure(text=f"Dmax [mm]: {dmax:.2f}")
         self.label_dsd.configure(text=f"dSD [mm]: {dsd:.3f}")
         self.label_dov.configure(text=f"dOV [%]: {dov:.2f}")
-
-        # Update xCoord and speed labels (showing actual fluctuating speed)
-        self.label_xcoord.configure(text=f"xCoord [m]: {self.current_x:.1f}")
+        
+        # Get fluctuation percentage for speed calculation
         try:
-            current_speed = self.production_speed
             fluctuation_percent = float(self.speed_fluct_entry.get() or "0")
+        except ValueError:
+            fluctuation_percent = 0
+            
+        # Process data sample (window calculation) - this is fast
+        processed_data = self.window_processor.process_sample(
+            data, 
+            production_speed=self.production_speed,
+            speed_fluctuation_percent=fluctuation_percent
+        )
+        
+        # Update current_x from window processor
+        self.current_x = self.window_processor.current_x
+        
+        # Update xCoord and speed labels
+        self.label_xcoord.configure(text=f"xCoord [m]: {self.current_x:.1f}")
+        
+        # Display production speed (potentially with fluctuation)
+        try:
             if fluctuation_percent > 0:
-                # Show the current actual speed including fluctuation
+                # Calculate a representative speed value
                 import random
                 fluctuation_factor = 1.0 + random.uniform(-fluctuation_percent/100, fluctuation_percent/100)
                 current_speed = self.production_speed * fluctuation_factor
@@ -1060,7 +1095,17 @@ class MainPage(ctk.CTkFrame):
         except ValueError:
             self.label_speed.configure(text=f"Speed [m/min]: {self.production_speed:.1f}")
 
-        # Indicators - this is fast
+        # Process flaw detection - this is fast
+        # Update flaw window size from UI
+        try:
+            flaw_window_size = float(self.entry_flaw_window.get() or "0.5")
+            self.flaw_detector.update_flaw_window_size(flaw_window_size)
+        except ValueError:
+            pass
+            
+        flaw_results = self.flaw_detector.process_flaws(data, self.current_x)
+        
+        # Update indicators based on current data
         lumps = data.get("lumps", 0)
         necks = data.get("necks", 0)
         if lumps:
@@ -1071,87 +1116,10 @@ class MainPage(ctk.CTkFrame):
             self.label_neck_indicator.configure(text="Neck ON", text_color="red")
         else:
             self.label_neck_indicator.configure(text="Neck OFF", text_color="green")
+        
         label_update_time = time.perf_counter() - label_update_start
 
-        # Update data collections - this is fast
-        data_update_start = time.perf_counter()
-        # Mark plots as needing update
-        self.plot_dirty = True
-        
-        # Data collection: store history
-        self.lumps_history.append(lumps)
-        self.necks_history.append(necks)
-
-        # Aktualizacja xCoord – wykorzystujemy go jako oś X
-        current_time = data.get("timestamp", datetime.now())
-        dt = 0 if self.last_update_time is None else (current_time - self.last_update_time).total_seconds()
-        self.last_update_time = current_time
-        
-        # Apply fluctuation to speed if enabled
-        try:
-            fluctuation_percent = float(self.speed_fluct_entry.get() or "0")
-            if fluctuation_percent > 0:
-                # Calculate random fluctuation between -fluctuation_percent and +fluctuation_percent
-                import random
-                fluctuation_factor = 1.0 + random.uniform(-fluctuation_percent/100, fluctuation_percent/100)
-                current_speed = self.production_speed * fluctuation_factor
-            else:
-                current_speed = self.production_speed
-        except ValueError:
-            current_speed = self.production_speed
-            
-        speed_mps = current_speed / 60.0  # Convert from m/min to m/s
-        self.current_x += dt * speed_mps
-        self.x_history.append(self.current_x)
-        
-        # Tracking lumps and necks in flaw window
-        # Get flaw window size from user input
-        try:
-            flaw_window_size = float(self.entry_flaw_window.get() or "0.5")
-        except ValueError:
-            flaw_window_size = 0.5
-            
-        # If there's a lump in current reading, add it to tracked lumps with current position
-        if lumps > 0:
-            self.flaw_lumps_coords.append(self.current_x)
-            self.flaw_lumps_count += 1
-            
-        # If there's a neck in current reading, add it to tracked necks with current position
-        if necks > 0:
-            self.flaw_necks_coords.append(self.current_x)
-            self.flaw_necks_count += 1
-            
-        # Remove lumps that are outside the flaw window (too old)
-        while self.flaw_lumps_coords and self.flaw_lumps_coords[0] < (self.current_x - flaw_window_size):
-            self.flaw_lumps_coords.pop(0)
-            self.flaw_lumps_count -= 1
-            
-        # Remove necks that are outside the flaw window (too old)
-        while self.flaw_necks_coords and self.flaw_necks_coords[0] < (self.current_x - flaw_window_size):
-            self.flaw_necks_coords.pop(0)
-            self.flaw_necks_count -= 1
-
-        # Utrzymujemy ograniczenie historii do maksymalnie MAX_POINTS próbek
-        # Nawet jeśli historia jest obcinana, zachowujemy współrzędne X dla poprawnego wykresu
-        while len(self.lumps_history) > self.MAX_POINTS:
-            self.lumps_history.pop(0)
-            if len(self.x_history) > self.MAX_POINTS:
-                self.x_history.pop(0)
-                
-        while len(self.necks_history) > self.MAX_POINTS:
-            self.necks_history.pop(0)
-
-        # Add to diameter history with x-coordinate
-        self.diameter_history.append(davg)
-        self.diameter_x.append(self.current_x)
-        
-        # Keep only MAX_POINTS samples in diameter history
-        while len(self.diameter_history) > self.MAX_POINTS:
-            self.diameter_x.pop(0)
-            self.diameter_history.pop(0)
-        data_update_time = time.perf_counter() - data_update_start
-
-        # Add diameter tolerance status check - this is fast
+        # Check diameter tolerance - this is fast
         diameter_preset = float(self.entry_diameter_setpoint.get() or 0.0)
         tolerance_plus = float(self.entry_tolerance_plus.get() or 0.5)
         tolerance_minus = float(self.entry_tolerance_minus.get() or 0.5)
@@ -1166,138 +1134,55 @@ class MainPage(ctk.CTkFrame):
         else:
             self.label_diameter_indicator.configure(text="Diameter: OK", text_color="green")
 
-        # Update plots only if enough time has passed - this is slow
-        # and likely the bottleneck causing spikes
-        now = time.time()  
-        plot_update_start = time.perf_counter()      
-        if (self.last_plot_update is None or 
-            (now - self.last_plot_update) >= self.min_plot_interval) and self.plot_dirty:
-            self._update_plot()
-            self.plot_dirty = False
-            self.last_plot_update = now
+        # Prepare plot data and update plots - this is the slower part
+        plot_update_start = time.perf_counter()
+        
+        # Set the plot_dirty flag on the PlotManager
+        self.plot_manager.plot_dirty = True
+        
+        # Prepare data for the plot manager
+        plot_data = {
+            'x_history': self.window_processor.x_history,
+            'lumps_history': self.window_processor.lumps_history,
+            'necks_history': self.window_processor.necks_history,
+            'current_x': self.current_x,
+            'batch_name': self.entry_batch.get() or "NO BATCH",
+            'plc_sample_time': self.plc_sample_time,
+            'diameter_x': self.window_processor.diameter_x,
+            'diameter_history': self.window_processor.diameter_history,
+            'diameter_preset': diameter_preset,
+            'fft_buffer_size': self.FFT_BUFFER_SIZE
+        }
+        
+        # Update plots through PlotManager
+        self.plot_manager.update_all_plots(plot_data)
         plot_update_time = time.perf_counter() - plot_update_start
 
-        # Show counter updates
+        # Update counter displays
         counters = self.controller.logic.get_counters()
-        self.lumps_count_label.configure(text=f"Count: {counters['lumps_count']} (Window: {self.flaw_lumps_count})")
-        self.necks_count_label.configure(text=f"Count: {counters['necks_count']} (Window: {self.flaw_necks_count})")
+        self.lumps_count_label.configure(
+            text=f"Count: {counters['lumps_count']} (Window: {flaw_results['window_lumps_count']})"
+        )
+        self.necks_count_label.configure(
+            text=f"Count: {counters['necks_count']} (Window: {flaw_results['window_necks_count']})"
+        )
         
         # Performance logging (only for slow updates)
         total_update_time = time.perf_counter() - update_start
         if total_update_time > 0.1:  # >100ms is considered slow
-            print(f"[MainPage] Update time: {total_update_time:.4f}s | Labels: {label_update_time:.4f}s | Data: {data_update_time:.4f}s | Plot: {plot_update_time:.4f}s")
+            print(f"[MainPage] Update time: {total_update_time:.4f}s | "
+                  f"Labels: {label_update_time:.4f}s | "
+                  f"Window: {self.window_processor.processing_time:.4f}s | "
+                  f"Flaw: {self.flaw_detector.processing_time:.4f}s | "
+                  f"Plot: {plot_update_time:.4f}s")
 
 
+    # This method is deprecated and replaced by PlotManager.update_all_plots
+    # Kept for reference but no longer used
     def _update_plot(self):
         """Update all plots - this is an expensive operation."""
-        try:
-            plot_start = time.perf_counter()
-            
-            # OPTIMIZATION: Clear + reset axis is faster than creating new plots
-            self.ax.clear()
-    
-            # Ustawienia osi i tytuł z informacją o batchu
-            current_batch = self.entry_batch.get() or "NO BATCH"
-            sample_time_ms = self.plc_sample_time * 1000  # Convert to milliseconds
-            self.ax.set_title(f"Last {len(self.x_history)} samples - Batch: {current_batch} - PLC: {sample_time_ms:.1f}ms")
-            self.ax.set_xlabel("X-Coord [m]")
-            self.ax.set_ylabel("Błędy w cyklu")
-            
-            # Use x-coord in meters from our sample history
-            if self.x_history:
-                x_min = self.x_history[0]
-                x_max = self.current_x
-                self.ax.set_xlim(x_min, x_max)
-    
-            # Use all collected data points (up to MAX_POINTS) rather than filtering by distance
-            filtered_indices = list(range(len(self.x_history)))
-            
-            if filtered_indices:
-                # Only plot visible data
-                x_vals = [self.x_history[i] for i in filtered_indices]
-                lumps_vals = [self.lumps_history[i] for i in filtered_indices]
-                necks_vals = [self.necks_history[i] for i in filtered_indices]
-                
-                # OPTIMIZATION: Use numpy for bar plotting
-                import numpy as np
-                x_vals = np.array(x_vals)
-                width = 0.3  # szerokość słupka w jednostkach x (metry)
-                
-                # OPTIMIZATION: Use faster plotting methods with reduced options
-                self.ax.bar(x_vals - width/2, lumps_vals, width=width, color="red", label="Lumps")
-                self.ax.bar(x_vals + width/2, necks_vals, width=width, color="blue", label="Necks")
-    
-                self.ax.legend()
-            plot1_time = time.perf_counter() - plot_start
-            
-            # OPTIMIZATION: Only update plots if they're visible
-            # FFT plot - update separately to avoid unnecessary work
-            fft_start = time.perf_counter()
-            self.ax_fft.clear()
-            import numpy as np
-            diameter_array = np.array(self.diameter_history[-self.FFT_BUFFER_SIZE:], dtype=np.float32)
-            if len(diameter_array) > 0:  # Only calculate if we have data
-                from window_fft_analysis import analyze_window_fft
-                diameter_fft = analyze_window_fft(diameter_array)
-                self.ax_fft.set_title("Diameter FFT Analysis")
-                self.ax_fft.plot(np.abs(diameter_fft), label="FFT", color="green")
-                self.ax_fft.legend()
-                self.ax_fft.grid(True)
-            fft_time = time.perf_counter() - fft_start
-            
-            # OPTIMIZATION: Diameter plot - update separately
-            diameter_start = time.perf_counter()
-            self.ax_diameter.clear()
-            if self.diameter_history:
-                # Title will be updated after we set the x-axis limits
-                
-                # Plot all diameter points directly - no downsampling needed
-                self.ax_diameter.plot(self.diameter_x, self.diameter_history, 'g-', label='Actual')
-                
-                # Horizontal target line
-                diameter_preset = float(self.entry_diameter_setpoint.get() or 0.0)
-                self.ax_diameter.axhline(y=diameter_preset, color='r', linestyle='--', label='Preset')
-                
-                self.ax_diameter.set_xlabel("X-Coord [m]")
-                self.ax_diameter.set_ylabel("Diameter [mm]")
-                
-                # Optimize y-axis limits
-                y_min = min(min(self.diameter_history), diameter_preset)
-                y_max = max(max(self.diameter_history), diameter_preset)
-                margin = (y_max - y_min) * 0.2
-                lower_bound = max(y_min - margin, 0)
-                upper_bound = y_max + margin
-                self.ax_diameter.set_ylim(lower_bound, upper_bound)
-                
-                # Set x-axis limits to match the data window - show all collected samples
-                if self.diameter_x:
-                    x_min = self.diameter_x[0]
-                    x_max = self.current_x
-                    self.ax_diameter.set_xlim(x_min, x_max)
-                    
-                    # Update the title to show sample count as well
-                    sample_count = len(self.diameter_history)
-                    sample_time_ms = self.plc_sample_time * 1000
-                    meters_covered = x_max - x_min
-                    self.ax_diameter.set_title(f"Avg Diameter - {sample_count} samples, {meters_covered:.1f}m - PLC: {sample_time_ms:.1f}ms")
-                self.ax_diameter.grid(True)
-                self.ax_diameter.legend()
-            diameter_time = time.perf_counter() - diameter_start
-            
-            # OPTIMIZATION: Draw all canvas at once after updates
-            draw_start = time.perf_counter()
-            self.canvas.draw()
-            self.canvas_fft.draw()
-            self.canvas_diameter.draw()
-            draw_time = time.perf_counter() - draw_start
-            
-            total_plot_time = time.perf_counter() - plot_start
-            # Log plot time if it's slow
-            if total_plot_time > 0.1:
-                print(f"[Plot] Total: {total_plot_time:.4f}s | Main: {plot1_time:.4f}s | FFT: {fft_time:.4f}s | Diameter: {diameter_time:.4f}s | Draw: {draw_time:.4f}s")
-                
-        except Exception as e:
-            print(f"Error updating plot: {e}")
+        pass
+        # Method replaced by PlotManager.update_all_plots
 
     def _on_speed_change(self, value: float):
         self.production_speed = float(value)
@@ -1311,7 +1196,17 @@ class MainPage(ctk.CTkFrame):
     def update_data(self):
         df = self.controller.data_mgr.get_current_data()
         if not df.empty:
-            data = df.iloc[-1].to_dict()  # select the most recent row as a dict
+            # Select the most recent row as a dict
+            data = df.iloc[-1].to_dict()
+            
+            # Update flaw window size from UI before processing
+            try:
+                flaw_window_size = float(self.entry_flaw_window.get() or "0.5")
+                self.flaw_detector.update_flaw_window_size(flaw_window_size)
+            except ValueError:
+                pass
+                
+            # Process data through our pipeline
             self.update_readings(data)
 
     def update_connection_indicators(self):
