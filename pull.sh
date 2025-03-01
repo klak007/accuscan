@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Kolorowanie
+# Kolory (opcjonalne)
 YELLOW='\e[33m'
 GREEN='\e[32m'
 RED='\e[31m'
@@ -14,26 +14,27 @@ NC='\e[0m' # Reset
 function print_help() {
     echo "Użycie: $0 [opcje]"
     echo
-    echo "Skrypt służy do pobierania (pull) wybranego brancha w formacie app-X.Y.Z."
+    echo "Skrypt służy do pobierania (git pull) wybranej gałęzi w stylu GitHub Flow."
+    echo "Najczęściej będzie to np. 'main', 'feature/nazwa' czy 'fix/...' itp."
     echo
     echo "Dostępne opcje:"
     echo "  --help            Wyświetla pomoc"
-    echo "  --branch <nazwa>  Od razu pobiera wskazaną wersję (branch) bez pytania"
+    echo "  --branch <nazwa>  Gałąź do pobrania (bez pytania interaktywnego)."
     exit 0
 }
 
 ###################################
-# Funkcja sprawdzająca .git
+# Sprawdzenie, czy to repo Git
 ###################################
 function check_if_git_repo() {
     if [[ ! -d .git ]]; then
-        echo -e "${RED}[ERROR] Ten katalog nie wygląda na repozytorium Git. Przerywam...${NC}"
+        echo -e "${RED}[ERROR] Nie znaleziono katalogu .git. Przerywam...${NC}"
         exit 1
     fi
 }
 
 ###################################
-# Funkcja sprawdzająca niezacommitowane zmiany
+# Sprawdzenie niezacommitowanych zmian
 ###################################
 function check_uncommitted_changes() {
     if [[ -n "$(git status --porcelain)" ]]; then
@@ -41,7 +42,7 @@ function check_uncommitted_changes() {
         read -r response
         if [[ "$response" != "Y" && "$response" != "y" ]]; then
             echo -e "${RED}[ERROR] Operacja przerwana.${NC}"
-            exit 0
+            exit 1
         fi
     fi
 }
@@ -49,14 +50,14 @@ function check_uncommitted_changes() {
 ###################################
 # Parsowanie argumentów
 ###################################
-selected_version="" # Może być ustawiona przez --branch
+selected_branch="" # Ustawimy, jeśli podano --branch
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --help)
             print_help
             ;;
         --branch)
-            selected_version="$2"
+            selected_branch="$2"
             shift 2
             ;;
         *)
@@ -76,67 +77,59 @@ check_uncommitted_changes
 # Pobranie aktualnej gałęzi
 ###################################
 current_branch=$(git rev-parse --abbrev-ref HEAD)
-echo -e "${BLUE}[INFO] Aktualnie używasz gałęzi:${NC} ${YELLOW}$current_branch${NC}"
+echo -e "${BLUE}[INFO] Aktualna gałąź: ${NC}${YELLOW}$current_branch${NC}"
 
-# Pobranie najnowszych danych z repo
-echo -e "${BLUE}[INFO] Pobieram listę wersji z GitHub...${NC}"
+###################################
+# Pobranie (fetch) najnowszych danych z repo
+###################################
+echo -e "${BLUE}[INFO] Pobieram najnowsze zmiany z origin...${NC}"
 git fetch --all --prune
 
-# Znalezienie najnowszego branchu w formacie app-X.Y.Z
-latest_version=$(git branch -r | grep -Eo 'app-[0-9]+\.[0-9]+\.[0-9]+' | sed 's/origin\///' | sort -V | tail -n 1)
-
-if [[ -z "$latest_version" ]]; then
-    latest_version="app-1.0.0"
+###################################
+# Wybór gałęzi, jeśli nie podano --branch
+###################################
+if [[ -z "$selected_branch" ]]; then
+    # Możesz tu np. ustawić domyślną gałąź "main", jeśli nie chcesz pytać
+    # selected_branch="main"
+    # Albo spytać użytkownika:
+    echo -e "${BLUE}[INFO] Podaj nazwę gałęzi do pobrania (np. main, feature/xyz, fix/bug-123): ${NC}"
+    read -r user_input
+    if [[ -z "$user_input" ]]; then
+        echo -e "${RED}[ERROR] Nie podano nazwy gałęzi. Przerywam.${NC}"
+        exit 1
+    fi
+    selected_branch="$user_input"
 fi
 
-echo -e "${BLUE}[INFO] Najnowsza dostępna wersja:${NC} ${GREEN}$latest_version${NC}"
+echo -e "${BLUE}[INFO] Wybrano gałąź: ${NC}${GREEN}$selected_branch${NC}"
 
 ###################################
-# Wybór wersji do pobrania
+# Sprawdzenie/utworzenie gałęzi lokalnie
 ###################################
-function choose_version_if_needed() {
-    if [[ -z "$selected_version" ]]; then
-        # Zapytaj użytkownika w trybie interaktywnym
-        read -p "$(echo -e \"${BLUE}Podaj wersję do pobrania (ENTER = '$latest_version'): ${NC}\")" user_input
-        if [[ -z "$user_input" ]]; then
-            selected_version="$latest_version"
-        else
-            selected_version="$user_input"
-        fi
-        echo -e "${BLUE}[INFO] Wybrano wersję:${NC} ${GREEN}$selected_version${NC}"
-    fi
-}
-
-choose_version_if_needed
-
-###################################
-# Funkcja do przełączenia gałęzi
-###################################
-function switch_branch() {
-    if git show-ref --verify --quiet refs/heads/"$selected_version"; then
-        echo -e "${YELLOW}[WARNING] Przełączanie na lokalną gałąź:${NC} $selected_version"
-        git checkout "$selected_version"
+if git show-ref --verify --quiet refs/heads/"$selected_branch"; then
+    echo -e "${YELLOW}[WARNING] Przełączam się na istniejącą lokalnie gałąź '$selected_branch'.${NC}"
+    git checkout "$selected_branch"
+else
+    if git ls-remote --exit-code origin "$selected_branch" &>/dev/null; then
+        echo -e "${BLUE}[INFO] Gałąź '$selected_branch' istnieje na origin. Tworzę lokalną gałąź i przełączam się...${NC}"
+        git checkout -b "$selected_branch" origin/"$selected_branch"
     else
-        echo -e "${YELLOW}[WARNING] Tworzenie nowej gałęzi '${selected_version}' z origin...${NC}"
-        git checkout -b "$selected_version" origin/"$selected_version"
+        echo -e "${RED}[ERROR] Gałąź '$selected_branch' nie istnieje lokalnie ani na origin.${NC}"
+        echo -e "${RED}[ERROR] Przerywam, bo nie ma czego pullować.${NC}"
+        exit 1
     fi
-}
-
-switch_branch
+fi
 
 ###################################
-# Funkcja do pull
+# Pull zmian
 ###################################
-function pull_changes() {
-    read -p "$(echo -e \"${BLUE}Czy chcesz pobrać najnowsze zmiany (pull) z '$selected_version'? (Y/n): ${NC}\")" confirm
-    if [[ "$confirm" != "Y" && "$confirm" != "y" ]]; then
-        echo -e "${RED}[ERROR] Operacja anulowana.${NC}"
-        exit 0
-    fi
+echo -e "${BLUE}[INFO] Czy chcesz pobrać najnowsze zmiany z '$selected_branch'? (Y/n): ${NC}"
+read -r confirm
+if [[ "$confirm" != "Y" && "$confirm" != "y" ]]; then
+    echo -e "${RED}[ERROR] Operacja anulowana.${NC}"
+    exit 0
+fi
 
-    git pull origin "$selected_version"
-    echo -e "${GREEN}[INFO] Wersja '$selected_version' została pobrana i przełączona!${NC}"
-    git status
-}
-
-pull_changes
+git pull origin "$selected_branch"
+echo -e "${GREEN}[INFO] Gałąź '$selected_branch' została zaktualizowana!${NC}"
+git status
