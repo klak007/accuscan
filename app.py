@@ -43,6 +43,7 @@ class App(ctk.CTk):
         self.acquisition_thread_running = False
         self.acquisition_thread = None
         self.db_queue = queue.Queue(maxsize=100)  # Queue for database operations
+        self.plc_write_queue = queue.Queue(maxsize=20)  # Queue for PLC write operations
         
         # Zapisanie parametrów bazy danych jako atrybut
         self.db_params = config.DB_PARAMS
@@ -51,7 +52,7 @@ class App(ctk.CTk):
         self.init_database_connection()
         
         # Inicjalizacja logiki
-        self.logic = MeasurementLogic()
+        self.logic = MeasurementLogic(controller=self)
         self.logic.init_logic()
         
         # UserManager i DataManager (keep for DB operations)
@@ -81,6 +82,9 @@ class App(ctk.CTk):
         
         # Start database worker thread
         self.start_db_worker()
+        
+        # Start PLC writer thread
+        self.start_plc_writer()
         
         # Start data acquisition thread
         self.start_acquisition_thread()
@@ -251,6 +255,55 @@ class App(ctk.CTk):
         except Exception as e:
             print(f"[App] PLC Reconnection failed: {e}")
     
+    def start_plc_writer(self):
+        """Start worker thread for PLC write operations"""
+        self.plc_writer_running = True
+        self.plc_writer_thread = threading.Thread(target=self._plc_writer, daemon=True)
+        self.plc_writer_thread.start()
+        print("[App] PLC writer thread started")
+        
+    def _plc_writer(self):
+        """Worker function for PLC write operations"""
+        while self.plc_writer_running:
+            try:
+                # Get an item from the queue with timeout
+                plc_write_args = self.plc_write_queue.get(timeout=0.5)
+                
+                # Check if PLC is connected
+                if not hasattr(self.logic, "plc_client") or not self.logic.plc_client.get_connected():
+                    # Skip this write operation
+                    self.plc_write_queue.task_done()
+                    continue
+                    
+                # Unpack the arguments - first element is function name, rest are args
+                func_name = plc_write_args[0]
+                args = plc_write_args[1:]
+                
+                # Perform the write operation based on function name
+                if func_name == "write_accuscan_out_settings":
+                    from plc_helper import write_accuscan_out_settings
+                    write_start = time.perf_counter()
+                    write_accuscan_out_settings(self.logic.plc_client, *args)
+                    write_time = time.perf_counter() - write_start
+                    if write_time > 0.01:  # Log if it took more than 10ms
+                        print(f"[PLC Write] Settings write took {write_time:.4f}s")
+                else:
+                    print(f"[PLC Write] Unknown function: {func_name}")
+                
+                # Mark task as done
+                self.plc_write_queue.task_done()
+                
+            except queue.Empty:
+                # No items in queue, just continue
+                continue
+            except Exception as e:
+                print(f"[PLC Writer] Error: {e}")
+                # Mark task as done if we got one
+                try:
+                    self.plc_write_queue.task_done()
+                except:
+                    pass
+    
     def _on_closing(self):
         """Zamykanie aplikacji – rozłączenie z PLC, zamknięcie okna."""
         print("[App] Zamykanie aplikacji...")
@@ -258,6 +311,7 @@ class App(ctk.CTk):
         # Stop threads
         self.acquisition_thread_running = False
         self.db_worker_running = False
+        self.plc_writer_running = False
         
         # Wait for threads to finish (with timeout)
         if self.acquisition_thread and self.acquisition_thread.is_alive():
@@ -265,6 +319,9 @@ class App(ctk.CTk):
             
         if hasattr(self, 'db_worker_thread') and self.db_worker_thread.is_alive():
             self.db_worker_thread.join(timeout=1.0)
+            
+        if hasattr(self, 'plc_writer_thread') and self.plc_writer_thread.is_alive():
+            self.plc_writer_thread.join(timeout=1.0)
             
         # Close logic connections
         self.logic.close_logic()

@@ -5,8 +5,9 @@ from db_helper import save_measurement_sample, save_event
 # ewentualnie data_manager, itp.
 
 class MeasurementLogic:
-    def __init__(self):
+    def __init__(self, controller=None):
         self.plc_client = None
+        self.controller = controller  # Reference to the App instance
         # ewentualne stany maszyny, liczniki stref nieczułości itp.
         self.reset_pending = False
         self.lumps_count = 0
@@ -36,19 +37,32 @@ class MeasurementLogic:
         self.necks_count += necks
 
         if lumps > 0 or necks > 0:
-            # Send impulse bits
-            write_accuscan_out_settings(
-                self.plc_client,
-                zl=True, zn=True, zf=True, zt=True
-            )
+            # Use the queue to send PLC write requests asynchronously
+            if self.controller and hasattr(self.controller, 'plc_write_queue'):
+                # Queue the write operation instead of doing it directly
+                self.controller.plc_write_queue.put(
+                    ("write_accuscan_out_settings", 2, True, True, True, True)
+                )
+            else:
+                # Fallback to direct write if queue not available
+                write_accuscan_out_settings(
+                    self.plc_client,
+                    zl=True, zn=True, zf=True, zt=True
+                )
             self.reset_pending = True
         
         if self.reset_pending:
-            # Clear bits next cycle
-            write_accuscan_out_settings(
-                self.plc_client,
-                zl=False, zn=False, zf=False, zt=False
-            )
+            # Queue the clear bits operation
+            if self.controller and hasattr(self.controller, 'plc_write_queue'):
+                self.controller.plc_write_queue.put(
+                    ("write_accuscan_out_settings", 2, False, False, False, False)
+                )
+            else:
+                # Fallback to direct write if queue not available
+                write_accuscan_out_settings(
+                    self.plc_client,
+                    zl=False, zn=False, zf=False, zt=False
+                )
             self.reset_pending = False
 
         if lumps > 0:
