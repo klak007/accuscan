@@ -1,41 +1,164 @@
 """
 Data processing module for AccuScan application.
-Handles window calculations and processing of measurement data.
+Handles window calculations and processing of measurement data with multithreading support.
 """
 
 import numpy as np
 import time
+import threading
+from collections import deque
 from datetime import datetime
 
 
-class WindowProcessor:
+class FastAcquisitionBuffer:
     """
-    Processes measurement data samples and manages data window.
-    Keeps track of sample history and calculates derived data.
+    Fast, thread-safe buffer for measurement data acquisition and processing.
+    Uses deques for efficient O(1) operations when adding/removing samples.
     """
     
     def __init__(self, max_samples=1024):
         """
-        Initialize the WindowProcessor.
+        Initialize the FastAcquisitionBuffer.
         
         Args:
             max_samples: Maximum number of samples to keep in history (default: 1024)
         """
-        # Windows for tracking various data types
         self.max_samples = max_samples
-        self.lumps_history = []
-        self.necks_history = []
-        self.x_history = []
-        self.diameter_history = []  # Average diameter values
-        self.diameter_x = []        # X-coordinates for diameter values
+        self.lock = threading.Lock()
+        
+        # Core measurement data with fixed-size deques
+        self.diameters = {
+            'D1': deque(maxlen=max_samples),
+            'D2': deque(maxlen=max_samples),
+            'D3': deque(maxlen=max_samples),
+            'D4': deque(maxlen=max_samples)
+        }
+        
+        # Metadata and derived values
+        self.lumps = deque(maxlen=max_samples)
+        self.necks = deque(maxlen=max_samples)
+        self.timestamps = deque(maxlen=max_samples)
+        self.x_coords = deque(maxlen=max_samples)
+        self.avg_diameters = deque(maxlen=max_samples)
         
         # Current position tracking
         self.current_x = 0.0
         self.last_update_time = None
         
         # Performance monitoring
+        self.acquisition_time = 0.0
         self.processing_time = 0.0
 
+    def add_sample(self, data, production_speed=50.0, speed_fluctuation_percent=0.0):
+        """
+        Thread-safe method to add a new sample to the buffer.
+        
+        Args:
+            data: Dictionary containing measurement data
+            production_speed: Base production speed in m/min
+            speed_fluctuation_percent: Random speed fluctuation in percent
+            
+        Returns:
+            Dictionary with basic metrics about the operation
+        """
+        with self.lock:
+            start_time = time.perf_counter()
+            
+            # Extract and store raw measurements
+            for i in range(1, 5):
+                key = f"D{i}"
+                self.diameters[key].append(data.get(key, 0))
+            
+            # Store defect indicators
+            self.lumps.append(data.get("lumps", 0))
+            self.necks.append(data.get("necks", 0))
+            
+            # Calculate and store average diameter
+            values = [data.get(f"D{i}", 0) for i in range(1, 5)]
+            avg = sum(values) / 4.0 if all(v != 0 for v in values) else 0
+            self.avg_diameters.append(avg)
+            
+            # Calculate x-coordinate based on speed
+            current_time = data.get("timestamp", datetime.now())
+            self.timestamps.append(current_time)
+            
+            dt = 0
+            if self.last_update_time is not None:
+                dt = (current_time - self.last_update_time).total_seconds()
+            self.last_update_time = current_time
+            
+            # Apply fluctuation to speed if specified
+            if speed_fluctuation_percent > 0:
+                import random
+                fluctuation_factor = 1.0 + random.uniform(-speed_fluctuation_percent/100, speed_fluctuation_percent/100)
+                current_speed = production_speed * fluctuation_factor
+            else:
+                current_speed = production_speed
+                
+            # Convert from m/min to m/s for calculation
+            speed_mps = current_speed / 60.0
+            self.current_x += dt * speed_mps
+            self.x_coords.append(self.current_x)
+            
+            self.acquisition_time = time.perf_counter() - start_time
+            
+            return {
+                'acquisition_time': self.acquisition_time,
+                'samples_count': len(self.timestamps)
+            }
+    
+    def get_latest_data(self):
+        """Get the most recent data point (thread-safe)"""
+        with self.lock:
+            if not self.timestamps:
+                return {}
+                
+            return {
+                'D1': self.diameters['D1'][-1] if self.diameters['D1'] else 0,
+                'D2': self.diameters['D2'][-1] if self.diameters['D2'] else 0,
+                'D3': self.diameters['D3'][-1] if self.diameters['D3'] else 0,
+                'D4': self.diameters['D4'][-1] if self.diameters['D4'] else 0,
+                'lumps': self.lumps[-1] if self.lumps else 0,
+                'necks': self.necks[-1] if self.necks else 0,
+                'avg_diameter': self.avg_diameters[-1] if self.avg_diameters else 0,
+                'timestamp': self.timestamps[-1] if self.timestamps else None,
+                'x_coord': self.x_coords[-1] if self.x_coords else 0,
+            }
+    
+    def get_window_data(self):
+        """Get all data for visualization (thread-safe copy)"""
+        with self.lock:
+            start_time = time.perf_counter()
+            
+            # Return copies of all data for thread safety
+            window_data = {
+                'D1': list(self.diameters['D1']),
+                'D2': list(self.diameters['D2']),
+                'D3': list(self.diameters['D3']),
+                'D4': list(self.diameters['D4']),
+                'lumps_history': list(self.lumps),
+                'necks_history': list(self.necks),
+                'timestamp_history': list(self.timestamps),
+                'x_history': list(self.x_coords),
+                'diameter_history': list(self.avg_diameters),
+                'diameter_x': list(self.x_coords),
+                'current_x': self.current_x,
+                'acquisition_time': self.acquisition_time
+            }
+            
+            self.processing_time = time.perf_counter() - start_time
+            window_data['processing_time'] = self.processing_time
+            
+            return window_data
+
+
+# Keep WindowProcessor for backwards compatibility
+class WindowProcessor(FastAcquisitionBuffer):
+    """
+    Legacy adapter class for backward compatibility.
+    Delegates to FastAcquisitionBuffer.
+    """
+    
     def process_sample(self, data, production_speed=50.0, speed_fluctuation_percent=0.0):
         """
         Process a new data sample, update histories, and calculate x-coordinate.
@@ -48,69 +171,5 @@ class WindowProcessor:
         Returns:
             Dictionary with processed data including window counters
         """
-        start_time = time.perf_counter()
-        
-        # Extract values from data dictionary
-        lumps = data.get("lumps", 0)
-        necks = data.get("necks", 0)
-        
-        # Calculate average diameter from D1-D4
-        d1 = data.get("D1", 0)
-        d2 = data.get("D2", 0)
-        d3 = data.get("D3", 0)
-        d4 = data.get("D4", 0)
-        diameters = [d1, d2, d3, d4]
-        davg = sum(diameters) / 4.0 if all(d != 0 for d in diameters) else 0
-        
-        # Calculate x-coordinate based on speed
-        current_time = data.get("timestamp", datetime.now())
-        dt = 0 if self.last_update_time is None else (current_time - self.last_update_time).total_seconds()
-        self.last_update_time = current_time
-        
-        # Apply fluctuation to speed if specified
-        if speed_fluctuation_percent > 0:
-            import random
-            fluctuation_factor = 1.0 + random.uniform(-speed_fluctuation_percent/100, speed_fluctuation_percent/100)
-            current_speed = production_speed * fluctuation_factor
-        else:
-            current_speed = production_speed
-            
-        # Convert from m/min to m/s for calculation
-        speed_mps = current_speed / 60.0
-        self.current_x += dt * speed_mps
-        
-        # Update histories
-        self.lumps_history.append(lumps)
-        self.necks_history.append(necks)
-        self.x_history.append(self.current_x)
-        self.diameter_history.append(davg)
-        self.diameter_x.append(self.current_x)
-        
-        # Enforce history limits
-        while len(self.lumps_history) > self.max_samples:
-            self.lumps_history.pop(0)
-            if len(self.x_history) > self.max_samples:
-                self.x_history.pop(0)
-        
-        while len(self.necks_history) > self.max_samples:
-            self.necks_history.pop(0)
-            
-        while len(self.diameter_history) > self.max_samples:
-            self.diameter_x.pop(0)
-            self.diameter_history.pop(0)
-        
-        # Calculate processing time
-        self.processing_time = time.perf_counter() - start_time
-        
-        # Return processed data
-        processed_data = {
-            'lumps_history': self.lumps_history,
-            'necks_history': self.necks_history,
-            'x_history': self.x_history,
-            'diameter_history': self.diameter_history,
-            'diameter_x': self.diameter_x,
-            'current_x': self.current_x,
-            'processing_time': self.processing_time
-        }
-        
-        return processed_data
+        self.add_sample(data, production_speed, speed_fluctuation_percent)
+        return self.get_window_data()

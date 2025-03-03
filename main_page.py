@@ -15,7 +15,7 @@ import time
 
 # Import new modules
 from visualization import PlotManager
-from data_processing import WindowProcessor
+from data_processing import WindowProcessor, FastAcquisitionBuffer
 from flaw_detection import FlawDetector
 
 class MainPage(ctk.CTkFrame):
@@ -1069,15 +1069,20 @@ class MainPage(ctk.CTkFrame):
         except ValueError:
             fluctuation_percent = 0
             
-        # Process data sample (window calculation) - this is fast
-        processed_data = self.window_processor.process_sample(
+        # Get window data directly from the acquisition buffer
+        # This still adds the sample to ensure it's processed
+        self.window_processor.process_sample(
             data, 
             production_speed=self.production_speed,
             speed_fluctuation_percent=fluctuation_percent
         )
         
-        # Update current_x from window processor
-        self.current_x = self.window_processor.current_x
+        # Get the window data directly from controller's acquisition buffer
+        # for better thread safety and performance
+        window_data = self.controller.acquisition_buffer.get_window_data()
+        
+        # Update current_x from window data
+        self.current_x = window_data['current_x']
         
         # Update xCoord and speed labels
         self.label_xcoord.configure(text=f"xCoord [m]: {self.current_x:.1f}")
@@ -1140,16 +1145,16 @@ class MainPage(ctk.CTkFrame):
         # Set the plot_dirty flag on the PlotManager
         self.plot_manager.plot_dirty = True
         
-        # Prepare data for the plot manager
+        # Prepare data for the plot manager using window_data from acquisition buffer
         plot_data = {
-            'x_history': self.window_processor.x_history,
-            'lumps_history': self.window_processor.lumps_history,
-            'necks_history': self.window_processor.necks_history,
+            'x_history': window_data['x_history'],
+            'lumps_history': window_data['lumps_history'],
+            'necks_history': window_data['necks_history'],
             'current_x': self.current_x,
             'batch_name': self.entry_batch.get() or "NO BATCH",
             'plc_sample_time': self.plc_sample_time,
-            'diameter_x': self.window_processor.diameter_x,
-            'diameter_history': self.window_processor.diameter_history,
+            'diameter_x': window_data['diameter_x'],
+            'diameter_history': window_data['diameter_history'],
             'diameter_preset': diameter_preset,
             'fft_buffer_size': self.FFT_BUFFER_SIZE
         }
@@ -1172,7 +1177,7 @@ class MainPage(ctk.CTkFrame):
         if total_update_time > 0.1:  # >100ms is considered slow
             print(f"[MainPage] Update time: {total_update_time:.4f}s | "
                   f"Labels: {label_update_time:.4f}s | "
-                  f"Window: {self.window_processor.processing_time:.4f}s | "
+                  f"Window: {window_data.get('processing_time', 0):.4f}s | "
                   f"Flaw: {self.flaw_detector.processing_time:.4f}s | "
                   f"Plot: {plot_update_time:.4f}s")
 
@@ -1194,11 +1199,9 @@ class MainPage(ctk.CTkFrame):
         self.prod_speed_value.configure(text=f"{self.production_speed:.1f}")
 
     def update_data(self):
-        df = self.controller.data_mgr.get_current_data()
-        if not df.empty:
-            # Select the most recent row as a dict
-            data = df.iloc[-1].to_dict()
-            
+        # Get latest data directly from the acquisition buffer instead of data_mgr
+        data = self.controller.acquisition_buffer.get_latest_data()
+        if data:  # If there's data available
             # Update flaw window size from UI before processing
             try:
                 flaw_window_size = float(self.entry_flaw_window.get() or "0.5")

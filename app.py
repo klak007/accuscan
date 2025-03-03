@@ -3,12 +3,15 @@
 import customtkinter as ctk
 from datetime import datetime
 import time
+import threading
+import queue
 from tkinter import messagebox
 # Import modułów
 import config
 from plc_helper import read_accuscan_data, connect_plc
 from db_helper import init_database, save_measurement_sample, check_database
 from data_manager import DataManager
+from data_processing import FastAcquisitionBuffer
 from logic import MeasurementLogic
 from user_manager import UserManager
 # Import stron
@@ -36,6 +39,11 @@ class App(ctk.CTk):
         self.log_frequency = 10  # Log every 10 cycles
         self.last_log_time = time.time()
         
+        # Thread control
+        self.acquisition_thread_running = False
+        self.acquisition_thread = None
+        self.db_queue = queue.Queue(maxsize=100)  # Queue for database operations
+        
         # Zapisanie parametrów bazy danych jako atrybut
         self.db_params = config.DB_PARAMS
         
@@ -46,9 +54,12 @@ class App(ctk.CTk):
         self.logic = MeasurementLogic()
         self.logic.init_logic()
         
-        # UserManager i DataManager
+        # UserManager i DataManager (keep for DB operations)
         self.user_manager = UserManager()
         self.data_mgr = DataManager(max_samples=1000)
+        
+        # New FastAcquisitionBuffer for high-speed acquisition
+        self.acquisition_buffer = FastAcquisitionBuffer(max_samples=1024)
         
         # Symulator AccuScan
         self.simulator = AccuScanSimulator()
@@ -65,11 +76,14 @@ class App(ctk.CTk):
         self.main_page.pack(fill="both", expand=True)
         self.settings_page.pack_forget()
         
-        # Startujemy cykliczne odczyty
-        self._update_data()
-        
         # Obsługa zamknięcia okna
         self.protocol("WM_DELETE_WINDOW", self._on_closing)
+        
+        # Start database worker thread
+        self.start_db_worker()
+        
+        # Start data acquisition thread
+        self.start_acquisition_thread()
         
         # Startujemy pętlę aktualizacyjną z niższą częstotliwością odświeżania UI
         self.start_update_loop()
@@ -101,55 +115,130 @@ class App(ctk.CTk):
             self.settings_page.pack(fill="both", expand=True)
             self.current_page = "SettingsPage"
     
-    def _update_data(self):
-        cycle_start = time.perf_counter()
-        current_time = time.time()
-        if self.run_measurement:
-            # Check PLC connection and retry if needed:
+    def start_acquisition_thread(self):
+        """Start dedicated thread for high-speed data acquisition from PLC"""
+        if self.acquisition_thread is not None and self.acquisition_thread.is_alive():
+            return  # Thread already running
+            
+        self.acquisition_thread_running = True
+        self.acquisition_thread = threading.Thread(target=self._acquisition_worker, daemon=True)
+        self.acquisition_thread.start()
+        print("[App] Data acquisition thread started")
+        
+    def _acquisition_worker(self):
+        """Worker function for high-speed data acquisition thread"""
+        cycle_count = 0
+        while self.acquisition_thread_running:
+            cycle_start = time.perf_counter()
+            
+            if not self.run_measurement:
+                # If not measuring, just sleep and continue
+                time.sleep(0.01)
+                continue
+                
+            # Check PLC connection and retry if needed
             if not (hasattr(self.logic, "plc_client") and self.logic.plc_client.get_connected()):
                 self._try_reconnect_plc()
-
-            # Only read if PLC is connected:
-            if hasattr(self.logic, "plc_client") and self.logic.plc_client.get_connected():
-                try:
-                    plc_start = time.perf_counter()
-                    data = self.simulator.read_data() if self.use_simulation else read_accuscan_data(self.logic.plc_client, db_number=2)
-                    plc_time = time.perf_counter() - plc_start
-                    data["timestamp"] = datetime.now()
-                    data["batch"] = self.main_page.entry_batch.get() or "XABC1566"
-                    data["product"] = self.main_page.entry_product.get() or "18X0600"
-                    
-                    dm_start = time.perf_counter()
-                    self.data_mgr.add_sample(data)
-                    dm_time = time.perf_counter() - dm_start
-                    
-                    db_start = time.perf_counter()
-                    if self.db_connected:
-                        success = save_measurement_sample(self.db_params, data)
-                        if not success:
-                            self.db_connected = False
-                    db_time = time.perf_counter() - db_start
-                    
-                    logic_start = time.perf_counter()
-                    self.logic.poll_plc_data(data)
-                    logic_time = time.perf_counter() - logic_start
-                    
-                    self.latest_data = data
-                    
-                    self.log_counter += 1
-                    if self.log_counter >= self.log_frequency:
-                        self.log_counter = 0
-                        total_time = time.perf_counter() - cycle_start
-                        if total_time > 0.1:
-                            print(f"[PERF] Total: {total_time:.4f}s | PLC: {plc_time:.4f}s | DB: {db_time:.4f}s | Logic: {logic_time:.4f}s | DM: {dm_time:.4f}s")
-                except RuntimeError as exc:
-                    print(f"[App] PLC read failed: {exc}")
-                    # Mark PLC as disconnected so retry logic can kick in
+                time.sleep(0.5)  # Wait before retrying
+                continue
+                
+            try:
+                # READ PHASE: Fast, minimal processing
+                plc_start = time.perf_counter()
+                data = self.simulator.read_data() if self.use_simulation else read_accuscan_data(self.logic.plc_client, db_number=2)
+                plc_time = time.perf_counter() - plc_start
+                
+                data["timestamp"] = datetime.now()
+                data["batch"] = self.main_page.entry_batch.get() or "XABC1566"
+                data["product"] = self.main_page.entry_product.get() or "18X0600"
+                
+                # Add to fast acquisition buffer - minimal processing, just store the data
+                acquisition_start = time.perf_counter()
+                acquisition_result = self.acquisition_buffer.add_sample(data)
+                acquisition_time = time.perf_counter() - acquisition_start
+                
+                # Store in DataManager for eventual database saving
+                self.data_mgr.add_sample(data)
+                
+                # Queue for database writing (non-blocking)
+                if self.db_connected:
+                    try:
+                        self.db_queue.put_nowait((self.db_params, data))
+                    except queue.Full:
+                        # Queue full, skip this sample for database
+                        pass
+                
+                # Logic processing can remain in the acquisition thread
+                # since it's time-sensitive for alarms
+                logic_start = time.perf_counter()
+                self.logic.poll_plc_data(data)
+                logic_time = time.perf_counter() - logic_start
+                
+                # Store latest data for UI thread
+                self.latest_data = data
+                
+                # Periodically log performance info
+                cycle_count += 1
+                if cycle_count >= self.log_frequency:
+                    cycle_count = 0
+                    total_time = time.perf_counter() - cycle_start
+                    if total_time > 0.025:  # Log if taking >25ms (over 75% of our budget)
+                        print(f"[ACQ] Total: {total_time:.4f}s | PLC: {plc_time:.4f}s | Buffer: {acquisition_time:.4f}s | Logic: {logic_time:.4f}s")
+                
+                # Calculate sleep time to maintain 32ms cycle
+                elapsed = time.perf_counter() - cycle_start
+                sleep_time = max(0, 0.032 - elapsed)
+                
+                if sleep_time > 0:
+                    time.sleep(sleep_time)
+                
+            except RuntimeError as exc:
+                print(f"[ACQ] PLC read failed: {exc}")
+                # Mark PLC as disconnected so retry logic can kick in
+                if hasattr(self.logic, "plc_client"):
                     self.logic.plc_client.disconnect()
-        # Schedule the next update exactly after 32 ms
-        self.after(32, self._update_data)
+                time.sleep(0.5)  # Wait before retrying
+    
+    def start_db_worker(self):
+        """Start worker thread for database operations"""
+        # Start database worker thread
+        self.db_worker_running = True
+        self.db_worker_thread = threading.Thread(target=self._db_worker, daemon=True)
+        self.db_worker_thread.start()
+        print("[App] Database worker thread started")
+        
+    def _db_worker(self):
+        """Worker function for database operations thread"""
+        while self.db_worker_running:
+            try:
+                # Get item from queue with timeout
+                params, data = self.db_queue.get(timeout=0.5)
+                
+                # Save to database
+                success = save_measurement_sample(params, data)
+                if not success:
+                    self.db_connected = False
+                    
+                # Mark task as done
+                self.db_queue.task_done()
+            except queue.Empty:
+                # No items in queue, just continue
+                continue
+            except Exception as e:
+                print(f"[DB Worker] Error: {e}")
+                # Mark task as done if we got one
+                try:
+                    self.db_queue.task_done()
+                except:
+                    pass
     
     def _try_reconnect_plc(self):
+        """Try to reconnect to the PLC"""
+        current_time = time.time()
+        if current_time - self.last_plc_retry < 5:  # Don't retry too often
+            return
+            
+        self.last_plc_retry = current_time
         print("[App] Recreating PLC connection...")
         if hasattr(self.logic, "plc_client"):
             try:
@@ -165,7 +254,22 @@ class App(ctk.CTk):
     def _on_closing(self):
         """Zamykanie aplikacji – rozłączenie z PLC, zamknięcie okna."""
         print("[App] Zamykanie aplikacji...")
+        
+        # Stop threads
+        self.acquisition_thread_running = False
+        self.db_worker_running = False
+        
+        # Wait for threads to finish (with timeout)
+        if self.acquisition_thread and self.acquisition_thread.is_alive():
+            self.acquisition_thread.join(timeout=1.0)
+            
+        if hasattr(self, 'db_worker_thread') and self.db_worker_thread.is_alive():
+            self.db_worker_thread.join(timeout=1.0)
+            
+        # Close logic connections
         self.logic.close_logic()
+        
+        # Destroy window
         self.destroy()
     
     def start_update_loop(self):
