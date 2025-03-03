@@ -36,33 +36,20 @@ class MeasurementLogic:
         self.lumps_count += lumps
         self.necks_count += necks
 
-        if lumps > 0 or necks > 0:
-            # Use the queue to send PLC write requests asynchronously
-            if self.controller and hasattr(self.controller, 'plc_write_queue'):
-                # Queue the write operation instead of doing it directly
-                self.controller.plc_write_queue.put(
-                    ("write_accuscan_out_settings", 2, True, True, True, True)
-                )
-            else:
-                # Fallback to direct write if queue not available
-                write_accuscan_out_settings(
-                    self.plc_client,
-                    zl=True, zn=True, zf=True, zt=True
-                )
-            self.reset_pending = True
+        # Note: Critical counter resets are now handled directly in the acquisition thread
+        # to ensure they happen in the same 32ms cycle
+        # We only queue non-critical settings writes here
         
-        if self.reset_pending:
-            # Queue the clear bits operation
+        # Handle any other PLC outputs or alarm states here
+        if lumps > 0 or necks > 0:
+            # Only queue non-time-critical settings like alarm indicators
             if self.controller and hasattr(self.controller, 'plc_write_queue'):
-                self.controller.plc_write_queue.put(
-                    ("write_accuscan_out_settings", 2, False, False, False, False)
-                )
-            else:
-                # Fallback to direct write if queue not available
-                write_accuscan_out_settings(
-                    self.plc_client,
-                    zl=False, zn=False, zf=False, zt=False
-                )
+                # We can queue any non-critical settings here
+                # Example: Set alarm indicators, etc.
+                pass
+                
+        # Clear any flags if needed
+        if self.reset_pending:
             self.reset_pending = False
 
         if lumps > 0:

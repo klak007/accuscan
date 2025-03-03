@@ -16,8 +16,10 @@ class DataManager:
         """
         Dodaje pojedynczy słownik z danymi (sample) do DataFrame.
         """
+        print(f"[DataManager] Before adding sample: {time.time()}")
         # Store latest sample
         self.latest_sample = sample.copy()
+        print(f"[DataManager] After adding sample: {time.time()}")
         
         # OPTIMIZATION: Create new DataFrame with explicit dtypes matching the columns
         # This prevents DataFrame from trying to infer types which can be slow

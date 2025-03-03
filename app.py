@@ -55,12 +55,19 @@ class App(ctk.CTk):
         self.logic = MeasurementLogic(controller=self)
         self.logic.init_logic()
         
-        # UserManager i DataManager (keep for DB operations)
+        # UserManager for user management
         self.user_manager = UserManager()
+        
+        # Legacy DataManager - will be phased out
+        # Keep temporarily for backwards compatibility
         self.data_mgr = DataManager(max_samples=1000)
         
-        # New FastAcquisitionBuffer for high-speed acquisition
+        # FastAcquisitionBuffer for high-speed acquisition
+        # This will eventually replace DataManager completely
         self.acquisition_buffer = FastAcquisitionBuffer(max_samples=1024)
+        
+        # Make acquisition_buffer available as data_mgr.buffer for transition
+        self.data_mgr.buffer = self.acquisition_buffer
         
         # Symulator AccuScan
         self.simulator = AccuScanSimulator()
@@ -147,29 +154,47 @@ class App(ctk.CTk):
                 continue
                 
             try:
-                # READ PHASE: Fast, minimal processing
+                # READ-RESET CYCLE: Critical to reset counters in the same 32ms cycle
                 plc_start = time.perf_counter()
-                data = self.simulator.read_data() if self.use_simulation else read_accuscan_data(self.logic.plc_client, db_number=2)
-                plc_time = time.perf_counter() - plc_start
                 
+                # 1. Read current data
+                data = self.simulator.read_data() if self.use_simulation else read_accuscan_data(self.logic.plc_client, db_number=2)
+                read_time = time.perf_counter() - plc_start
+                
+                # 2. IMMEDIATELY reset the counters in PLC to avoid cumulative counts
+                # This is critical and must happen in the same cycle as the read
+                reset_start = time.perf_counter()
+                if not self.use_simulation and data.get("lumps", 0) > 0 or data.get("necks", 0) > 0:
+                    # Direct write for critical reset - no queuing
+                    from plc_helper import write_accuscan_out_settings
+                    write_accuscan_out_settings(
+                        self.logic.plc_client, db_number=2,
+                        # Set and immediately clear the reset bits
+                        zl=True, zn=True, zf=True, zt=False
+                    )
+                reset_time = time.perf_counter() - reset_start
+                
+                # Add timing information to the data
                 data["timestamp"] = datetime.now()
                 data["batch"] = self.main_page.entry_batch.get() or "XABC1566"
                 data["product"] = self.main_page.entry_product.get() or "18X0600"
+                data["plc_read_time"] = read_time
+                data["plc_reset_time"] = reset_time
                 
                 # Add to fast acquisition buffer - minimal processing, just store the data
                 acquisition_start = time.perf_counter()
                 acquisition_result = self.acquisition_buffer.add_sample(data)
                 acquisition_time = time.perf_counter() - acquisition_start
                 
-                # Store in DataManager for eventual database saving
-                self.data_mgr.add_sample(data)
-                
                 # Queue for database writing (non-blocking)
+                # We now store complete samples in FastAcquisitionBuffer
+                # and DB worker can access them directly
                 if self.db_connected:
                     try:
+                        # Just queue the most recent sample, buffer will handle batch operations
                         self.db_queue.put_nowait((self.db_params, data))
                     except queue.Full:
-                        # Queue full, skip this sample for database
+                        # Queue full, DB worker will pick it up from buffer eventually
                         pass
                 
                 # Logic processing can remain in the acquisition thread
@@ -187,7 +212,7 @@ class App(ctk.CTk):
                     cycle_count = 0
                     total_time = time.perf_counter() - cycle_start
                     if total_time > 0.025:  # Log if taking >25ms (over 75% of our budget)
-                        print(f"[ACQ] Total: {total_time:.4f}s | PLC: {plc_time:.4f}s | Buffer: {acquisition_time:.4f}s | Logic: {logic_time:.4f}s")
+                        print(f"[ACQ] Total: {total_time:.4f}s | Read: {read_time:.4f}s | Reset: {reset_time:.4f}s | Buffer: {acquisition_time:.4f}s | Logic: {logic_time:.4f}s")
                 
                 # Calculate sleep time to maintain 32ms cycle
                 elapsed = time.perf_counter() - cycle_start
@@ -213,21 +238,62 @@ class App(ctk.CTk):
         
     def _db_worker(self):
         """Worker function for database operations thread"""
+        last_saved_timestamp = None
+        
         while self.db_worker_running:
             try:
-                # Get item from queue with timeout
-                params, data = self.db_queue.get(timeout=0.5)
-                
-                # Save to database
-                success = save_measurement_sample(params, data)
-                if not success:
-                    self.db_connected = False
+                # First try to get items from the queue (newest samples)
+                try:
+                    params, data = self.db_queue.get(timeout=0.1)
                     
-                # Mark task as done
-                self.db_queue.task_done()
-            except queue.Empty:
-                # No items in queue, just continue
-                continue
+                    # Save to database
+                    success = save_measurement_sample(params, data)
+                    if not success:
+                        self.db_connected = False
+                    else:
+                        last_saved_timestamp = data.get('timestamp')
+                        
+                    # Mark task as done
+                    self.db_queue.task_done()
+                    
+                    # Continue to get more items from queue if available
+                    continue
+                    
+                except queue.Empty:
+                    # No items in queue, try batch saving from buffer
+                    pass
+                
+                # If queue is empty, we can do periodic batch saves from the buffer
+                if self.db_connected and hasattr(self, 'acquisition_buffer'):
+                    # Get samples from buffer that haven't been saved yet
+                    with self.acquisition_buffer.lock:
+                        unsaved_samples = []
+                        for sample in self.acquisition_buffer.samples:
+                            if last_saved_timestamp is None or sample.get('timestamp') > last_saved_timestamp:
+                                unsaved_samples.append(sample)
+                        
+                        # Save in batches of up to 10 samples
+                        if unsaved_samples:
+                            batch_size = 10
+                            batches = [unsaved_samples[i:i+batch_size] for i in range(0, len(unsaved_samples), batch_size)]
+                            
+                            for batch in batches:
+                                # Save each sample in batch
+                                for sample in batch:
+                                    success = save_measurement_sample(self.db_params, sample)
+                                    if not success:
+                                        self.db_connected = False
+                                        break
+                                    last_saved_timestamp = sample.get('timestamp')
+                                
+                                if not self.db_connected:
+                                    break
+                            
+                            print(f"[DB Worker] Batch saved {len(unsaved_samples)} samples")
+                
+                # Sleep if no work was done
+                time.sleep(1.0)
+                
             except Exception as e:
                 print(f"[DB Worker] Error: {e}")
                 # Mark task as done if we got one

@@ -14,6 +14,7 @@ class FastAcquisitionBuffer:
     """
     Fast, thread-safe buffer for measurement data acquisition and processing.
     Uses deques for efficient O(1) operations when adding/removing samples.
+    Can replace DataManager with more efficient storage and direct DB functionality.
     """
     
     def __init__(self, max_samples=1024):
@@ -41,6 +42,9 @@ class FastAcquisitionBuffer:
         self.x_coords = deque(maxlen=max_samples)
         self.avg_diameters = deque(maxlen=max_samples)
         
+        # Store all complete samples for potential DB access
+        self.samples = deque(maxlen=max_samples)
+        
         # Current position tracking
         self.current_x = 0.0
         self.last_update_time = None
@@ -48,6 +52,11 @@ class FastAcquisitionBuffer:
         # Performance monitoring
         self.acquisition_time = 0.0
         self.processing_time = 0.0
+        
+        # Statistics cache
+        self.stats_cache = {}
+        self.last_stats_update = 0
+        self.stats_cache_ttl = 1.0  # 1 second
 
     def add_sample(self, data, production_speed=50.0, speed_fluctuation_percent=0.0):
         """
@@ -100,6 +109,16 @@ class FastAcquisitionBuffer:
             self.current_x += dt * speed_mps
             self.x_coords.append(self.current_x)
             
+            # Store complete sample with additional computed values
+            sample_copy = data.copy()
+            sample_copy['xCoord'] = self.current_x
+            sample_copy['speed'] = current_speed
+            sample_copy['avg_diameter'] = avg
+            self.samples.append(sample_copy)
+            
+            # Invalidate statistics cache
+            self.stats_cache = {}
+            
             self.acquisition_time = time.perf_counter() - start_time
             
             return {
@@ -110,20 +129,67 @@ class FastAcquisitionBuffer:
     def get_latest_data(self):
         """Get the most recent data point (thread-safe)"""
         with self.lock:
-            if not self.timestamps:
+            if not self.samples:
                 return {}
                 
-            return {
-                'D1': self.diameters['D1'][-1] if self.diameters['D1'] else 0,
-                'D2': self.diameters['D2'][-1] if self.diameters['D2'] else 0,
-                'D3': self.diameters['D3'][-1] if self.diameters['D3'] else 0,
-                'D4': self.diameters['D4'][-1] if self.diameters['D4'] else 0,
-                'lumps': self.lumps[-1] if self.lumps else 0,
-                'necks': self.necks[-1] if self.necks else 0,
-                'avg_diameter': self.avg_diameters[-1] if self.avg_diameters else 0,
-                'timestamp': self.timestamps[-1] if self.timestamps else None,
-                'x_coord': self.x_coords[-1] if self.x_coords else 0,
-            }
+            # Return the latest complete sample directly
+            return self.samples[-1]
+            
+    def get_current_data(self):
+        """
+        DataManager compatibility method - returns data in DataFrame-like structure
+        for eventual transition away from DataManager
+        """
+        import pandas as pd
+        with self.lock:
+            if not self.samples:
+                # Return empty DataFrame with expected columns
+                return pd.DataFrame(columns=["timestamp","D1","D2","D3","D4","lumps","necks","xCoord","speed"])
+            
+            # Convert samples to DataFrame
+            return pd.DataFrame(list(self.samples))
+            
+    def get_statistics(self, last_n=100):
+        """Calculate statistics from recent samples (with caching)"""
+        now = time.time()
+        
+        # Check if we can use cached stats
+        if self.stats_cache and now - self.last_stats_update < self.stats_cache_ttl:
+            return self.stats_cache
+            
+        with self.lock:
+            if not self.samples:
+                return {}
+                
+            # Get the last N samples
+            recent_samples = list(self.samples)[-min(last_n, len(self.samples)):]
+            
+            # Initialize stats dictionary
+            stats = {}
+            
+            # Calculate diameter statistics
+            for i in range(1, 5):
+                key = f"D{i}"
+                values = [sample.get(key, 0) for sample in recent_samples]
+                if values:
+                    import numpy as np
+                    stats[f"{key}_mean"] = np.mean(values)
+                    stats[f"{key}_std"] = np.std(values)
+                    stats[f"{key}_min"] = np.min(values)
+                    stats[f"{key}_max"] = np.max(values)
+            
+            # Calculate overall statistics
+            diameter_values = [sample.get('avg_diameter', 0) for sample in recent_samples]
+            if diameter_values:
+                import numpy as np
+                stats["mean_diameter"] = np.mean(diameter_values)
+                stats["std_diameter"] = np.std(diameter_values)
+            
+            # Cache the results
+            self.stats_cache = stats
+            self.last_stats_update = now
+            
+            return stats
     
     def get_window_data(self, interpolate_gaps=True):
         """
