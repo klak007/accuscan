@@ -21,7 +21,17 @@ class MeasurementLogic:
     def close_logic(self):
         """Zamykanie połączenia z PLC."""
         if self.plc_client:
-            self.plc_client.disconnect()
+            from plc_helper import disconnect_plc
+            try:
+                # Use our improved disconnect function to properly clean up
+                disconnect_plc(self.plc_client)
+            except Exception as e:
+                print(f"[Logic] Error disconnecting PLC: {e}")
+                # Fallback to direct disconnect
+                try:
+                    self.plc_client.disconnect()
+                except:
+                    pass
             self.plc_client = None
             print("[Logic] Rozłączono z PLC.")
 

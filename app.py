@@ -312,11 +312,22 @@ class App(ctk.CTk):
         print("[App] Recreating PLC connection...")
         if hasattr(self.logic, "plc_client"):
             try:
-                self.logic.plc_client.disconnect()
-            except:
-                pass
+                # Use our improved disconnect function
+                from plc_helper import disconnect_plc
+                disconnect_plc(self.logic.plc_client)
+            except Exception as e:
+                print(f"[App] Error during PLC disconnect: {e}")
+                # Fallback to direct disconnect
+                try:
+                    self.logic.plc_client.disconnect()
+                except:
+                    pass
+        
         try:
-            self.logic.plc_client = connect_plc("192.168.50.90")
+            # Use proper config values and improved connect function
+            from plc_helper import connect_plc
+            import config
+            self.logic.plc_client = connect_plc(config.PLC_IP, config.PLC_RACK, config.PLC_SLOT, max_attempts=1)
             print("[App] PLC Reconnection successful.")
         except Exception as e:
             print(f"[App] PLC Reconnection failed: {e}")
