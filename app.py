@@ -5,6 +5,8 @@ from datetime import datetime
 import time
 import threading
 import queue
+import multiprocessing
+from multiprocessing import Process, Value, Event, Queue
 from tkinter import messagebox
 # Import modułów
 import config
@@ -18,6 +20,12 @@ from user_manager import UserManager
 from main_page import MainPage
 from settings_page import SettingsPage
 from accuscan_simulator import AccuScanSimulator
+
+# Set multiprocessing start method to 'spawn' for better compatibility
+if __name__ == "__main__":
+    # Use spawn method for Windows compatibility
+    # This should be set before any other multiprocessing code runs
+    multiprocessing.set_start_method('spawn', force=True)
 
 class App(ctk.CTk):
     """
@@ -48,7 +56,8 @@ class App(ctk.CTk):
         # Use multiprocessing.Queue for sharing data between processes
         # unlike threading.Queue, this is safe for interprocess communication
         import multiprocessing as mp
-        self.data_queue = mp.Queue(maxsize=100)  # Queue for sending acquisition data to UI
+        # Increased queue size to handle high demand periods
+        self.data_queue = mp.Queue(maxsize=1000)  # Queue for sending acquisition data to UI
         
         # Zapisanie parametrów bazy danych jako atrybut
         self.db_params = config.DB_PARAMS
@@ -172,46 +181,109 @@ class App(ctk.CTk):
         
     def _data_receiver_worker(self):
         """Worker thread that receives data from the acquisition process and updates the buffer"""
+        # Cache UI values to reduce UI thread interactions
+        batch_cache = "XABC1566"
+        product_cache = "18X0600"
+        speed_cache = 50.0
+        ui_refresh_counter = 0
+        
+        # Performance monitoring
+        last_perf_log = time.time()
+        samples_processed = 0
+        
         while self.data_receiver_running:
             try:
-                # Get data from the queue with a timeout
-                data = self.data_queue.get(timeout=0.5)
-                
-                # Add batch and product info from UI - Use a safe method to access UI
-                if hasattr(self, 'main_page'):
+                # Process in batches to avoid falling behind when UI is busy
+                batch_size = min(20, self.data_queue.qsize())
+                if batch_size == 0:
+                    # No data available, try to get at least one sample with timeout
                     try:
-                        # Copy values locally to avoid UI thread contention
-                        data["batch"] = self.main_page.entry_batch.get() if hasattr(self.main_page, 'entry_batch') else "XABC1566"
-                        data["product"] = self.main_page.entry_product.get() if hasattr(self.main_page, 'entry_product') else "18X0600"
-                        data["speed"] = getattr(self.main_page, 'production_speed', 50.0)
-                    except Exception as e:
-                        # Fallback to defaults if UI access fails
-                        data["batch"] = "XABC1566"
-                        data["product"] = "18X0600"
-                        data["speed"] = 50.0
-                        print(f"[Data Receiver] UI access error: {e}")
+                        data = self.data_queue.get(timeout=0.1)
+                        batch_size = 1
+                    except queue.Empty:
+                        # No data to process, just sleep a bit and continue
+                        time.sleep(0.01)
+                        continue
+                else:
+                    # Get the first item in the batch
+                    data = self.data_queue.get(timeout=0.1)
                 
-                # Update the buffer with the received data
+                batch_start = time.perf_counter()
+                
+                # Only refresh UI values occasionally to reduce overhead
+                ui_refresh_counter += 1
+                if ui_refresh_counter >= 10:  # Refresh every 10 processing cycles
+                    ui_refresh_counter = 0
+                    # Update cached values from UI
+                    if hasattr(self, 'main_page'):
+                        try:
+                            batch_cache = self.main_page.entry_batch.get() if hasattr(self.main_page, 'entry_batch') else "XABC1566"
+                            product_cache = self.main_page.entry_product.get() if hasattr(self.main_page, 'entry_product') else "18X0600"
+                            speed_cache = getattr(self.main_page, 'production_speed', 50.0)
+                        except Exception as e:
+                            print(f"[Data Receiver] UI access error: {e}")
+                
+                # First process the data we already retrieved
+                data["batch"] = batch_cache
+                data["product"] = product_cache
+                data["speed"] = speed_cache
+                
                 self.acquisition_buffer.add_sample(data)
-                
-                # Process the data with the logic component
                 self.logic.poll_plc_data(data)
-                
-                # Store latest data for UI
                 self.latest_data = data
                 
-                # Queue for database if connected
                 if self.db_connected:
                     try:
                         self.db_queue.put_nowait((self.db_params, data))
                     except queue.Full:
                         pass
+                
+                samples_processed += 1
+                
+                # Then process any remaining items in the batch
+                for _ in range(batch_size - 1):
+                    try:
+                        data = self.data_queue.get_nowait()
                         
-            except (queue.Empty, Exception) as e:
-                # Just continue if queue is empty or there's an error
-                if not isinstance(e, queue.Empty):  # Only log non-empty queue errors
-                    print(f"[Data Receiver] Error: {e}")
-                continue
+                        # Use cached UI values
+                        data["batch"] = batch_cache
+                        data["product"] = product_cache
+                        data["speed"] = speed_cache
+                        
+                        self.acquisition_buffer.add_sample(data)
+                        self.logic.poll_plc_data(data)
+                        self.latest_data = data
+                        
+                        if self.db_connected:
+                            try:
+                                self.db_queue.put_nowait((self.db_params, data))
+                            except queue.Full:
+                                pass
+                        
+                        samples_processed += 1
+                    except queue.Empty:
+                        # Queue emptied during processing
+                        break
+                
+                # Log batch processing performance
+                batch_time = time.perf_counter() - batch_start
+                if batch_size > 1 and batch_time > 0.01:  # Only log significant batches
+                    print(f"[Data Receiver] Processed batch of {batch_size} samples in {batch_time:.4f}s")
+                
+                # Log overall performance metrics every 5 seconds
+                now = time.time()
+                if now - last_perf_log > 5.0:
+                    elapsed = now - last_perf_log
+                    rate = samples_processed / elapsed if elapsed > 0 else 0
+                    queue_size = self.data_queue.qsize()
+                    print(f"[Data Receiver] Processing rate: {rate:.1f} samples/sec, Queue size: {queue_size}")
+                    last_perf_log = now
+                    samples_processed = 0
+                        
+            except Exception as e:
+                print(f"[Data Receiver] Error: {e}")
+                # Sleep a tiny bit to avoid CPU spinning on repeated errors
+                time.sleep(0.01)
     
     @staticmethod
     def _acquisition_process_worker(process_running, run_measurement, use_simulation, data_queue, plc_ip, plc_rack, plc_slot):
@@ -293,10 +365,26 @@ class App(ctk.CTk):
                 data["plc_reset_time"] = reset_time
                 
                 # Send the data to the main process via the queue
-                print(f"[ACQ Process] Queue size before put: {data_queue.qsize()}")
                 try:
-                    data_queue.put(data, block=False)
-                    print(f"[ACQ Process] Sent data. Queue size after put: {data_queue.qsize()}")
+                    # Check queue size and log warning if it's getting full
+                    current_size = data_queue.qsize()
+                    
+                    # Non-blocking queue put with timeout - this allows us to drop samples
+                    # if the queue is full rather than blocking the acquisition cycle
+                    if current_size < 900:  # Only try to enqueue if we're not close to capacity
+                        data_queue.put(data, block=False)
+                        
+                        # Only log every 10th message when queue size is below warning threshold
+                        if cycle_count % 10 == 0 and current_size < 20:
+                            print(f"[ACQ Process] Queue size: {current_size}")
+                        # Always log when queue size is concerning
+                        elif current_size > 20:
+                            print(f"[ACQ Process] WARNING: Queue size is high: {current_size}")
+                    else:
+                        # Queue is nearly full - drop this sample to avoid blocking
+                        print(f"[ACQ Process] CRITICAL: Queue size at {current_size} - dropping sample")
+                        # Sleep a tiny bit to give receiver time to catch up
+                        time.sleep(0.001)
                 except queue.Full:
                     print("[ACQ Process] Data queue is full. Could not enqueue data.")
                 except Exception as e:
@@ -571,6 +659,9 @@ class App(ctk.CTk):
             return None
 
 if __name__ == "__main__":
+    # Initialize multiprocessing with 'spawn' method for cross-platform compatibility
+    multiprocessing.freeze_support()  # Needed for Windows executable support
+    
     ctk.set_appearance_mode("dark")
     ctk.set_default_color_theme("blue")
     app = App()

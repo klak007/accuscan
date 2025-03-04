@@ -30,6 +30,12 @@ class PlotManager:
         self.last_update_time = None
         self.plot_dirty = False
         
+        # Performance monitoring
+        self.plot_update_count = 0
+        self.throttle_level = 1  # 1=normal (all plots), 2=skip FFT, 3=essential only
+        self.last_high_cpu_time = 0  # Last time we detected high CPU usage
+        self.adaptive_mode = True  # Enable adaptive throttling
+        
     def update_status_plot(self, x_history, lumps_history, necks_history, current_x, batch_name, plc_sample_time=0):
         """
         Update the status plot (lumps/necks over x-coordinate).
@@ -175,6 +181,7 @@ class PlotManager:
             (now - self.last_update_time) >= self.min_update_interval) and self.plot_dirty:
             
             plot_start = time.perf_counter()
+            self.plot_update_count += 1
             
             # Update each plot
             status_time = 0
@@ -184,18 +191,7 @@ class PlotManager:
             # Get PLC sample time from data dictionary
             plc_sample_time = data_dict.get('plc_sample_time', 0)
             
-            if 'status' in self.figures:
-                start = time.perf_counter()
-                self.update_status_plot(
-                    data_dict['x_history'], 
-                    data_dict['lumps_history'], 
-                    data_dict['necks_history'],
-                    data_dict['current_x'],
-                    data_dict['batch_name'],
-                    plc_sample_time
-                )
-                status_time = time.perf_counter() - start
-            
+            # Always update essential plots at any throttle level
             if 'diameter' in self.figures:
                 start = time.perf_counter()
                 self.update_diameter_plot(
@@ -207,7 +203,21 @@ class PlotManager:
                 )
                 diameter_time = time.perf_counter() - start
             
-            if 'fft' in self.figures:
+            # For status plot, update less frequently at high throttle level
+            if 'status' in self.figures and (self.throttle_level < 3 or self.plot_update_count % 2 == 0):
+                start = time.perf_counter()
+                self.update_status_plot(
+                    data_dict['x_history'], 
+                    data_dict['lumps_history'], 
+                    data_dict['necks_history'],
+                    data_dict['current_x'],
+                    data_dict['batch_name'],
+                    plc_sample_time
+                )
+                status_time = time.perf_counter() - start
+            
+            # For FFT plot, skip at higher throttle levels
+            if 'fft' in self.figures and self.throttle_level == 1:  # Only update at lowest throttle level
                 start = time.perf_counter()
                 self.update_fft_plot(
                     data_dict['diameter_history'],
@@ -215,16 +225,39 @@ class PlotManager:
                 )
                 fft_time = time.perf_counter() - start
             
-            # Draw all canvases
+            # Draw only the canvases that were updated
             draw_start = time.perf_counter()
             for key, (fig, _) in self.figures.items():
-                fig.canvas.draw()
+                # Only draw updated plots based on throttle level
+                if (key == 'diameter' or 
+                    (key == 'status' and (self.throttle_level < 3 or self.plot_update_count % 2 == 0)) or
+                    (key == 'fft' and self.throttle_level == 1)):
+                    fig.canvas.draw()
             draw_time = time.perf_counter() - draw_start
             
             self.plot_dirty = False
             self.last_update_time = now
             
             total_plot_time = time.perf_counter() - plot_start
+            
+            # Adaptive throttling based on performance
+            if self.adaptive_mode:
+                if total_plot_time > 0.2:  # Slow plotting detected
+                    # Increase throttling level (up to maximum of 3)
+                    old_level = self.throttle_level
+                    self.throttle_level = min(self.throttle_level + 1, 3)
+                    if old_level != self.throttle_level:
+                        print(f"[Plot] Increasing throttle level to {self.throttle_level} due to slow updates")
+                    self.last_high_cpu_time = now
+                elif total_plot_time < 0.05 and (now - self.last_high_cpu_time) > 5.0:
+                    # Decrease throttling if performance is good for a while
+                    old_level = self.throttle_level
+                    self.throttle_level = max(self.throttle_level - 1, 1)
+                    if old_level != self.throttle_level:
+                        print(f"[Plot] Decreasing throttle level to {self.throttle_level} due to good performance")
+            
+            # Log performance data but only if it's significant
             if total_plot_time > 0.1:
                 print(f"[Plot] Total: {total_plot_time:.4f}s | Status: {status_time:.4f}s | "
-                      f"Diameter: {diameter_time:.4f}s | FFT: {fft_time:.4f}s | Draw: {draw_time:.4f}s")
+                      f"Diameter: {diameter_time:.4f}s | FFT: {fft_time:.4f}s | Draw: {draw_time:.4f}s | "
+                      f"Throttle: {self.throttle_level}")
