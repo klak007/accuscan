@@ -221,12 +221,10 @@ class App(ctk.CTk):
         import time
         from datetime import datetime
         from plc_helper import read_accuscan_data, connect_plc, write_accuscan_out_settings
-        from accuscan_simulator import AccuScanSimulator
+        
         
         print(f"[ACQ Process] Starting acquisition process worker")
         
-        # Create local simulator
-        simulator = AccuScanSimulator()
         
         # Connect to the PLC
         plc_client = None
@@ -262,17 +260,14 @@ class App(ctk.CTk):
                 # READ-RESET CYCLE: Critical to reset counters in the same 32ms cycle
                 plc_start = time.perf_counter()
                 
-                # 1. Read current data
-                if use_simulation.value:
-                    data = simulator.read_data() 
-                else:
-                    data = read_accuscan_data(plc_client, db_number=2)
+                
+                data = read_accuscan_data(plc_client, db_number=2)
                 read_time = time.perf_counter() - plc_start
                 
                 # 2. IMMEDIATELY reset the counters in PLC to avoid cumulative counts
                 # This is critical and must happen in the same cycle as the read
                 reset_start = time.perf_counter()
-                if not use_simulation.value and (data.get("lumps", 0) > 0 or data.get("necks", 0) > 0):
+                if (data.get("lumps", 0) > 0 or data.get("necks", 0) > 0):
                     # Direct write for critical reset - no queuing
                     write_accuscan_out_settings(
                         plc_client, db_number=2,

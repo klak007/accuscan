@@ -71,7 +71,7 @@ class PlotManager:
             
             # Use numpy for bar plotting 
             x_vals = np.array(x_vals)
-            width = 0.3  # Width of bars in x units (meters)
+            width = 0.1  # Width of bars in x units (meters)
             
             # Plot bars for lumps and necks
             ax.bar(x_vals - width/2, lumps_vals, width=width, color="red", label="Lumps")
