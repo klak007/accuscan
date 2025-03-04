@@ -9,7 +9,6 @@ import multiprocessing
 from multiprocessing import Process, Value, Event, Queue
 from tkinter import messagebox
 # Import modułów
-import config
 from plc_helper import read_accuscan_data, connect_plc
 from db_helper import init_database, save_measurement_sample, check_database
 from data_manager import DataManager
@@ -20,6 +19,27 @@ from user_manager import UserManager
 from main_page import MainPage
 from settings_page import SettingsPage
 from accuscan_simulator import AccuScanSimulator
+
+# Configuration settings (originally from config.py)
+# PLC connection parameters
+PLC_IP = "192.168.50.90"  # Przykładowy adres sterownika
+PLC_RACK = 0              # Zwykle 0 przy S7-1200
+PLC_SLOT = 1              # Często 1 przy S7-1200
+
+# Database parameters
+DB_PARAMS = {
+    "host": "localhost",
+    "user": "root",
+    "password": "root",
+    "db": "accuscan_db",
+    "port": 3306
+}
+
+# Optional read interval (in seconds)
+READ_INTERVAL_S = 0.05    # 50ms sampling
+
+# Maximum number of samples to keep in the buffer
+MAX_SAMPLES = 1000
 
 # Set multiprocessing start method to 'spawn' for better compatibility
 if __name__ == "__main__":
@@ -60,7 +80,7 @@ class App(ctk.CTk):
         self.data_queue = mp.Queue(maxsize=250)  # Queue for sending acquisition data to UI
         
         # Zapisanie parametrów bazy danych jako atrybut
-        self.db_params = config.DB_PARAMS
+        self.db_params = DB_PARAMS
         
         # Inicjalizacja bazy danych
         self.init_database_connection()
@@ -158,9 +178,9 @@ class App(ctk.CTk):
                 self.run_measurement_flag,
                 self.use_simulation_flag,
                 self.data_queue,
-                config.PLC_IP,
-                config.PLC_RACK,
-                config.PLC_SLOT
+                PLC_IP,
+                PLC_RACK,
+                PLC_SLOT
             ),
             daemon=True
         )
@@ -755,8 +775,7 @@ class App(ctk.CTk):
         try:
             # Use proper config values and improved connect function
             from plc_helper import connect_plc
-            import config
-            self.logic.plc_client = connect_plc(config.PLC_IP, config.PLC_RACK, config.PLC_SLOT, max_attempts=1)
+            self.logic.plc_client = connect_plc(PLC_IP, PLC_RACK, PLC_SLOT, max_attempts=1)
             print("[App] PLC Reconnection successful.")
         except Exception as e:
             print(f"[App] PLC Reconnection failed: {e}")

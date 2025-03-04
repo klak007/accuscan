@@ -1,5 +1,4 @@
 # logic.py
-import config
 from plc_helper import connect_plc, read_accuscan_data, write_accuscan_out_settings
 from db_helper import save_measurement_sample, save_event
 # ewentualnie data_manager, itp.
@@ -12,11 +11,30 @@ class MeasurementLogic:
         self.reset_pending = False
         self.lumps_count = 0
         self.necks_count = 0
+        
+        # Get configuration from controller
+        if controller:
+            self.plc_ip = controller.PLC_IP
+            self.plc_rack = controller.PLC_RACK
+            self.plc_slot = controller.PLC_SLOT
+            self.db_params = controller.db_params
+        else:
+            # Default values if no controller
+            self.plc_ip = "192.168.50.90"
+            self.plc_rack = 0
+            self.plc_slot = 1
+            self.db_params = {
+                "host": "localhost",
+                "user": "root",
+                "password": "root",
+                "db": "accuscan_db",
+                "port": 3306
+            }
 
     def init_logic(self):
         """Nawiązanie połączenia, ustawienie początkowych parametrów."""
-        self.plc_client = connect_plc(config.PLC_IP, config.PLC_RACK, config.PLC_SLOT)
-        print(f"[Logic] Połączono z PLC {config.PLC_IP}")
+        self.plc_client = connect_plc(self.plc_ip, self.plc_rack, self.plc_slot)
+        print(f"[Logic] Połączono z PLC {self.plc_ip}")
 
     def close_logic(self):
         """Zamykanie połączenia z PLC."""
@@ -69,7 +87,7 @@ class MeasurementLogic:
                 "product": data.get("product", ""),
                 "description": f"Wykryto lumps = {data['lumps']}"
             }
-            save_event(config.DB_PARAMS, event_data)
+            save_event(self.DB_PARAMS, event_data)
         # Możesz tu zaimplementować strefy "waiting / collecting / finishing" itp.
 
     def get_counters(self) -> dict:
