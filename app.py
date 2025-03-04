@@ -211,9 +211,9 @@ class App(ctk.CTk):
                     samples_to_drop = current_queue_size - QUEUE_WARNING_THRESHOLD
                     for _ in range(samples_to_drop):
                         try:
-                            # Get and discard samples
+                            # Get and discard samples - multiprocessing Queue doesn't have task_done
                             _ = self.data_queue.get_nowait()
-                            self.data_queue.task_done()
+                            # Note: multiprocessing.Queue doesn't have task_done method
                         except queue.Empty:
                             break
                     print(f"[Data Receiver] Dropped {samples_to_drop} samples, new queue size: {self.data_queue.qsize()}")
@@ -269,8 +269,7 @@ class App(ctk.CTk):
                 self.logic.poll_plc_data(data)
                 self.latest_data = data
                 
-                # Mark the task as done
-                self.data_queue.task_done()
+                # Note: multiprocessing.Queue doesn't have task_done method
                 samples_processed += 1
                 
                 # Database saving criteria - only for the first sample in the batch
@@ -324,8 +323,7 @@ class App(ctk.CTk):
                         # Update latest data
                         self.latest_data = data
                         
-                        # Mark task as done
-                        self.data_queue.task_done()
+                        # Note: multiprocessing.Queue doesn't have task_done method
                         samples_processed += 1
                         
                         # Only save flaws to database

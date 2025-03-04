@@ -1338,8 +1338,15 @@ class MainPage(ctk.CTkFrame):
             'diameter_x': window_data['diameter_x'],
             'diameter_history': window_data['diameter_history'],
             'diameter_preset': diameter_preset,
-            'fft_buffer_size': self.FFT_BUFFER_SIZE
+            'fft_buffer_size': self.FFT_BUFFER_SIZE,
+            'timestamp': time.time(),  # Add timestamp for debugging
+            'update_id': id(self) % 10000  # Add unique update ID for tracking updates
         }
+        
+        # Add debug log if we have data but no visible updates
+        if window_data['x_history'] and len(window_data['x_history']) > 0:
+            num_points = len(window_data['x_history'])
+            print(f"[MainPage] Plot data ready: {num_points} points, X range: {window_data['x_history'][0]:.1f}-{self.current_x:.1f}m")
         
         # Force a direct update in the main thread to ensure plots are visible even if process is not working
         if not hasattr(self.plot_manager, 'plot_process') or not self.plot_manager.plot_process or not self.plot_manager.plot_process.is_alive():
@@ -1366,8 +1373,16 @@ class MainPage(ctk.CTkFrame):
             self.fig.canvas.draw()
             self.fig_diameter.canvas.draw()
         else:
-            # Normal case - update through PlotManager process
+            # Normal case - update through PlotManager process 
             self.plot_manager.update_all_plots(plot_data)
+            
+            # Force drawing the existing figures to ensure we see something
+            # This is a fallback if the process isn't drawing
+            if not hasattr(self, 'last_forced_draw') or time.time() - self.last_forced_draw > 2.0:
+                print("[MainPage] Forcing canvas draw to ensure visibility")
+                self.fig.canvas.draw()
+                self.fig_diameter.canvas.draw() 
+                self.last_forced_draw = time.time()
         plot_update_time = time.perf_counter() - plot_update_start
 
         # Update counter displays

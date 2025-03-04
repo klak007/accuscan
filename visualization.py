@@ -142,6 +142,16 @@ class PlotManager:
                     
                     # Process the data and generate plot data
                     start_time = time.perf_counter()
+                    update_id = plot_data.get('update_id', 0)
+                    data_timestamp = plot_data.get('timestamp', 0)
+                    time_since_creation = time.time() - data_timestamp if data_timestamp else 0
+                    
+                    # Log what data we received
+                    x_history_len = len(plot_data.get('x_history', []))
+                    diameter_history_len = len(plot_data.get('diameter_history', []))
+                    print(f"[Plot Process] Processing update {update_id}: {x_history_len} points, "
+                          f"data age: {time_since_creation:.3f}s")
+                          
                     processed_data = {}
                     
                     # Status plot processing
