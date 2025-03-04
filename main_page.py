@@ -206,51 +206,10 @@ class MainPage(ctk.CTkFrame):
         )
         self.btn_save_settings.grid(row=5, column=0, padx=5, pady=15, sticky="ew")
 
-        # # Add the simulation button below "Zapisz nastawy"
-        # self.btn_simulation = ctk.CTkButton(
-        #     self.left_panel,
-        #     text="Włącz symulację",
-        #     command=self._toggle_simulation,
-        #     fg_color="blue",
-        #     hover_color="dark blue"
-        # )
-        # self.btn_simulation.grid(row=6, column=0, padx=5, pady=5, sticky="ew")
-
-        # # Indykatory lumps/necks
-        # self.indicator_frame = ctk.CTkFrame(self.left_panel)
-        # self.indicator_frame.grid(row=7, column=0, padx=5, pady=5, sticky="ew")
-        
-        # # Create a frame for indicators and counters
-        # indicator_content = ctk.CTkFrame(self.indicator_frame)
-        # indicator_content.pack(fill="x", expand=True)
-        
-        # # Left side - Lump indicator and counter
-        # lump_frame = ctk.CTkFrame(indicator_content)
-        # lump_frame.pack(side="left", padx=5)
-        # self.label_lump_indicator = ctk.CTkLabel(lump_frame, text="Lump: Off")
-        # self.label_lump_indicator.pack(pady=2)
-        # self.lumps_count_label = ctk.CTkLabel(lump_frame, text="Count: 0")
-        # self.lumps_count_label.pack(pady=2)
-        
-        # # Right side - Neck indicator and counter
-        # neck_frame = ctk.CTkFrame(indicator_content)
-        # neck_frame.pack(side="left", padx=5)
-        # self.label_neck_indicator = ctk.CTkLabel(neck_frame, text="Neck: Off")
-        # self.label_neck_indicator.pack(pady=2)
-        # self.necks_count_label = ctk.CTkLabel(neck_frame, text="Count: 0")
-        # self.necks_count_label.pack(pady=2)
-
-        # # Right side - Diameter tolerance indicator
-        # diameter_frame = ctk.CTkFrame(indicator_content)
-        # diameter_frame.pack(side="left", padx=5)
-        # self.label_diameter_indicator = ctk.CTkLabel(diameter_frame, text="Diameter: OK")
-        # self.label_diameter_indicator.pack(pady=2)
-        # self.diameter_deviation_label = ctk.CTkLabel(diameter_frame, text="Dev: 0.00 mm")
-        # self.diameter_deviation_label.pack(pady=2)
-
         # =============================
         # NOWE POLE NASTAW DLA RECEPTURY
         # =============================
+        
         row_start = 8  # Wstawiamy poniżej lumps/necks
 
         self.label_recipe_name = ctk.CTkLabel(self.left_panel, text="Nazwa receptury:")
@@ -818,79 +777,6 @@ class MainPage(ctk.CTkFrame):
         self.speed_fluct_entry.insert(0, "2.0")  # Changed default from 5% to 2%
         self.speed_fluct_entry.pack(side="right", padx=5)
 
-
-        # Simulation parameters frame - now at row=1
-        self.sim_frame = ctk.CTkFrame(self.middle_panel, fg_color="transparent") 
-        self.sim_frame.grid(row=1, column=0, padx=5, pady=5, sticky="nsew")
-        
-        # Parametry symulacji
-        self.label_lumps_chance = ctk.CTkLabel(self.sim_frame, text="Prawd. grudek:")
-        self.label_lumps_chance.grid(row=0, column=0, padx=5, pady=5, sticky="w")
-        self.entry_lumps_chance = ctk.CTkEntry(self.sim_frame, placeholder_text="0.01")
-        self.entry_lumps_chance.grid(row=0, column=1, padx=5, pady=5)
-
-        self.label_necks_chance = ctk.CTkLabel(self.sim_frame, text="Prawd. przewężeń:")
-        self.label_necks_chance.grid(row=1, column=0, padx=5, pady=5, sticky="w")
-        self.entry_necks_chance = ctk.CTkEntry(self.sim_frame, placeholder_text="0.01")
-        self.entry_necks_chance.grid(row=1, column=1, padx=5, pady=5)
-
-        self.label_d1_mean = ctk.CTkLabel(self.sim_frame, text="d1 średnia:")
-        self.label_d1_mean.grid(row=2, column=0, padx=5, pady=5, sticky="w")
-        self.entry_d1_mean = ctk.CTkEntry(self.sim_frame, placeholder_text="18.0")
-        self.entry_d1_mean.grid(row=2, column=1, padx=5, pady=5)
-
-        self.label_d1_std = ctk.CTkLabel(self.sim_frame, text="d1 odchylenie:")
-        self.label_d1_std.grid(row=3, column=0, padx=5, pady=5, sticky="w")
-        self.entry_d1_std = ctk.CTkEntry(self.sim_frame, placeholder_text="0.1")
-        self.entry_d1_std.grid(row=3, column=1, padx=5, pady=5)
-
-        self.label_d2_mean = ctk.CTkLabel(self.sim_frame, text="d2 średnia:")
-        self.label_d2_mean.grid(row=4, column=0, padx=5, pady=5, sticky="w")
-        self.entry_d2_mean = ctk.CTkEntry(self.sim_frame, placeholder_text="18.0")
-        self.entry_d2_mean.grid(row=4, column=1, padx=5, pady=5)
-
-        self.label_d2_std = ctk.CTkLabel(self.sim_frame, text="d2 odchylenie:")
-        self.label_d2_std.grid(row=5, column=0, padx=5, pady=5, sticky="w")
-        self.entry_d2_std = ctk.CTkEntry(self.sim_frame, placeholder_text="0.1")
-        self.entry_d2_std.grid(row=5, column=1, padx=5, pady=5)
-
-        self.label_d3_mean = ctk.CTkLabel(self.sim_frame, text="d3 średnia:")
-        self.label_d3_mean.grid(row=6, column=0, padx=5, pady=5, sticky="w")
-        self.entry_d3_mean = ctk.CTkEntry(self.sim_frame, placeholder_text="18.0")
-        self.entry_d3_mean.grid(row=6, column=1, padx=5, pady=5)
-
-        self.label_d3_std = ctk.CTkLabel(self.sim_frame, text="d3 odchylenie:")
-        self.label_d3_std.grid(row=7, column=0, padx=5, pady=5, sticky="w")
-        self.entry_d3_std = ctk.CTkEntry(self.sim_frame, placeholder_text="0.1")
-        self.entry_d3_std.grid(row=7, column=1, padx=5, pady=5)
-
-        self.label_d4_mean = ctk.CTkLabel(self.sim_frame, text="d4 średnia:")
-        self.label_d4_mean.grid(row=8, column=0, padx=5, pady=5, sticky="w")
-        self.entry_d4_mean = ctk.CTkEntry(self.sim_frame, placeholder_text="18.0")
-        self.entry_d4_mean.grid(row=8, column=1, padx=5, pady=5)
-
-        self.label_d4_std = ctk.CTkLabel(self.sim_frame, text="d4 odchylenie:")
-        self.label_d4_std.grid(row=9, column=0, padx=5, pady=5, sticky="w")
-        self.entry_d4_std = ctk.CTkEntry(self.sim_frame, placeholder_text="0.1")
-        self.entry_d4_std.grid(row=9, column=1, padx=5, pady=5)
-
-        self.speed_label = ctk.CTkLabel(self.sim_frame, text="Prędkość symulacji:")
-        self.speed_label.grid(row=11, column=0, padx=5, pady=5, sticky="w")
-        
-        self.speed_slider = ctk.CTkSlider(self.sim_frame, from_=0, to=100, command=self._on_speed_change)
-        self.speed_slider.set(self.production_speed)
-        self.speed_slider.grid(row=11, column=1, padx=5, pady=5, sticky="ew")
-        
-        self.speed_value_label = ctk.CTkLabel(self.sim_frame, text=f"Speed: {self.production_speed}")
-        self.speed_value_label.grid(row=12, column=0, columnspan=2, padx=5, pady=5, sticky="w")
-
-        self.btn_save_sim_settings = ctk.CTkButton(
-            self.sim_frame, text="Zapisz symulację", command=self._save_sim_settings
-        )
-        self.btn_save_sim_settings.grid(row=13, column=0, columnspan=2, padx=5, pady=10, sticky="ew")
-
-        # domyślnie chowamy parametry, jeśli symulacja nie jest aktywna
-        self._toggle_simulation_visibility(False)
 
     # ---------------------------------------------------------------------------------
     # 4. Prawa kolumna (row=1, col=2) – Wykres + przyciski
