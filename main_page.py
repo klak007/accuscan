@@ -885,6 +885,10 @@ class MainPage(ctk.CTkFrame):
         # Toggle simulation state
         self.controller.use_simulation = not self.controller.use_simulation
         
+        # If using multiprocessing, also update the shared flag
+        if hasattr(self.controller, 'use_simulation_flag'):
+            self.controller.use_simulation_flag.value = 1 if self.controller.use_simulation else 0
+        
         # Update button text and appearance based on state
         if self.controller.use_simulation:
             self.btn_simulation.configure(
@@ -1014,10 +1018,14 @@ class MainPage(ctk.CTkFrame):
     def _on_start(self):
         print("[GUI] Start pressed!")
         self.controller.run_measurement = True
+        if hasattr(self.controller, 'run_measurement_flag'):
+            self.controller.run_measurement_flag.value = 1
 
     def _on_stop(self):
         print("[GUI] Stop pressed!")
         self.controller.run_measurement = False
+        if hasattr(self.controller, 'run_measurement_flag'):
+            self.controller.run_measurement_flag.value = 0
 
     def _on_ack(self):
         print("[GUI] Kwituj pressed!")
