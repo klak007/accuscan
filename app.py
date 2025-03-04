@@ -56,8 +56,8 @@ class App(ctk.CTk):
         # Use multiprocessing.Queue for sharing data between processes
         # unlike threading.Queue, this is safe for interprocess communication
         import multiprocessing as mp
-        # Increased queue size to handle high demand periods
-        self.data_queue = mp.Queue(maxsize=1000)  # Queue for sending acquisition data to UI
+        # Smaller queue size to prevent memory buildup - we'll implement throttling instead
+        self.data_queue = mp.Queue(maxsize=250)  # Queue for sending acquisition data to UI
         
         # Zapisanie parametrów bazy danych jako atrybut
         self.db_params = config.DB_PARAMS
@@ -194,17 +194,39 @@ class App(ctk.CTk):
         last_perf_log = time.time()
         samples_processed = 0
         
+        # Process a larger batch size to keep up with high data rates
+        MAX_BATCH_SIZE = 100  # Increased from 20 to 100
+        QUEUE_WARNING_THRESHOLD = 50  # Log warnings if queue exceeds this size
+        QUEUE_CRITICAL_THRESHOLD = 200  # Start dropping samples if queue exceeds this size
+        
         while self.data_receiver_running:
             try:
-                # Process in batches to avoid falling behind when UI is busy
-                batch_size = min(20, self.data_queue.qsize())
+                # Check if we need to handle queue overflow situation
+                current_queue_size = self.data_queue.qsize()
+                
+                # Critical overflow - need to drop samples to catch up
+                if current_queue_size > QUEUE_CRITICAL_THRESHOLD:
+                    print(f"[Data Receiver] CRITICAL: Queue size {current_queue_size} exceeds threshold, dropping samples to catch up")
+                    # Drop samples to catch up, keeping only the most recent samples
+                    samples_to_drop = current_queue_size - QUEUE_WARNING_THRESHOLD
+                    for _ in range(samples_to_drop):
+                        try:
+                            # Get and discard samples
+                            _ = self.data_queue.get_nowait()
+                            self.data_queue.task_done()
+                        except queue.Empty:
+                            break
+                    print(f"[Data Receiver] Dropped {samples_to_drop} samples, new queue size: {self.data_queue.qsize()}")
+                
+                # Process in larger batches to avoid falling behind when UI is busy
+                batch_size = min(MAX_BATCH_SIZE, self.data_queue.qsize())
                 if batch_size == 0:
                     # No data available, try to get at least one sample with timeout
                     try:
                         data = self.data_queue.get(timeout=0.1)
                         batch_size = 1
                     except queue.Empty:
-                        # No data to process, just sleep a bit and continue
+                        # No data to process, sleep and continue
                         time.sleep(0.01)
                         continue
                 else:
@@ -215,7 +237,7 @@ class App(ctk.CTk):
                 
                 # Only refresh UI values occasionally to reduce overhead
                 ui_refresh_counter += 1
-                if ui_refresh_counter >= 10:  # Refresh every 10 processing cycles
+                if ui_refresh_counter >= 20:  # Reduced frequency of UI updates from 10 to 20 cycles
                     ui_refresh_counter = 0
                     # Update cached values from UI using the safer methods if available
                     if hasattr(self, 'main_page'):
@@ -237,131 +259,101 @@ class App(ctk.CTk):
                         except Exception as e:
                             print(f"[Data Receiver] UI access error: {e}")
                 
-                # First process the data we already retrieved
+                # Minimal processing for each sample
                 data["batch"] = batch_cache
                 data["product"] = product_cache
                 data["speed"] = speed_cache
                 
+                # Add to buffer but skip some unnecessary processing steps for bulk items
                 self.acquisition_buffer.add_sample(data)
                 self.logic.poll_plc_data(data)
                 self.latest_data = data
                 
-                # Database saving, but now based on flaw detection conditions
-                if self.db_connected and hasattr(self, 'main_page'):
-                    # Check if we need to save based on user thresholds
-                    save_to_db = False
-                    
-                    # Get current window flaw counts from the flaw detector
+                # Mark the task as done
+                self.data_queue.task_done()
+                samples_processed += 1
+                
+                # Database saving criteria - only for the first sample in the batch
+                # or for samples with flaws to avoid database overload
+                save_to_db = False
+                
+                # Only check flaw detector for first sample in batch for efficiency
+                if samples_processed % 10 == 0 and self.db_connected and hasattr(self, 'main_page'):
                     if hasattr(self.main_page, 'flaw_detector'):
-                        # Get user-defined thresholds if available
-                        max_lumps = 30  # Default
-                        max_necks = 7   # Default
-                        
-                        if hasattr(self.main_page, 'get_max_lumps'):
-                            max_lumps = self.main_page.get_max_lumps()
-                        elif hasattr(self.main_page, 'entry_max_lumps'):
-                            try:
-                                max_lumps = int(self.main_page.entry_max_lumps.get() or "30")
-                            except (ValueError, AttributeError):
-                                pass
-                                
-                        if hasattr(self.main_page, 'get_max_necks'):
-                            max_necks = self.main_page.get_max_necks()
-                        elif hasattr(self.main_page, 'entry_max_necks'):
-                            try:
-                                max_necks = int(self.main_page.entry_max_necks.get() or "7")
-                            except (ValueError, AttributeError):
-                                pass
-                        
-                        # Get current flaw counts from the detector
+                        # Check thresholds only periodically to reduce overhead
                         window_lumps = getattr(self.main_page.flaw_detector, 'window_lumps_count', 0)
                         window_necks = getattr(self.main_page.flaw_detector, 'window_necks_count', 0)
+                        
+                        # Get current window flaw counts from the detector
+                        max_lumps = getattr(self.main_page, 'get_max_lumps', lambda: 30)()
+                        max_necks = getattr(self.main_page, 'get_max_necks', lambda: 7)()
                         
                         # Save if thresholds are exceeded
                         if window_lumps >= max_lumps or window_necks >= max_necks:
                             save_to_db = True
-                            print(f"[Data Receiver] Saving to DB: Window flaws exceed thresholds (Lumps: {window_lumps}/{max_lumps}, Necks: {window_necks}/{max_necks})")
-                            
-                    # Immediate data (from the current sample)
-                    current_lumps = data.get("lumps", 0)
-                    current_necks = data.get("necks", 0)
-                    
-                    # Also save when we detect immediate flaws
-                    if current_lumps > 0 or current_necks > 0:
-                        save_to_db = True
-                    
-                    # If we decide to save, add to DB queue
-                    if save_to_db:
-                        try:
-                            self.db_queue.put_nowait((self.db_params, data))
-                        except queue.Full:
-                            print("[Data Receiver] DB queue full, couldn't save data")
-                            pass
                 
-                samples_processed += 1
+                # Always check immediate flaws
+                current_lumps = data.get("lumps", 0)
+                current_necks = data.get("necks", 0)
                 
-                # Then process any remaining items in the batch
+                # Save when we detect immediate flaws
+                if current_lumps > 0 or current_necks > 0:
+                    save_to_db = True
+                
+                # If we decide to save, add to DB queue
+                if save_to_db and self.db_connected:
+                    try:
+                        self.db_queue.put_nowait((self.db_params, data))
+                    except queue.Full:
+                        # Log but don't block
+                        pass
+                
+                # Then process remaining items in the batch - more efficiently
                 for _ in range(batch_size - 1):
                     try:
                         data = self.data_queue.get_nowait()
                         
-                        # Use cached UI values
+                        # Use cached UI values - minimal processing
                         data["batch"] = batch_cache
                         data["product"] = product_cache
                         data["speed"] = speed_cache
                         
+                        # Add to buffer - minimal processing
                         self.acquisition_buffer.add_sample(data)
-                        self.logic.poll_plc_data(data)
+                        
+                        # Update latest data
                         self.latest_data = data
                         
-                        # Use same database saving logic for batch items
-                        if self.db_connected and hasattr(self, 'main_page'):
-                            # Check if we need to save based on user thresholds
-                            save_to_db = False
-                            
-                            # Get current window flaw counts from the flaw detector
-                            if hasattr(self.main_page, 'flaw_detector'):
-                                # Use cached values from previous check
-                                window_lumps = getattr(self.main_page.flaw_detector, 'window_lumps_count', 0)
-                                window_necks = getattr(self.main_page.flaw_detector, 'window_necks_count', 0)
-                                
-                                # We already checked thresholds in first sample, so continue using those
-                                if window_lumps >= max_lumps or window_necks >= max_necks:
-                                    save_to_db = True
-                                    
-                            # Immediate data (from the current sample)
-                            current_lumps = data.get("lumps", 0)
-                            current_necks = data.get("necks", 0)
-                            
-                            # Also save when we detect immediate flaws
-                            if current_lumps > 0 or current_necks > 0:
-                                save_to_db = True
-                            
-                            # If we decide to save, add to DB queue
-                            if save_to_db:
-                                try:
-                                    self.db_queue.put_nowait((self.db_params, data))
-                                except queue.Full:
-                                    # Just drop it if queue is full
-                                    pass
-                        
+                        # Mark task as done
+                        self.data_queue.task_done()
                         samples_processed += 1
+                        
+                        # Only save flaws to database
+                        if self.db_connected and (data.get("lumps", 0) > 0 or data.get("necks", 0) > 0):
+                            try:
+                                self.db_queue.put_nowait((self.db_params, data))
+                            except queue.Full:
+                                pass
+                                
                     except queue.Empty:
-                        # Queue emptied during processing
                         break
                 
-                # Log batch processing performance
-                batch_time = time.perf_counter() - batch_start
-                if batch_size > 1 and batch_time > 0.01:  # Only log significant batches
-                    print(f"[Data Receiver] Processed batch of {batch_size} samples in {batch_time:.4f}s")
-                
-                # Log overall performance metrics every 5 seconds
+                # Log performance only periodically or when queue is large
+                current_queue_size = self.data_queue.qsize()
                 now = time.time()
-                if now - last_perf_log > 5.0:
+                
+                if (now - last_perf_log > 5.0) or (current_queue_size > QUEUE_WARNING_THRESHOLD):
                     elapsed = now - last_perf_log
                     rate = samples_processed / elapsed if elapsed > 0 else 0
-                    queue_size = self.data_queue.qsize()
-                    print(f"[Data Receiver] Processing rate: {rate:.1f} samples/sec, Queue size: {queue_size}")
+                    
+                    # Log more information if queue size is concerning
+                    if current_queue_size > QUEUE_WARNING_THRESHOLD:
+                        print(f"[Data Receiver] WARNING - Queue size: {current_queue_size}, " 
+                              f"Processing rate: {rate:.1f} samples/sec, "
+                              f"Batch time: {time.perf_counter() - batch_start:.4f}s for {batch_size} samples")
+                    else:
+                        print(f"[Data Receiver] Processing rate: {rate:.1f} samples/sec, Queue size: {current_queue_size}")
+                    
                     last_perf_log = now
                     samples_processed = 0
                         
@@ -555,29 +547,59 @@ class App(ctk.CTk):
                 data["plc_read_time"] = read_time
                 data["plc_reset_time"] = reset_time
                 
-                # Send the data to the main process via the queue
+                # Send the data to the main process via the queue with adaptive throttling
                 try:
-                    # Check queue size and log warning if it's getting full
+                    # Check queue size and implement dynamic throttling
                     current_size = data_queue.qsize()
                     
-                    # Non-blocking queue put with timeout - this allows us to drop samples
-                    # if the queue is full rather than blocking the acquisition cycle
-                    if current_size < 900:  # Only try to enqueue if we're not close to capacity
+                    # Define throttling thresholds
+                    LOW_THRESHOLD = 20      # Normal operation
+                    WARNING_THRESHOLD = 50  # Begin throttling
+                    HIGH_THRESHOLD = 200    # Aggressive throttling
+                    CRITICAL_THRESHOLD = 500 # Drop samples
+                    
+                    # Normal operation - queue is handling the load
+                    if current_size < LOW_THRESHOLD:
                         data_queue.put(data, block=False)
-                        
-                        # Only log every 10th message when queue size is below warning threshold
-                        if cycle_count % 10 == 0 and current_size < 20:
+                        # Only log occasionally during normal operation
+                        if cycle_count % 20 == 0:
                             print(f"[ACQ Process] Queue size: {current_size}")
-                        # Always log when queue size is concerning
-                        elif current_size > 20:
-                            print(f"[ACQ Process] WARNING: Queue size is high: {current_size}")
+                            
+                    # Warning level - begin throttling by adding delay proportional to queue size
+                    elif current_size < HIGH_THRESHOLD:
+                        data_queue.put(data, block=False)
+                        # Log warning
+                        if cycle_count % 5 == 0:
+                            print(f"[ACQ Process] WARNING: Queue growing - size: {current_size}")
+                        # Add small delay proportional to queue size
+                        delay_factor = (current_size - LOW_THRESHOLD) / (HIGH_THRESHOLD - LOW_THRESHOLD)
+                        throttle_delay = 0.005 * delay_factor  # max ~5ms delay
+                        time.sleep(throttle_delay)
+                        
+                    # High level - aggressive throttling and selective sampling
+                    elif current_size < CRITICAL_THRESHOLD:
+                        # Only add data with flaws or every 3rd sample
+                        if data.get("lumps", 0) > 0 or data.get("necks", 0) > 0 or cycle_count % 3 == 0:
+                            data_queue.put(data, block=False)
+                        # Always log high threshold warnings
+                        if cycle_count % 2 == 0:
+                            print(f"[ACQ Process] HIGH LOAD: Queue size {current_size} - throttling and selective sampling")
+                        # Add larger delay to let receiver catch up
+                        time.sleep(0.010)  # 10ms delay
+                        
+                    # Critical level - drop samples and let receiver catch up
                     else:
-                        # Queue is nearly full - drop this sample to avoid blocking
-                        print(f"[ACQ Process] CRITICAL: Queue size at {current_size} - dropping sample")
-                        # Sleep a tiny bit to give receiver time to catch up
-                        time.sleep(0.001)
+                        # Only keep samples with flaws
+                        if data.get("lumps", 0) > 0 or data.get("necks", 0) > 0:
+                            data_queue.put(data, block=False)
+                        # Always log critical warnings
+                        print(f"[ACQ Process] CRITICAL: Queue size at {current_size} - dropping samples, adding delay")
+                        # Add significant delay to allow receiver to catch up
+                        time.sleep(0.050)  # 50ms delay
+                        
                 except queue.Full:
                     print("[ACQ Process] Data queue is full. Could not enqueue data.")
+                    time.sleep(0.050)  # Add delay when queue is completely full
                 except Exception as e:
                     print(f"[ACQ Process] Error sending data to queue: {e}")
                 
