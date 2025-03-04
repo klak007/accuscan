@@ -18,6 +18,7 @@ pandas
 pillow
 ply
 protobuf==4.25.3
+psutil==5.9.8
 pyparsing
 PyQt5==5.15.10
 PyQt5_sip

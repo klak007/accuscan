@@ -18,6 +18,7 @@ pandas @ file:///C:/b/abs_e18w9ay4we/croot/pandas_1732735115740/work/dist/pandas
 pillow @ file:///C:/b/abs_b50vowcrzo/croot/pillow_1738010273782/work
 ply @ file:///C:/Users/dev-admin/perseverance-python-buildout/croot/ply_1729041337918/work
 protobuf==4.25.3
+psutil==5.9.8
 pyparsing @ file:///C:/Users/dev-admin/buildout/croot/pyparsing_1735861809022/work
 PyQt5==5.15.10
 PyQt5_sip @ file:///C:/b/abs_d1i1jr9fgt/croot/pyqt-split_1736540551157/work/pyqt_sip

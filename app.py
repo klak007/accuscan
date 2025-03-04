@@ -805,6 +805,14 @@ class App(ctk.CTk):
         self.db_worker_running = False
         self.plc_writer_running = False
         
+        # Clean up plot process if it exists in main_page
+        if hasattr(self, 'main_page') and hasattr(self.main_page, 'plot_manager'):
+            try:
+                self.main_page.plot_manager.stop_plot_process()
+                print("[App] Plot process stopped")
+            except Exception as e:
+                print(f"[App] Error stopping plot process: {e}")
+        
         # Wait for threads to finish (with timeout)
         if hasattr(self, 'acquisition_thread') and self.acquisition_thread and self.acquisition_thread.is_alive():
             self.acquisition_thread.join(timeout=1.0)
