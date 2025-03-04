@@ -80,8 +80,6 @@ class SettingsPage(ctk.CTkFrame):
         self.btn_historia.pack(side="left", padx=5)
         self.btn_accuscan  = ctk.CTkButton(self.top_bar, text="Accuscan",  command=self._on_accuscan_click)
         self.btn_accuscan.pack(side="left", padx=5)
-        self.btn_auth = ctk.CTkButton(self.top_bar, text="Log In", command=self._on_auth_click)
-        self.btn_auth.pack(side="left", padx=5)
         # --- New indicators placed to the right of btn_auth ---
         self.ind_plc = ctk.CTkLabel(self.top_bar, text="PLC: Unknown", fg_color="transparent", text_color="orange")
         self.ind_plc.pack(side="right", padx=5)
@@ -112,43 +110,6 @@ class SettingsPage(ctk.CTkFrame):
 
     def _on_accuscan_click(self):
         print("[GUI] Kliknięto przycisk 'Accuscan'.")
-
-    def _on_auth_click(self):
-        if not self.controller.user_manager.current_user:
-            self._show_login_dialog()
-        else:
-            self.controller.user_manager.logout()
-            self.btn_auth.configure(text="Log In")
-            print("[GUI] Wylogowano.")
-
-    def _show_login_dialog(self):
-        login_dialog = ctk.CTkToplevel(self)
-        login_dialog.title("Log In")
-        login_dialog.geometry("300x300")
-        login_dialog.resizable(False, False)
-        username_label = ctk.CTkLabel(login_dialog, text="Username:")
-        username_label.pack(pady=(20, 5))
-        username_entry = ctk.CTkEntry(login_dialog)
-        username_entry.pack(pady=5)
-        password_label = ctk.CTkLabel(login_dialog, text="Password:")
-        password_label.pack(pady=(10, 5))
-        password_entry = ctk.CTkEntry(login_dialog, show="*")
-        password_entry.pack(pady=5)
-        submit_btn = ctk.CTkButton(login_dialog, text="Submit", command=lambda: self._submit_login(username_entry, password_entry, login_dialog, submit_btn))
-        submit_btn.pack(pady=(15, 10))
-
-    def _submit_login(self, username_entry, password_entry, dialog, submit_btn):
-        username = username_entry.get()
-        password = password_entry.get()
-        if username and password:
-            if self.controller.user_manager.login(username, password):
-                submit_btn.configure(text="Zalogowano", fg_color="green")
-                self.btn_auth.configure(text="Log Out")
-                dialog.after(1000, dialog.destroy)
-            else:
-                submit_btn.configure(text="Niepoprawne dane", fg_color="red")
-        else:
-            submit_btn.configure(text="Niepoprawne dane", fg_color="red")
 
     def _create_filter_panel(self):
         self.filter_frame = ctk.CTkFrame(self.main_frame)

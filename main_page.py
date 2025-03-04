@@ -10,7 +10,6 @@ from tkinter import messagebox
 from tkinter import simpledialog, messagebox
 import db_helper
 import plc_helper
-from window_fft_analysis import analyze_window_fft
 import time
 from db_helper import save_settings, save_settings_history
 
@@ -74,8 +73,6 @@ class MainPage(ctk.CTkFrame):
         self.min_plot_interval = 0.8  # Minimum seconds between plot updates
 
         self._create_top_bar()
-        if self.controller.user_manager.current_user:
-            self.btn_auth.configure(text="Log Out")
         self._create_left_panel()
         self._create_middle_panel()
         self._create_right_panel()
@@ -115,14 +112,11 @@ class MainPage(ctk.CTkFrame):
         self.btn_nastawy  = ctk.CTkButton(self.top_bar, text="nastawy",  command=lambda: self.controller.toggle_page("SettingsPage"))
         self.btn_historia  = ctk.CTkButton(self.top_bar, text="historia",  command=self._on_historia_click)
         self.btn_accuscan  = ctk.CTkButton(self.top_bar, text="Accuscan",  command=self._on_accuscan_click)
-        # Single authentication button (toggle login/logout)
-        self.btn_auth = ctk.CTkButton(self.top_bar, text="Log In", command=self._on_auth_click)
 
         self.btn_pomiary.pack(side="left", padx=5)
         self.btn_nastawy.pack(side="left", padx=5)
         self.btn_historia.pack(side="left", padx=5)
         self.btn_accuscan.pack(side="left", padx=5)
-        self.btn_auth.pack(side="left", padx=5)
         
         # New control frame added for measurement buttons (Start/Stop/Kwituj)
         self.control_frame = ctk.CTkFrame(self.top_bar)
@@ -159,60 +153,13 @@ class MainPage(ctk.CTkFrame):
     def _on_accuscan_click(self):
         print("[GUI] Kliknięto przycisk 'Accuscan'.")
 
-    def _on_auth_click(self):
-        # If no user is logged in, prompt login dialog.
-        if not self.controller.user_manager.current_user:
-            self._show_login_dialog()
-        else:
-            # Log out the current user and update button text.
-            self.controller.user_manager.logout()
-            self.btn_auth.configure(text="Log In")
-            print("[GUI] Wylogowano.")
-
-    def _show_login_dialog(self):
-        login_dialog = ctk.CTkToplevel(self)
-        login_dialog.title("Log In")
-        login_dialog.geometry("300x300")
-        login_dialog.resizable(False, False)
-        
-        username_label = ctk.CTkLabel(login_dialog, text="Username:")
-        username_label.pack(pady=(20, 5))
-        username_entry = ctk.CTkEntry(login_dialog)
-        username_entry.pack(pady=5)
-        
-        password_label = ctk.CTkLabel(login_dialog, text="Password:")
-        password_label.pack(pady=(10, 5))
-        password_entry = ctk.CTkEntry(login_dialog, show="*")
-        password_entry.pack(pady=5)
-        
-        submit_btn = ctk.CTkButton(
-            login_dialog, text="Submit",
-            command=lambda: self._submit_login(username_entry, password_entry, login_dialog, submit_btn)
-        )
-        submit_btn.pack(pady=(15, 10))
-
-    def _submit_login(self, username_entry, password_entry, dialog, submit_btn):
-        username = username_entry.get()
-        password = password_entry.get()
-        if username and password:
-            if self.controller.user_manager.login(username, password):
-                submit_btn.configure(text="Zalogowano", fg_color="green")
-                # Update the auth button text to "Log Out"
-                self.btn_auth.configure(text="Log Out")
-                dialog.after(1000, dialog.destroy)
-            else:
-                submit_btn.configure(text="Niepoprawne dane", fg_color="red")
-        else:
-            submit_btn.configure(text="Niepoprawne dane", fg_color="red")
-
     def _on_exit_click(self):
-        """Safely close the application"""
         # Stop measurements
-        self.controller.run_measurement = False
-        # Close PLC connection through logic
-        self.controller.logic.close_logic()
-        # Destroy the main window
+        self.controller.run_measurement_flag.value = 0  # if you have such a flag
+        self.controller.process_running_flag.value = 0  # to signal child process to exit
+        # Optionally, wait a moment or join the process if needed
         self.controller.destroy()
+
 
     # ---------------------------------------------------------------------------------
     # 2. Lewa kolumna (row=1, col=0) – Batch, Product, itp.
@@ -610,7 +557,7 @@ class MainPage(ctk.CTkFrame):
     def _save_settings(self):
         """
         Zczytuje wartości z entry i zapisuje do bazy (settings + settings_register),
-        a następnie wysyła parametry do PLC.
+        a następnie wysyła parametry do PLC asynchronicznie.
         """
         # 1. Zczytaj wartości z pól
         recipe_name = self.entry_recipe_name.get() or ""
@@ -624,16 +571,20 @@ class MainPage(ctk.CTkFrame):
         max_necks_str = self.entry_max_necks.get() or "3"
 
         # Konwersje na float lub int
-        diameter_setpoint = float(diameter_setpoint_str)
-        tolerance_plus = float(tolerance_plus_str)
-        tolerance_minus = float(tolerance_minus_str)
-        lump_threshold = float(lump_threshold_str)
-        neck_threshold = float(neck_threshold_str)
-        flaw_window = float(flaw_window_str)
-        max_lumps = int(max_lumps_str)
-        max_necks = int(max_necks_str)
+        try:
+            diameter_setpoint = float(diameter_setpoint_str)
+            tolerance_plus = float(tolerance_plus_str)
+            tolerance_minus = float(tolerance_minus_str)
+            lump_threshold = float(lump_threshold_str)
+            neck_threshold = float(neck_threshold_str)
+            flaw_window = float(flaw_window_str)
+            max_lumps = int(max_lumps_str)
+            max_necks = int(max_necks_str)
+        except ValueError:
+            messagebox.showerror("Błąd", "Błędne dane wejściowe.")
+            return
 
-        # 2. Zbuduj słownik do zapisu w bazie, używając kluczy zgodnych z tymi oczekiwanymi przez db_helper:
+        # 2. Zbuduj słownik do zapisu w bazie (tak jak wcześniej)
         settings_data = {
             "recipe_name": recipe_name,
             "product_nr": self.entry_product.get() or "",
@@ -645,8 +596,6 @@ class MainPage(ctk.CTkFrame):
             "flaw_window": flaw_window,
             "max_lumps_in_flaw_window": max_lumps,
             "max_necks_in_flaw_window": max_necks,
-            # Dodatkowe wartości – możesz je ustawić na stałe lub odczytać z innych pól,
-            # jeżeli są dostępne w interfejsie użytkownika:
             "diameter_window": 0.0,
             "diameter_std_dev": 0.0,
             "num_scans": 128,
@@ -655,42 +604,35 @@ class MainPage(ctk.CTkFrame):
             "neck_histeresis": 0.0,
         }
 
-        # 3. Zapis do bazy (settings + history)
+        # 3. Zapis do bazy
         try:
-            
             settings_id = save_settings(self.controller.db_params, settings_data)
-            # Jeśli chcesz, możesz także wywołać save_settings_history – funkcja save_settings
-            # sama już ją wywołuje w niektórych implementacjach.
             print("[GUI] Wysłano nowe nastawy do DB.")
         except Exception as e:
             messagebox.showerror("Błąd", f"Nie udało się zapisać ustawień do DB: {str(e)}")
+            return
 
-        # 4. Zapis do PLC przez plc_helper:
+        # 4. Wysyłanie komendy do PLC asynchronicznie poprzez kolejkę:
+        # Skoro cykliczne resetowanie zt odbywa się w _acquisition_process_worker, nie potrzebujemy tutaj sterować tym
+        write_cmd = {
+            "command": "write_settings",
+            "params": {
+                "db_number": 2,
+                "lump_threshold": lump_threshold,
+                "neck_threshold": neck_threshold,
+                "flaw_preset_diameter": diameter_setpoint,
+                "upper_tol": tolerance_plus,
+                "under_tol": tolerance_minus
+                # Nie przekazujemy zt, bo reset zt jest wykonywany cyklicznie
+            }
+        }
         try:
-            plc_helper.write_accuscan_out_settings(
-                self.controller.logic.plc_client,  # zakładam, że połączenie do PLC mamy w logic
-                db_number=2,  # np. DB2
-                lump_threshold=lump_threshold,
-                neck_threshold=neck_threshold,
-                flaw_preset_diameter=diameter_setpoint,
-                upper_tol=tolerance_plus,
-                under_tol=tolerance_minus,
-                zt=True  # Reset tolerancji
-            )
-            # Reset ZT in next cycle:
-            self.after(100, lambda: plc_helper.write_accuscan_out_settings(
-                self.controller.logic.plc_client,
-                db_number=2,
-                zt=False,
-                lump_threshold=lump_threshold,
-                neck_threshold=neck_threshold,
-                flaw_preset_diameter=diameter_setpoint,
-                upper_tol=tolerance_plus,
-                under_tol=tolerance_minus
-            ))
-            print("[GUI] Wysłano nowe nastawy do PLC.")
+            # Wysyłamy komendę do kolejki – wątek PLC writer odbierze ją i wykona zapis
+            self.controller.plc_write_queue.put_nowait(write_cmd)
+            print("[GUI] Komenda zapisu nastaw do PLC wysłana asynchronicznie.")
         except Exception as e:
-            print(f"[GUI] Błąd zapisu do PLC: {e}")
+            print(f"[GUI] Błąd przy wysyłaniu komendy do PLC: {e}")
+
 
 
     def _on_speed_change(self, value: float):
@@ -950,81 +892,6 @@ class MainPage(ctk.CTkFrame):
         # domyślnie chowamy parametry, jeśli symulacja nie jest aktywna
         self._toggle_simulation_visibility(False)
 
-    def _toggle_simulation(self):
-        # Check permissions
-        if not self.controller.user_manager.is_admin():
-            print("[GUI] Brak uprawnień do uruchomienia symulacji!")
-            messagebox.showwarning("Brak uprawnień", 
-                                "Musisz być zalogowany jako admin, aby włączyć symulację.")
-            return
-        
-        # Toggle simulation state
-        self.controller.use_simulation = not self.controller.use_simulation
-        
-        # If using multiprocessing, also update the shared flag
-        if hasattr(self.controller, 'use_simulation_flag'):
-            self.controller.use_simulation_flag.value = 1 if self.controller.use_simulation else 0
-        
-        # Update button text and appearance based on state
-        if self.controller.use_simulation:
-            self.btn_simulation.configure(
-                text="Wyłącz symulację",
-                fg_color="orange", 
-                hover_color="dark orange"
-            )
-            self._toggle_simulation_visibility(True)
-        else:
-            self.btn_simulation.configure(
-                text="Włącz symulację",
-                fg_color="blue",
-                hover_color="dark blue"
-            )
-            self._toggle_simulation_visibility(False)
-        
-        print(f"[GUI] Symulacja={self.controller.use_simulation}")
-
-    def _toggle_simulation_visibility(self, visible: bool):
-        if visible:
-            self.sim_frame.grid()
-        else:
-            self.sim_frame.grid_remove()
-
-    def _save_sim_settings(self):
-        d1_mean_str = self.entry_d1_mean.get()
-        lumps_str = self.entry_lumps_chance.get()
-        d2_mean_str = self.entry_d2_mean.get()
-        d3_mean_str = self.entry_d3_mean.get()
-        d4_mean_str = self.entry_d4_mean.get()
-        d1_std_str = self.entry_d1_std.get()
-        d2_std_str = self.entry_d2_std.get()
-        d3_std_str = self.entry_d3_std.get()
-        d4_std_str = self.entry_d4_std.get()
-        necks_str = self.entry_necks_chance.get()
-
-        # nastawy do symulatora
-        if d1_mean_str:
-            self.controller.simulator.d1_mean = float(d1_mean_str)
-        if lumps_str:
-            self.controller.simulator.lumps_chance = float(lumps_str)
-        if d2_mean_str:
-            self.controller.simulator.d2_mean = float(d2_mean_str)
-        if d3_mean_str:
-            self.controller.simulator.d3_mean = float(d3_mean_str)
-        if d4_mean_str:
-            self.controller.simulator.d4_mean = float(d4_mean_str)
-        if d1_std_str:
-            self.controller.simulator.d1_std = float(d1_std_str)
-        if d2_std_str:
-            self.controller.simulator.d2_std = float(d2_std_str)
-        if d3_std_str:
-            self.controller.simulator.d3_std = float(d3_std_str)
-        if d4_std_str:
-            self.controller.simulator.d4_std = float(d4_std_str)
-        if necks_str:
-            self.controller.simulator.necks_chance = float(necks_str)
-
-        print("[GUI] Zapisano parametry symulacji w obiekcie simulator.")
-
     # ---------------------------------------------------------------------------------
     # 4. Prawa kolumna (row=1, col=2) – Wykres + przyciski
     # ---------------------------------------------------------------------------------
@@ -1094,35 +961,47 @@ class MainPage(ctk.CTkFrame):
     def _on_start(self):
         print("[GUI] Start pressed!")
         self.controller.run_measurement = True
+
+        # Wysyłamy komendę do PLC writer
+        try:
+            # Przygotowujemy słownik komendy resetu.
+            # Nazwa komendy to np. "write_reset".
+            # Parametry: ustaw resetujące bity na True.
+            reset_cmd = {
+                "command": "write_reset",
+                "params": {
+                    "db_number": 2,
+                    "zl": True, 
+                    "zn": True, 
+                    "zf": True, 
+                    "zt": False,
+                    # Pozostałe parametry nie są potrzebne – mogą być None albo pominięte,
+                    # bo cykliczny reset z tą częścią wykonuje się w workerze.
+                }
+            }
+            # Wysyłamy komendę do kolejki PLC writer.
+            self.controller.plc_write_queue.put_nowait(reset_cmd)
+            print("[GUI] Initial reset command sent to PLC via queue.")
+
+            # Opcjonalnie – wyślij komendę czyszczącą (clear reset bits) po 100ms.
+            def clear_reset():
+                clear_cmd = {
+                    "command": "write_reset",
+                    "params": {
+                        "db_number": 2,
+                        "zl": False, 
+                        "zn": False, 
+                        "zf": False, 
+                        "zt": False
+                    }
+                }
+                self.controller.plc_write_queue.put_nowait(clear_cmd)
+                print("[GUI] Clear reset command sent to PLC via queue.")
+            self.after(100, clear_reset)
+        except Exception as e:
+            print(f"[GUI] Error sending reset command: {e}")
         
-        # Force a reset of the PLC counters before starting the measurement
-        if hasattr(self.controller, 'logic') and hasattr(self.controller.logic, 'plc_client'):
-            try:
-                # Send a reset command to the PLC immediately when starting
-                from plc_helper import write_accuscan_out_settings
-                plc_client = self.controller.logic.plc_client
-                
-                # First reset that immediately clears all counters
-                print("[GUI] Sending initial reset to PLC")
-                write_accuscan_out_settings(
-                    plc_client, db_number=2,
-                    # Set all reset bits
-                    zl=True, zn=True, zf=True, zt=False,
-                    # Keep other settings at current values
-                    lump_threshold=None,
-                    neck_threshold=None,
-                    flaw_preset_diameter=None,
-                    upper_tol=None,
-                    under_tol=None
-                )
-                
-                # Additional reset after a small delay to ensure bits are cleared
-                # Schedule this to run after a brief delay
-                self.after(100, lambda: self._clear_reset_bits(plc_client))
-            except Exception as e:
-                print(f"[GUI] Error during initial reset: {e}")
-        
-        # Set the measurement flag to start acquisition
+        # Ustaw flagę pomiaru, aby rozpocząć akwizycję.
         if hasattr(self.controller, 'run_measurement_flag'):
             self.controller.run_measurement_flag.value = 1
             self.controller.initial_reset_needed = True
@@ -1153,37 +1032,48 @@ class MainPage(ctk.CTkFrame):
             self.controller.run_measurement_flag.value = 0
 
     def _on_ack(self):
-        """Handle Kwituj button press by resetting all PLC counters"""
+        """Handle Kwituj button press by asynchronously resetting all PLC counters."""
         print("[GUI] Kwituj pressed!")
         
-        # Send a reset command to the PLC when Kwituj is pressed
-        if hasattr(self.controller, 'logic') and hasattr(self.controller.logic, 'plc_client'):
-            try:
-                # Get access to the plc client
-                from plc_helper import write_accuscan_out_settings
-                plc_client = self.controller.logic.plc_client
-                
-                if plc_client and plc_client.get_connected():
-                    # First reset that immediately clears all counters
-                    print("[GUI] Sending Kwituj reset to PLC")
-                    write_accuscan_out_settings(
-                        plc_client, db_number=2,
-                        # Set all reset bits
-                        zl=True, zn=True, zf=True, zt=True,  # Including zt here is important
-                        # Keep other settings at current values
-                        lump_threshold=None,
-                        neck_threshold=None,
-                        flaw_preset_diameter=None,
-                        upper_tol=None,
-                        under_tol=None
-                    )
-                    
-                    # Schedule clearing the reset bits after a brief delay
-                    self.after(100, lambda: self._clear_reset_bits_all(plc_client))
-                else:
-                    print("[GUI] Cannot reset PLC - no connection")
-            except Exception as e:
-                print(f"[GUI] Error during Kwituj reset: {e}")
+        try:
+            # Przygotuj komendę resetu dla przycisku Kwituj.
+            # Tutaj chcemy ustawić wszystkie bity resetu (zl, zn, zf, zt) na True.
+            ack_cmd = {
+                "command": "ack_reset",
+                "params": {
+                    "db_number": 2,
+                    "zl": True,
+                    "zn": True,
+                    "zf": True,
+                    "zt": True
+                    # Inne parametry (lump_threshold, neck_threshold, flaw_preset_diameter, upper_tol, under_tol)
+                    # nie są wymagane, jeśli PLC worker odczytuje bieżące wartości lub reset wykonuje się cyklicznie.
+                }
+            }
+            # Wysłanie komendy do kolejki PLC writer
+            self.controller.plc_write_queue.put_nowait(ack_cmd)
+            print("[GUI] Kwituj reset command sent asynchronously.")
+            
+            # Po 100 ms wysyłamy komendę, która czyści bity resetu (ustawia wszystkie na False).
+            def clear_ack():
+                clear_ack_cmd = {
+                    "command": "ack_reset_clear",
+                    "params": {
+                        "db_number": 2,
+                        "zl": False,
+                        "zn": False,
+                        "zf": False,
+                        "zt": False
+                    }
+                }
+                self.controller.plc_write_queue.put_nowait(clear_ack_cmd)
+                print("[GUI] Ack clear reset command sent asynchronously.")
+            
+            self.after(100, clear_ack)
+            
+        except Exception as e:
+            print(f"[GUI] Error during asynchronous Kwituj reset: {e}")
+
     
     def _clear_reset_bits_all(self, plc_client):
         """Clear ALL reset bits after Kwituj reset"""
@@ -1384,15 +1274,6 @@ class MainPage(ctk.CTkFrame):
                 self.fig_diameter.canvas.draw() 
                 self.last_forced_draw = time.time()
         plot_update_time = time.perf_counter() - plot_update_start
-
-        # Update counter displays
-        counters = self.controller.logic.get_counters()
-        self.lumps_count_label.configure(
-            text=f"Count: {counters['lumps_count']} (Window: {flaw_results['window_lumps_count']})"
-        )
-        self.necks_count_label.configure(
-            text=f"Count: {counters['necks_count']} (Window: {flaw_results['window_necks_count']})"
-        )
         
         # Performance logging (only for slow updates)
         total_update_time = time.perf_counter() - update_start
@@ -1441,4 +1322,3 @@ class MainPage(ctk.CTkFrame):
             self.ind_plc.configure(text="PLC: OK", text_color="green")
         else:
             self.ind_plc.configure(text="PLC: OFF", text_color="red")
-

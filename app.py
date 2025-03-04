@@ -11,14 +11,10 @@ from tkinter import messagebox
 # Import modułów
 from plc_helper import read_accuscan_data, connect_plc
 from db_helper import init_database, save_measurement_sample, check_database
-from data_manager import DataManager
 from data_processing import FastAcquisitionBuffer
-from logic import MeasurementLogic
-from user_manager import UserManager
 # Import stron
 from main_page import MainPage
 from settings_page import SettingsPage
-from accuscan_simulator import AccuScanSimulator
 
 # Configuration settings (originally from config.py)
 # PLC connection parameters
@@ -34,12 +30,6 @@ DB_PARAMS = {
     "db": "accuscan_db",
     "port": 3306
 }
-
-# Optional read interval (in seconds)
-READ_INTERVAL_S = 0.05    # 50ms sampling
-
-# Maximum number of samples to keep in the buffer
-MAX_SAMPLES = 1000
 
 # Set multiprocessing start method to 'spawn' for better compatibility
 if __name__ == "__main__":
@@ -58,7 +48,7 @@ class App(ctk.CTk):
         
         # Flagi sterujące
         self.run_measurement = False
-        self.use_simulation = False
+        
         self.current_page = "MainPage"
         self.db_connected = False
         
@@ -73,6 +63,9 @@ class App(ctk.CTk):
         self.db_queue = queue.Queue(maxsize=100)  # Queue for database operations
         self.plc_write_queue = queue.Queue(maxsize=20)  # Queue for PLC write operations
         
+        # Start PLC writer thread
+        self.start_plc_writer()
+
         # Use multiprocessing.Queue for sharing data between processes
         # unlike threading.Queue, this is safe for interprocess communication
         import multiprocessing as mp
@@ -85,26 +78,8 @@ class App(ctk.CTk):
         # Inicjalizacja bazy danych
         self.init_database_connection()
         
-        # Inicjalizacja logiki
-        self.logic = MeasurementLogic(controller=self)
-        self.logic.init_logic()
-        
-        # UserManager for user management
-        self.user_manager = UserManager()
-        
-        # Legacy DataManager - will be phased out
-        # Keep temporarily for backwards compatibility
-        self.data_mgr = DataManager(max_samples=1000)
-        
         # FastAcquisitionBuffer for high-speed acquisition
-        # This will eventually replace DataManager completely
         self.acquisition_buffer = FastAcquisitionBuffer(max_samples=1024)
-        
-        # Make acquisition_buffer available as data_mgr.buffer for transition
-        self.data_mgr.buffer = self.acquisition_buffer
-        
-        # Symulator AccuScan
-        self.simulator = AccuScanSimulator()
         
         # --- Tworzymy kontener na strony ---
         self.container = ctk.CTkFrame(self)
@@ -123,9 +98,6 @@ class App(ctk.CTk):
         
         # Start database worker thread
         self.start_db_worker()
-        
-        # Start PLC writer thread
-        self.start_plc_writer()
         
         # Start data acquisition process (not thread)
         self.start_acquisition_process()
@@ -167,7 +139,7 @@ class App(ctk.CTk):
         
         # Shared control variables between processes
         self.run_measurement_flag = Value('i', 0)  # 0 = False, 1 = True
-        self.use_simulation_flag = Value('i', 0)  # 0 = False, 1 = True
+        
         self.process_running_flag = Value('i', 1)  # 1 = True, 0 = False
         
         # Create a separate process for data acquisition
@@ -176,7 +148,7 @@ class App(ctk.CTk):
             args=(
                 self.process_running_flag,
                 self.run_measurement_flag,
-                self.use_simulation_flag,
+                
                 self.data_queue,
                 PLC_IP,
                 PLC_RACK,
@@ -286,46 +258,12 @@ class App(ctk.CTk):
                 
                 # Add to buffer but skip some unnecessary processing steps for bulk items
                 self.acquisition_buffer.add_sample(data)
-                self.logic.poll_plc_data(data)
                 self.latest_data = data
                 
                 # Note: multiprocessing.Queue doesn't have task_done method
                 samples_processed += 1
                 
-                # Database saving criteria - only for the first sample in the batch
-                # or for samples with flaws to avoid database overload
-                save_to_db = False
-                
-                # Only check flaw detector for first sample in batch for efficiency
-                if samples_processed % 10 == 0 and self.db_connected and hasattr(self, 'main_page'):
-                    if hasattr(self.main_page, 'flaw_detector'):
-                        # Check thresholds only periodically to reduce overhead
-                        window_lumps = getattr(self.main_page.flaw_detector, 'window_lumps_count', 0)
-                        window_necks = getattr(self.main_page.flaw_detector, 'window_necks_count', 0)
-                        
-                        # Get current window flaw counts from the detector
-                        max_lumps = getattr(self.main_page, 'get_max_lumps', lambda: 30)()
-                        max_necks = getattr(self.main_page, 'get_max_necks', lambda: 7)()
-                        
-                        # Save if thresholds are exceeded
-                        if window_lumps >= max_lumps or window_necks >= max_necks:
-                            save_to_db = True
-                
-                # Always check immediate flaws
-                current_lumps = data.get("lumps", 0)
-                current_necks = data.get("necks", 0)
-                
-                # Save when we detect immediate flaws
-                if current_lumps > 0 or current_necks > 0:
-                    save_to_db = True
-                
-                # If we decide to save, add to DB queue
-                if save_to_db and self.db_connected:
-                    try:
-                        self.db_queue.put_nowait((self.db_params, data))
-                    except queue.Full:
-                        # Log but don't block
-                        pass
+                # Database saving removed - no longer saving measurement samples
                 
                 # Then process remaining items in the batch - more efficiently
                 for _ in range(batch_size - 1):
@@ -346,13 +284,8 @@ class App(ctk.CTk):
                         # Note: multiprocessing.Queue doesn't have task_done method
                         samples_processed += 1
                         
-                        # Only save flaws to database
-                        if self.db_connected and (data.get("lumps", 0) > 0 or data.get("necks", 0) > 0):
-                            try:
-                                self.db_queue.put_nowait((self.db_params, data))
-                            except queue.Full:
-                                pass
-                                
+                        # Database saving removed - no longer saving measurement samples
+                            
                     except queue.Empty:
                         break
                 
@@ -381,7 +314,7 @@ class App(ctk.CTk):
                 time.sleep(0.01)
     
     @staticmethod
-    def _acquisition_process_worker(process_running, run_measurement, use_simulation, data_queue, plc_ip, plc_rack, plc_slot):
+    def _acquisition_process_worker(process_running, run_measurement, data_queue, plc_ip, plc_rack, plc_slot):
         """
         Worker function for high-speed data acquisition process.
         This runs in a separate process to avoid GIL limitations.
@@ -389,7 +322,7 @@ class App(ctk.CTk):
         Args:
             process_running: Shared Value flag indicating if process should continue running
             run_measurement: Shared Value flag indicating if measurements should be taken
-            use_simulation: Shared Value flag indicating if simulation should be used
+            
             data_queue: Multiprocessing Queue for sending data back to main process
             plc_ip: IP address of the PLC
             plc_rack: Rack number of the PLC
@@ -454,7 +387,7 @@ class App(ctk.CTk):
                 continue
                 
             # Check PLC connection and retry if needed
-            if not (plc_client and plc_client.get_connected()) and not use_simulation.value:
+            if not (plc_client and plc_client.get_connected()):
                 try:
                     plc_client = connect_plc(plc_ip, plc_rack, plc_slot, max_attempts=1)
                     print(f"[ACQ Process] Reconnected to PLC at {plc_ip}")
@@ -465,7 +398,7 @@ class App(ctk.CTk):
                     continue
             
             # Perform initial reset when starting measurements
-            if initial_reset_needed and plc_client and plc_client.get_connected() and not use_simulation.value:
+            if initial_reset_needed and plc_client and plc_client.get_connected():
                 try:
                     print("[ACQ Process] Performing initial reset after measurement start")
                     # First reset with all reset bits set
@@ -493,13 +426,8 @@ class App(ctk.CTk):
                 # READ-RESET CYCLE: Critical to reset counters in the same 32ms cycle
                 plc_start = time.perf_counter()
                 
-                # Simulation or real data based on flag
-                if use_simulation.value:
-                    from accuscan_simulator import AccuScanSimulator
-                    simulator = AccuScanSimulator()
-                    data = simulator.read_data()
-                else:
-                    data = read_accuscan_data(plc_client, db_number=2)
+                
+                data = read_accuscan_data(plc_client, db_number=2)
                 read_time = time.perf_counter() - plc_start
                 
                 # 2. IMMEDIATELY reset the counters in PLC to avoid cumulative counts
@@ -517,7 +445,7 @@ class App(ctk.CTk):
                     print("[ACQ Process] Performing emergency reset...")
                 
                 # Perform reset for ANY flaws or if values are suspiciously high
-                if (has_flaws or lumps > 100 or necks > 100) and not use_simulation.value:
+                if (has_flaws or lumps > 100 or necks > 100):
                     try:
                         # For performance optimization on frequent resets, do reset with separate writes
                         # First set bits to clear counters
@@ -660,13 +588,13 @@ class App(ctk.CTk):
             except Exception as e:
                 print(f"[ACQ Process] Error during acquisition: {e}")
                 # If it's a PLC connection issue, clean up and try to reconnect next cycle
-                if not use_simulation.value:
-                    try:
-                        if plc_client:
-                            plc_client.disconnect()
-                            plc_client = None
-                    except:
-                        pass
+                
+                try:
+                    if plc_client:
+                        plc_client.disconnect()
+                        plc_client = None
+                except:
+                    pass
                 time.sleep(0.1)  # Small delay before next attempt
         
         print("[ACQ Process] Acquisition process worker exiting")
@@ -676,7 +604,41 @@ class App(ctk.CTk):
                 plc_client.disconnect()
             except:
                 pass
+
+    def start_plc_writer(self):
+        """Start worker thread for PLC write operations."""
+        self.plc_writer_running = True
+        self.plc_writer_thread = threading.Thread(target=self._plc_writer, daemon=True)
+        self.plc_writer_thread.start()
+        print("[App] PLC writer thread started")
+
     
+    def _plc_writer(self):
+        """Worker function for PLC write operations."""
+        while self.plc_writer_running:
+            try:
+                write_cmd = self.plc_write_queue.get(timeout=0.5)
+                if write_cmd.get("command") == "write_accuscan_out_settings":
+                    from plc_helper import write_accuscan_out_settings
+                    # Użyj obiektu PLC, który masz – np. self.plc_client,
+                    # lub jeśli korzystasz z innego mechanizmu, przekaż odpowiedni obiekt.
+                    if hasattr(self, "plc_client") and self.plc_client and self.plc_client.get_connected():
+                        write_accuscan_out_settings(
+                            self.plc_client,
+                            db_number=write_cmd.get("db_number", 2),
+                            lump_threshold=write_cmd.get("lump_threshold"),
+                            neck_threshold=write_cmd.get("neck_threshold"),
+                            flaw_preset_diameter=write_cmd.get("flaw_preset_diameter"),
+                            upper_tol=write_cmd.get("upper_tol"),
+                            under_tol=write_cmd.get("under_tol"),
+                        )
+                    else:
+                        print("[PLC Writer] PLC not connected. Command skipped.")
+            except queue.Empty:
+                continue
+            except Exception as e:
+                print(f"[PLC Writer] Error: {e}")
+
     def start_db_worker(self):
         """Start worker thread for database operations"""
         # Start database worker thread
@@ -686,61 +648,21 @@ class App(ctk.CTk):
         print("[App] Database worker thread started")
         
     def _db_worker(self):
-        """Worker function for database operations thread"""
-        last_saved_timestamp = None
+        """Worker function for database operations thread - no longer saves measurement samples"""
+        print("[DB Worker] Database worker started (measurement sample saving disabled)")
         
         while self.db_worker_running:
             try:
-                # First try to get items from the queue (newest samples)
+                # Clear any items from the queue but don't save them
                 try:
                     params, data = self.db_queue.get(timeout=0.1)
-                    
-                    # Save to database
-                    success = save_measurement_sample(params, data)
-                    if not success:
-                        self.db_connected = False
-                    else:
-                        last_saved_timestamp = data.get('timestamp')
-                        
-                    # Mark task as done
+                    # Just mark as done without saving
                     self.db_queue.task_done()
-                    
-                    # Continue to get more items from queue if available
-                    continue
-                    
                 except queue.Empty:
-                    # No items in queue, try batch saving from buffer
+                    # No items in queue
                     pass
-                
-                # If queue is empty, we can do periodic batch saves from the buffer
-                if self.db_connected and hasattr(self, 'acquisition_buffer'):
-                    # Get samples from buffer that haven't been saved yet
-                    with self.acquisition_buffer.lock:
-                        unsaved_samples = []
-                        for sample in self.acquisition_buffer.samples:
-                            if last_saved_timestamp is None or sample.get('timestamp') > last_saved_timestamp:
-                                unsaved_samples.append(sample)
-                        
-                        # Save in batches of up to 10 samples
-                        if unsaved_samples:
-                            batch_size = 10
-                            batches = [unsaved_samples[i:i+batch_size] for i in range(0, len(unsaved_samples), batch_size)]
-                            
-                            for batch in batches:
-                                # Save each sample in batch
-                                for sample in batch:
-                                    success = save_measurement_sample(self.db_params, sample)
-                                    if not success:
-                                        self.db_connected = False
-                                        break
-                                    last_saved_timestamp = sample.get('timestamp')
-                                
-                                if not self.db_connected:
-                                    break
-                            
-                            print(f"[DB Worker] Batch saved {len(unsaved_samples)} samples")
-                
-                # Sleep if no work was done
+                    
+                # Sleep to avoid CPU spinning
                 time.sleep(1.0)
                 
             except Exception as e:
@@ -748,84 +670,6 @@ class App(ctk.CTk):
                 # Mark task as done if we got one
                 try:
                     self.db_queue.task_done()
-                except:
-                    pass
-    
-    def _try_reconnect_plc(self):
-        """Try to reconnect to the PLC"""
-        current_time = time.time()
-        if current_time - self.last_plc_retry < 5:  # Don't retry too often
-            return
-            
-        self.last_plc_retry = current_time
-        print("[App] Recreating PLC connection...")
-        if hasattr(self.logic, "plc_client"):
-            try:
-                # Use our improved disconnect function
-                from plc_helper import disconnect_plc
-                disconnect_plc(self.logic.plc_client)
-            except Exception as e:
-                print(f"[App] Error during PLC disconnect: {e}")
-                # Fallback to direct disconnect
-                try:
-                    self.logic.plc_client.disconnect()
-                except:
-                    pass
-        
-        try:
-            # Use proper config values and improved connect function
-            from plc_helper import connect_plc
-            self.logic.plc_client = connect_plc(PLC_IP, PLC_RACK, PLC_SLOT, max_attempts=1)
-            print("[App] PLC Reconnection successful.")
-        except Exception as e:
-            print(f"[App] PLC Reconnection failed: {e}")
-    
-    def start_plc_writer(self):
-        """Start worker thread for PLC write operations"""
-        self.plc_writer_running = True
-        self.plc_writer_thread = threading.Thread(target=self._plc_writer, daemon=True)
-        self.plc_writer_thread.start()
-        print("[App] PLC writer thread started")
-        
-    def _plc_writer(self):
-        """Worker function for PLC write operations"""
-        while self.plc_writer_running:
-            try:
-                # Get an item from the queue with timeout
-                plc_write_args = self.plc_write_queue.get(timeout=0.5)
-                
-                # Check if PLC is connected
-                if not hasattr(self.logic, "plc_client") or not self.logic.plc_client.get_connected():
-                    # Skip this write operation
-                    self.plc_write_queue.task_done()
-                    continue
-                    
-                # Unpack the arguments - first element is function name, rest are args
-                func_name = plc_write_args[0]
-                args = plc_write_args[1:]
-                
-                # Perform the write operation based on function name
-                if func_name == "write_accuscan_out_settings":
-                    from plc_helper import write_accuscan_out_settings
-                    write_start = time.perf_counter()
-                    write_accuscan_out_settings(self.logic.plc_client, *args)
-                    write_time = time.perf_counter() - write_start
-                    if write_time > 0.01:  # Log if it took more than 10ms
-                        print(f"[PLC Write] Settings write took {write_time:.4f}s")
-                else:
-                    print(f"[PLC Write] Unknown function: {func_name}")
-                
-                # Mark task as done
-                self.plc_write_queue.task_done()
-                
-            except queue.Empty:
-                # No items in queue, just continue
-                continue
-            except Exception as e:
-                print(f"[PLC Writer] Error: {e}")
-                # Mark task as done if we got one
-                try:
-                    self.plc_write_queue.task_done()
                 except:
                     pass
     
@@ -873,9 +717,6 @@ class App(ctk.CTk):
                 print("[App] Forcing acquisition process termination...")
                 self.acquisition_process.terminate()
                 self.acquisition_process.join(timeout=1.0)
-            
-        # Close logic connections
-        self.logic.close_logic()
         
         # Destroy window
         self.destroy()
