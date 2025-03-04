@@ -413,32 +413,56 @@ class App(ctk.CTk):
                 # 2. IMMEDIATELY reset the counters in PLC to avoid cumulative counts
                 # This is critical and must happen in the same cycle as the read
                 reset_start = time.perf_counter()
-                has_flaws = (data.get("lumps", 0) > 0 or data.get("necks", 0) > 0)
-                if has_flaws and not use_simulation.value:
+                
+                # Get lump and neck values to detect potential issues
+                lumps = data.get("lumps", 0)
+                necks = data.get("necks", 0)
+                has_flaws = (lumps > 0 or necks > 0)
+                
+                # Warning for unusually high values which indicates reset issue
+                if lumps > 100 or necks > 100:
+                    print(f"[ACQ Process] WARNING: Unusually high values detected: lumps={lumps}, necks={necks}")
+                    print("[ACQ Process] Performing emergency reset...")
+                
+                # Perform reset for ANY flaws or if values are suspiciously high
+                if (has_flaws or lumps > 100 or necks > 100) and not use_simulation.value:
                     try:
-                        # Direct write for critical reset - no queuing
+                        # For performance optimization on frequent resets, do reset with separate writes
+                        # First set bits to clear counters
                         write_accuscan_out_settings(
                             plc_client, db_number=2,
                             # Set all reset bits
                             zl=True, zn=True, zf=True, zt=False
                         )
                         
+                        # Immediately clear bits in a second write
+                        if has_flaws:  # Only do second write if we actually had flaws
+                            write_accuscan_out_settings(
+                                plc_client, db_number=2,
+                                # Clear all reset bits
+                                zl=False, zn=False, zf=False, zt=False
+                            )
+                        
                         # Log reset performance issues
                         now = time.time()
                         reset_count += 1
-                        if now - last_reset_time < 0.1:  # Resets happening too close together
-                            print(f"[ACQ Process] WARNING: Rapid resets detected - {reset_count} in 5 seconds")
+                        
+                        # Track high frequency of resets
+                        if now - last_reset_time < 0.05:  # Resets happening very close together
+                            print(f"[ACQ Process] WARNING: Rapid resets detected! This may impact performance.")
+                            
+                            # If we see this is becoming a problem, slow down the acquisition cycle slightly
+                            # to give PLC more time to process
+                            time.sleep(0.01)  # Add a tiny delay to give PLC breathing room
+                        
                         last_reset_time = now
                         
-                        # Log reset counts
+                        # Log reset counts periodically
                         if now - reset_log_time > 5.0:
                             if reset_count > 0:
                                 print(f"[ACQ Process] Reset count: {reset_count} in last 5 seconds")
                             reset_count = 0
                             reset_log_time = now
-                            
-                        # Schedule clearing of reset bits in next cycle
-                        # This is done implicitly in the write_accuscan_out_settings call
                     except Exception as e:
                         print(f"[ACQ Process] Reset error: {e}")
                 
@@ -486,10 +510,30 @@ class App(ctk.CTk):
                 # Calculate sleep time to maintain 32ms cycle
                 elapsed = time.perf_counter() - cycle_start
                 sleep_time = max(0, 0.032 - elapsed)
+                
+                # Log and handle cycle time issues
                 if elapsed > 0.032:
-                    print(f"[ACQ Process] Uwaga! Czas cyklu przekroczył 32 ms: {elapsed:.6f} s")
-                if sleep_time > 0:
-                    time.sleep(sleep_time)
+                    # Check if we've recently had lump/neck resets
+                    current_time = time.time()
+                    time_since_reset = current_time - last_reset_time
+                    
+                    if time_since_reset < 0.1 and has_flaws:
+                        # The overrun is likely due to a recent lump/neck reset
+                        print(f"[ACQ Process] Cycle time exceeded due to lump/neck reset: {elapsed:.4f}s, Lumps={lumps}, Necks={necks}")
+                    elif elapsed > 0.1:
+                        # Severe delay - this might indicate something more serious
+                        print(f"[ACQ Process] SEVERE DELAY: Cycle time {elapsed:.4f}s is significantly over budget!")
+                    else:
+                        # Regular overrun - just log it
+                        print(f"[ACQ Process] Cycle time exceeded: {elapsed:.4f}s")
+                    
+                    # For severe delays, try sleeping a tiny bit to let system recover
+                    if elapsed > 0.2:
+                        time.sleep(0.01)
+                else:
+                    # Normal case - sleep to maintain timing
+                    if sleep_time > 0:
+                        time.sleep(sleep_time)
                 
             except Exception as e:
                 print(f"[ACQ Process] Error during acquisition: {e}")

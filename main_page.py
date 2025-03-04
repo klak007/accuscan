@@ -1091,7 +1091,56 @@ class MainPage(ctk.CTkFrame):
             self.controller.run_measurement_flag.value = 0
 
     def _on_ack(self):
+        """Handle Kwituj button press by resetting all PLC counters"""
         print("[GUI] Kwituj pressed!")
+        
+        # Send a reset command to the PLC when Kwituj is pressed
+        if hasattr(self.controller, 'logic') and hasattr(self.controller.logic, 'plc_client'):
+            try:
+                # Get access to the plc client
+                from plc_helper import write_accuscan_out_settings
+                plc_client = self.controller.logic.plc_client
+                
+                if plc_client and plc_client.get_connected():
+                    # First reset that immediately clears all counters
+                    print("[GUI] Sending Kwituj reset to PLC")
+                    write_accuscan_out_settings(
+                        plc_client, db_number=2,
+                        # Set all reset bits
+                        zl=True, zn=True, zf=True, zt=True,  # Including zt here is important
+                        # Keep other settings at current values
+                        lump_threshold=None,
+                        neck_threshold=None,
+                        flaw_preset_diameter=None,
+                        upper_tol=None,
+                        under_tol=None
+                    )
+                    
+                    # Schedule clearing the reset bits after a brief delay
+                    self.after(100, lambda: self._clear_reset_bits_all(plc_client))
+                else:
+                    print("[GUI] Cannot reset PLC - no connection")
+            except Exception as e:
+                print(f"[GUI] Error during Kwituj reset: {e}")
+    
+    def _clear_reset_bits_all(self, plc_client):
+        """Clear ALL reset bits after Kwituj reset"""
+        try:
+            from plc_helper import write_accuscan_out_settings
+            print("[GUI] Clearing ALL reset bits after Kwituj")
+            write_accuscan_out_settings(
+                plc_client, db_number=2,
+                # Clear all reset bits including zt
+                zl=False, zn=False, zf=False, zt=False,
+                # Keep other settings at current values
+                lump_threshold=None,
+                neck_threshold=None,
+                flaw_preset_diameter=None,
+                upper_tol=None,
+                under_tol=None
+            )
+        except Exception as e:
+            print(f"[GUI] Error clearing reset bits: {e}")
 
     # ---------------------------------------------------------------------------------
     # 5. Metoda update_readings – aktualizacja etykiet i wykresu
