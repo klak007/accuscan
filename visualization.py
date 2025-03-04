@@ -40,14 +40,21 @@ class PlotManager:
         self.last_high_cpu_time = 0  # Last time we detected high CPU usage
         self.adaptive_mode = True  # Enable adaptive throttling
         
+        # Flag to track if we've fallen back to main thread plotting
+        self.using_main_thread = False
+        
         # Create multiprocessing queues and events
-        self.plot_data_queue = Queue(maxsize=5)  # Queue for sending data to plot process
+        self.plot_data_queue = Queue(maxsize=10)  # Queue for sending data to plot process (increased size)
         self.plot_request_queue = Queue(maxsize=5)  # Queue for requesting specific plot updates
         self.plot_complete_event = Event()  # Event to signal when plotting is complete
         self.plot_process_active = Value('i', 0)  # Shared flag to indicate if process is running
         
         # Initialize the plotting process
-        self.start_plot_process()
+        try:
+            self.start_plot_process()
+        except Exception as e:
+            print(f"[PlotManager] Failed to start plot process: {e}")
+            self.using_main_thread = True
     
     def start_plot_process(self):
         """Start a dedicated process for generating plot data"""
@@ -99,7 +106,12 @@ class PlotManager:
             active_flag: Shared Value to indicate if process should continue running
             target_core: CPU core to run on (if possible)
         """
-        print(f"[Plot Process] Starting on core {target_core}")
+        # Important: Configure matplotlib to use a non-interactive backend
+        # This prevents GUI-related errors in the subprocess
+        import matplotlib
+        matplotlib.use('Agg')  # Use the Agg backend which doesn't require a display
+        
+        print(f"[Plot Process] Starting on core {target_core}, using matplotlib backend: {matplotlib.get_backend()}")
         
         # Try to pin process to specific CPU core
         try:
@@ -120,7 +132,7 @@ class PlotManager:
                     request_type = request_queue.get_nowait()
                     print(f"[Plot Process] Got request for {request_type} plot")
                     # Process specific plot request here if needed
-                except Exception:
+                except:
                     # No request, continue normal processing
                     pass
                 
@@ -178,21 +190,21 @@ class PlotManager:
                     # Update the local cache
                     plot_cache.update(processed_data)
                     
-                    # Put processed data back in the queue
-                    try:
-                        # Return the plotting data to main thread
-                        # Use a separate queue to avoid blocking
-                        # (Implementation detail: in actual code, we'd use a separate return queue)
-                        complete_event.set()
-                        
-                        # Log performance
-                        if processing_time > 0.05:  # Only log if significant
-                            print(f"[Plot Process] Generated plot data in {processing_time:.4f}s")
-                    except Exception as e:
-                        print(f"[Plot Process] Error returning data: {e}")
+                    # Signal that plotting data is ready
+                    complete_event.set()
                     
-                except Exception:
-                    # No data to process (Queue.Empty or other exception)
+                    # Log performance
+                    if processing_time > 0.05:  # Only log if significant
+                        print(f"[Plot Process] Generated plot data in {processing_time:.4f}s")
+                        
+                    # Mark the item as processed
+                    data_queue.task_done()
+                    
+                except mp.queues.Empty:
+                    # No data to process
+                    time.sleep(0.01)
+                except Exception as e:
+                    print(f"[Plot Process] Error processing data: {e}")
                     time.sleep(0.01)
             
             except Exception as e:
@@ -334,6 +346,39 @@ class PlotManager:
                 ax.grid(True)
                 ax.legend()
     
+    def check_plot_process(self):
+        """Check if the plot process is alive and restart it if needed"""
+        if self.using_main_thread:
+            # We already decided to use main thread, don't try to restart
+            return False
+            
+        if not hasattr(self, 'plot_process') or not self.plot_process or not self.plot_process.is_alive():
+            print("[PlotManager] Plot process is not running, attempting to restart")
+            try:
+                # Clean up any old process
+                if hasattr(self, 'plot_process') and self.plot_process:
+                    try:
+                        self.plot_process.terminate()
+                        self.plot_process.join(timeout=1.0)
+                    except:
+                        pass
+                
+                # Reset queues
+                while not self.plot_data_queue.empty():
+                    try:
+                        self.plot_data_queue.get_nowait()
+                    except:
+                        pass
+                        
+                # Start a new process
+                self.start_plot_process()
+                return True
+            except Exception as e:
+                print(f"[PlotManager] Failed to restart plot process: {e}")
+                self.using_main_thread = True
+                return False
+        return True
+        
     def update_all_plots(self, data_dict):
         """
         Main entry point for plot updates with throttling.
@@ -346,10 +391,15 @@ class PlotManager:
         if (self.last_update_time is None or 
             (now - self.last_update_time) >= self.min_update_interval) and self.plot_dirty:
             
+            # Check and potentially restart the plot process
+            process_ok = self.check_plot_process()
+            
             # First, send the data to the plotting process
             try:
                 # Check if the plot process exists and is active
-                if hasattr(self, 'plot_process') and self.plot_process and self.plot_process.is_alive():
+                if process_ok and not self.using_main_thread:
+                    print(f"[PlotManager] Sending data to plot process, queue size: {self.plot_data_queue.qsize()}")
+                    
                     # Make a deep copy to avoid shared memory issues
                     plot_data = copy.deepcopy(data_dict)
                     
@@ -371,9 +421,13 @@ class PlotManager:
                         
                 # If we get here, either:
                 # 1. There is no plot process 
-                # 2. The plot process has died
+                # 2. The plot process has died and couldn't be restarted
                 # 3. We chose to still update in the main thread
-                # So we fall back to updating plots in the main thread
+                
+                # Fallback: update plots in the main thread
+                if not self.using_main_thread:
+                    print("[PlotManager] Falling back to main thread plotting")
+                    self.using_main_thread = True
                     plot_start = time.perf_counter()
                     self.plot_update_count += 1
                     

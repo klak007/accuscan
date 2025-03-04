@@ -85,14 +85,16 @@ class MainPage(ctk.CTkFrame):
         self.flaw_detector = FlawDetector(flaw_window_size=0.5)
         
         # Initialize the plot manager and pass the figures
+        # This will start the separate plotting process
         self.plot_manager = PlotManager(
             figures_dict={
                 'status': (self.fig, self.ax),
                 'diameter': (self.fig_diameter, self.ax_diameter),
                 'fft': (self.fig_fft, self.ax_fft)
             }, 
-            min_update_interval=self.min_plot_interval
+            min_update_interval=0.2  # Reduce interval for more responsive updates
         )
+        print("[MainPage] Plot manager initialized with separate process")
 
     # ---------------------------------------------------------------------------------
     # 1. Górna belka nawigacji (row=0, col=0..2)
@@ -1339,8 +1341,33 @@ class MainPage(ctk.CTkFrame):
             'fft_buffer_size': self.FFT_BUFFER_SIZE
         }
         
-        # Update plots through PlotManager
-        self.plot_manager.update_all_plots(plot_data)
+        # Force a direct update in the main thread to ensure plots are visible even if process is not working
+        if not hasattr(self.plot_manager, 'plot_process') or not self.plot_manager.plot_process or not self.plot_manager.plot_process.is_alive():
+            print("[MainPage] Plot process not active, updating in main thread")
+            # Do direct updates for the important plots
+            self.plot_manager.update_status_plot(
+                plot_data['x_history'], 
+                plot_data['lumps_history'], 
+                plot_data['necks_history'],
+                plot_data['current_x'],
+                plot_data['batch_name'],
+                plot_data['plc_sample_time']
+            )
+            
+            self.plot_manager.update_diameter_plot(
+                plot_data['diameter_x'],
+                plot_data['diameter_history'],
+                plot_data['current_x'],
+                plot_data['diameter_preset'],
+                plot_data['plc_sample_time']
+            )
+            
+            # Draw the canvases
+            self.fig.canvas.draw()
+            self.fig_diameter.canvas.draw()
+        else:
+            # Normal case - update through PlotManager process
+            self.plot_manager.update_all_plots(plot_data)
         plot_update_time = time.perf_counter() - plot_update_start
 
         # Update counter displays
