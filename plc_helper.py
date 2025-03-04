@@ -79,10 +79,10 @@ def connect_plc(ip: str, rack: int = 0, slot: int = 1, delay: int = 2, max_attem
                 client = snap7.client.Client()
                 
                 # Set a reasonable PDU size (default is too small)
-                client.set_param(snap7.snap7types.PduSizeCode, 4)  # Use PDU size 960 bytes
+                # client.set_param(snap7.type.PduSizeCode, 4)  # Use PDU size 960 bytes
                 
                 # Set connection timeout (default 1.5s might be too short)
-                client.set_param(snap7.snap7types.RemotePort, 102)
+                # client.set_param(snap7.type.RemotePort, 102)
                 
                 # Connect
                 client.connect(ip, rack, slot)

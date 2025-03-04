@@ -217,7 +217,8 @@ class App(ctk.CTk):
                 # Calculate sleep time to maintain 32ms cycle
                 elapsed = time.perf_counter() - cycle_start
                 sleep_time = max(0, 0.032 - elapsed)
-                
+                if elapsed > 0.032:
+                    print(f"Uwaga! Czas cyklu przekroczył 32 ms: {elapsed:.6f} s")
                 if sleep_time > 0:
                     time.sleep(sleep_time)
                 

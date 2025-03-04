@@ -191,7 +191,7 @@ class FastAcquisitionBuffer:
             
             return stats
     
-    def get_window_data(self, interpolate_gaps=True):
+    def get_window_data(self, interpolate_gaps=False):
         """
         Get all data for visualization (thread-safe copy)
         
