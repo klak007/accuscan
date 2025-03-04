@@ -1032,8 +1032,57 @@ class MainPage(ctk.CTkFrame):
     def _on_start(self):
         print("[GUI] Start pressed!")
         self.controller.run_measurement = True
+        
+        # Force a reset of the PLC counters before starting the measurement
+        if hasattr(self.controller, 'logic') and hasattr(self.controller.logic, 'plc_client'):
+            try:
+                # Send a reset command to the PLC immediately when starting
+                from plc_helper import write_accuscan_out_settings
+                plc_client = self.controller.logic.plc_client
+                
+                # First reset that immediately clears all counters
+                print("[GUI] Sending initial reset to PLC")
+                write_accuscan_out_settings(
+                    plc_client, db_number=2,
+                    # Set all reset bits
+                    zl=True, zn=True, zf=True, zt=False,
+                    # Keep other settings at current values
+                    lump_threshold=None,
+                    neck_threshold=None,
+                    flaw_preset_diameter=None,
+                    upper_tol=None,
+                    under_tol=None
+                )
+                
+                # Additional reset after a small delay to ensure bits are cleared
+                # Schedule this to run after a brief delay
+                self.after(100, lambda: self._clear_reset_bits(plc_client))
+            except Exception as e:
+                print(f"[GUI] Error during initial reset: {e}")
+        
+        # Set the measurement flag to start acquisition
         if hasattr(self.controller, 'run_measurement_flag'):
             self.controller.run_measurement_flag.value = 1
+            self.controller.initial_reset_needed = True
+            
+    def _clear_reset_bits(self, plc_client):
+        """Clear the reset bits after the initial reset"""
+        try:
+            from plc_helper import write_accuscan_out_settings
+            print("[GUI] Clearing reset bits")
+            write_accuscan_out_settings(
+                plc_client, db_number=2,
+                # Clear all reset bits
+                zl=False, zn=False, zf=False, zt=False,
+                # Keep other settings at current values
+                lump_threshold=None,
+                neck_threshold=None,
+                flaw_preset_diameter=None,
+                upper_tol=None,
+                under_tol=None
+            )
+        except Exception as e:
+            print(f"[GUI] Error clearing reset bits: {e}")
 
     def _on_stop(self):
         print("[GUI] Stop pressed!")

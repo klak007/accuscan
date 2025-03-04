@@ -165,6 +165,9 @@ class App(ctk.CTk):
             daemon=True
         )
         
+        # Set a flag to force an initial reset of the PLC counters when we start measuring
+        self.initial_reset_needed = True
+        
         # Start the acquisition process
         self.acquisition_process.start()
         print(f"[App] Data acquisition process started with PID: {self.acquisition_process.pid}")
@@ -304,27 +307,56 @@ class App(ctk.CTk):
         import time
         from datetime import datetime
         from plc_helper import read_accuscan_data, connect_plc, write_accuscan_out_settings
-        
+        import queue
         
         print(f"[ACQ Process] Starting acquisition process worker")
-        
         
         # Connect to the PLC
         plc_client = None
         try:
             plc_client = connect_plc(plc_ip, plc_rack, plc_slot)
             print(f"[ACQ Process] Connected to PLC at {plc_ip}")
+            
+            # Immediately perform initial reset to clear any lingering values
+            if plc_client and plc_client.get_connected():
+                # First reset that immediately clears all counters
+                print("[ACQ Process] Performing initial PLC reset")
+                write_accuscan_out_settings(
+                    plc_client, db_number=2,
+                    # Set all reset bits
+                    zl=True, zn=True, zf=True, zt=False
+                )
+                
+                # Short sleep to let reset complete
+                time.sleep(0.05)
+                
+                # Clear the reset bits
+                write_accuscan_out_settings(
+                    plc_client, db_number=2,
+                    # Clear reset bits
+                    zl=False, zn=False, zf=False, zt=False
+                )
         except Exception as e:
             print(f"[ACQ Process] Initial PLC connection failed: {e}")
         
         cycle_count = 0
         log_frequency = 10
         
+        # Flag to track if we need to perform an initial reset
+        initial_reset_needed = True
+        
+        # Performance tracking for lump/neck resets
+        last_reset_time = 0
+        reset_count = 0
+        reset_log_time = time.time()
+        
         # Main acquisition loop
         while process_running.value:
             cycle_start = time.perf_counter()
             
             if not run_measurement.value:
+                # Reset the initial reset flag when measurement is off
+                initial_reset_needed = True
                 # If not measuring, just sleep and continue
                 time.sleep(0.01)
                 continue
@@ -334,29 +366,82 @@ class App(ctk.CTk):
                 try:
                     plc_client = connect_plc(plc_ip, plc_rack, plc_slot, max_attempts=1)
                     print(f"[ACQ Process] Reconnected to PLC at {plc_ip}")
+                    initial_reset_needed = True  # Need to reset after reconnection
                 except Exception as e:
                     print(f"[ACQ Process] PLC reconnection failed: {e}")
                     time.sleep(0.5)  # Wait before retrying
                     continue
+            
+            # Perform initial reset when starting measurements
+            if initial_reset_needed and plc_client and plc_client.get_connected() and not use_simulation.value:
+                try:
+                    print("[ACQ Process] Performing initial reset after measurement start")
+                    # First reset with all reset bits set
+                    write_accuscan_out_settings(
+                        plc_client, db_number=2,
+                        zl=True, zn=True, zf=True, zt=False
+                    )
+                    time.sleep(0.05)  # Short delay to ensure reset is processed
+                    
+                    # Then clear reset bits
+                    write_accuscan_out_settings(
+                        plc_client, db_number=2,
+                        zl=False, zn=False, zf=False, zt=False
+                    )
+                    
+                    # Do an initial read and discard to clear any pending data
+                    _ = read_accuscan_data(plc_client, db_number=2)
+                    
+                    initial_reset_needed = False
+                    print("[ACQ Process] Initial reset completed")
+                except Exception as e:
+                    print(f"[ACQ Process] Error during initial reset: {e}")
                 
             try:
                 # READ-RESET CYCLE: Critical to reset counters in the same 32ms cycle
                 plc_start = time.perf_counter()
                 
-                
-                data = read_accuscan_data(plc_client, db_number=2)
+                # Simulation or real data based on flag
+                if use_simulation.value:
+                    from accuscan_simulator import AccuScanSimulator
+                    simulator = AccuScanSimulator()
+                    data = simulator.read_data()
+                else:
+                    data = read_accuscan_data(plc_client, db_number=2)
                 read_time = time.perf_counter() - plc_start
                 
                 # 2. IMMEDIATELY reset the counters in PLC to avoid cumulative counts
                 # This is critical and must happen in the same cycle as the read
                 reset_start = time.perf_counter()
-                if (data.get("lumps", 0) > 0 or data.get("necks", 0) > 0):
-                    # Direct write for critical reset - no queuing
-                    write_accuscan_out_settings(
-                        plc_client, db_number=2,
-                        # Set and immediately clear the reset bits
-                        zl=True, zn=True, zf=True, zt=False
-                    )
+                has_flaws = (data.get("lumps", 0) > 0 or data.get("necks", 0) > 0)
+                if has_flaws and not use_simulation.value:
+                    try:
+                        # Direct write for critical reset - no queuing
+                        write_accuscan_out_settings(
+                            plc_client, db_number=2,
+                            # Set all reset bits
+                            zl=True, zn=True, zf=True, zt=False
+                        )
+                        
+                        # Log reset performance issues
+                        now = time.time()
+                        reset_count += 1
+                        if now - last_reset_time < 0.1:  # Resets happening too close together
+                            print(f"[ACQ Process] WARNING: Rapid resets detected - {reset_count} in 5 seconds")
+                        last_reset_time = now
+                        
+                        # Log reset counts
+                        if now - reset_log_time > 5.0:
+                            if reset_count > 0:
+                                print(f"[ACQ Process] Reset count: {reset_count} in last 5 seconds")
+                            reset_count = 0
+                            reset_log_time = now
+                            
+                        # Schedule clearing of reset bits in next cycle
+                        # This is done implicitly in the write_accuscan_out_settings call
+                    except Exception as e:
+                        print(f"[ACQ Process] Reset error: {e}")
+                
                 reset_time = time.perf_counter() - reset_start
                 
                 # Add timing information to the data
