@@ -12,6 +12,7 @@ import db_helper
 import plc_helper
 from window_fft_analysis import analyze_window_fft
 import time
+from db_helper import save_settings, save_settings_history
 
 # Import new modules
 from visualization import PlotManager
@@ -639,7 +640,7 @@ class MainPage(ctk.CTkFrame):
 
         # 3. Zapis do bazy (settings + history)
         try:
-            from db_helper import save_settings, save_settings_history
+            
             settings_id = save_settings(self.controller.db_params, settings_data)
             # Jeśli chcesz, możesz także wywołać save_settings_history – funkcja save_settings
             # sama już ją wywołuje w niektórych implementacjach.
@@ -680,35 +681,48 @@ class MainPage(ctk.CTkFrame):
         self.speed_label.configure(text=f"Speed: {self.production_speed:.1f}")
 
     def _on_typowy_click(self):
-        import datetime
-        now = datetime.datetime.now()
-        date_time_str = f"{now.day:02d}_{now.month:02d}_{now.hour:02d}_{now.minute:02d}"  # Format: dd_MM_HH_mm
-        self.entry_batch.delete(0, "end")
-        self.entry_batch.insert(0, f"btch_{date_time_str}")
-        self.entry_product.delete(0, "end")
-        self.entry_product.insert(0, f"prdct_{date_time_str}")
-        self.entry_recipe_name.delete(0, "end")
-        self.entry_recipe_name.insert(0, f"recipe_{date_time_str}")
-        self.entry_diameter_setpoint.delete(0, "end")
-        self.entry_diameter_setpoint.insert(0, "39")
-        self.entry_tolerance_plus.delete(0, "end")
-        self.entry_tolerance_plus.insert(0, "0.5")
-        self.entry_tolerance_minus.delete(0, "end")
-        self.entry_tolerance_minus.insert(0, "0.5")
-        self.entry_lump_threshold.delete(0, "end")
-        self.entry_lump_threshold.insert(0, "0.1")
-        self.entry_neck_threshold.delete(0, "end")
-        self.entry_neck_threshold.insert(0, "0.1")
-        self.entry_flaw_window.delete(0, "end")
-        self.entry_flaw_window.insert(0, "0.5")  # Changed from 2.0 to 0.5 meters
-        self.entry_max_lumps.delete(0, "end")
-        self.entry_max_lumps.insert(0, "30")
-        self.entry_max_necks.delete(0, "end")
-        self.entry_max_necks.insert(0, "7")
+        """Set example settings with batch UI update to avoid blocking data processing"""
+        # First ensure measurement continues without blocking
+        if hasattr(self.controller, 'run_measurement_flag'):
+            self.controller.run_measurement_flag.value = 1
+            
+        # Use after() to schedule UI updates in the next idle cycle, avoiding thread blocking
+        def update_ui_fields():
+            # Get current date/time string
+            import datetime
+            now = datetime.datetime.now()
+            date_time_str = f"{now.day:02d}_{now.month:02d}_{now.hour:02d}_{now.minute:02d}"
+            
+            # Prepare all values first (batch operations)
+            field_values = {
+                "entry_batch": f"btch_{date_time_str}",
+                "entry_product": f"prdct_{date_time_str}",
+                "entry_recipe_name": f"recipe_{date_time_str}",
+                "entry_diameter_setpoint": "39",
+                "entry_tolerance_plus": "0.5",
+                "entry_tolerance_minus": "0.5",
+                "entry_lump_threshold": "0.1",
+                "entry_neck_threshold": "0.1",
+                "entry_flaw_window": "0.5",
+                "entry_max_lumps": "30",
+                "entry_max_necks": "7",
+                "speed_fluct_entry": "2.0"
+            }
+            
+            # Update all fields in a single batch to minimize UI processing
+            for field_name, value in field_values.items():
+                if hasattr(self, field_name):
+                    field = getattr(self, field_name)
+                    field.delete(0, "end")
+                    field.insert(0, value)
+            
+            print("[GUI] Example settings applied without blocking")
         
-        # Set speed fluctuation to default 2%
-        self.speed_fluct_entry.delete(0, "end")
-        self.speed_fluct_entry.insert(0, "2.0")
+        # Schedule the UI update for the next idle cycle
+        self.after(10, update_ui_fields)
+        
+        # Immediately return to avoid blocking
+        return
 
     # ---------------------------------------------------------------------------------
     # 3. Środkowa kolumna (row=1, col=1) – parametry symulacji
@@ -1203,7 +1217,7 @@ class MainPage(ctk.CTkFrame):
         
     def _on_prod_speed_change(self, value: float):
         """Handle production speed slider change"""
-        self.production_speed = float(value)
+        self.production_speed = value
         self.prod_speed_value.configure(text=f"{self.production_speed:.1f}")
 
     def update_data(self):

@@ -58,7 +58,7 @@ class FastAcquisitionBuffer:
         self.last_stats_update = 0
         self.stats_cache_ttl = 1.0  # 1 second
 
-    def add_sample(self, data, production_speed=50.0, speed_fluctuation_percent=0.0):
+    def add_sample(self, data, production_speed=None, speed_fluctuation_percent=0.0):
         """
         Thread-safe method to add a new sample to the buffer.
         
@@ -104,8 +104,11 @@ class FastAcquisitionBuffer:
             else:
                 current_speed = production_speed
                 
+            if production_speed is None:
+                production_speed = data.get("speed", 50.0)
+                
             # Convert from m/min to m/s for calculation
-            speed_mps = current_speed / 60.0
+            speed_mps = production_speed / 60.0
             self.current_x += dt * speed_mps
             self.x_coords.append(self.current_x)
             

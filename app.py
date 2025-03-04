@@ -26,7 +26,7 @@ class App(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("AccuScan GUI")
-        self.geometry("1920x1080")
+        self.geometry("1920x700+0+0")
         
         # Flagi sterujące
         self.run_measurement = False
@@ -177,10 +177,19 @@ class App(ctk.CTk):
                 # Get data from the queue with a timeout
                 data = self.data_queue.get(timeout=0.5)
                 
-                # Add batch and product info from UI
+                # Add batch and product info from UI - Use a safe method to access UI
                 if hasattr(self, 'main_page'):
-                    data["batch"] = self.main_page.entry_batch.get() or "XABC1566"
-                    data["product"] = self.main_page.entry_product.get() or "18X0600"
+                    try:
+                        # Copy values locally to avoid UI thread contention
+                        data["batch"] = self.main_page.entry_batch.get() if hasattr(self.main_page, 'entry_batch') else "XABC1566"
+                        data["product"] = self.main_page.entry_product.get() if hasattr(self.main_page, 'entry_product') else "18X0600"
+                        data["speed"] = getattr(self.main_page, 'production_speed', 50.0)
+                    except Exception as e:
+                        # Fallback to defaults if UI access fails
+                        data["batch"] = "XABC1566"
+                        data["product"] = "18X0600"
+                        data["speed"] = 50.0
+                        print(f"[Data Receiver] UI access error: {e}")
                 
                 # Update the buffer with the received data
                 self.acquisition_buffer.add_sample(data)
@@ -200,6 +209,8 @@ class App(ctk.CTk):
                         
             except (queue.Empty, Exception) as e:
                 # Just continue if queue is empty or there's an error
+                if not isinstance(e, queue.Empty):  # Only log non-empty queue errors
+                    print(f"[Data Receiver] Error: {e}")
                 continue
     
     @staticmethod
@@ -282,8 +293,12 @@ class App(ctk.CTk):
                 data["plc_reset_time"] = reset_time
                 
                 # Send the data to the main process via the queue
+                print(f"[ACQ Process] Queue size before put: {data_queue.qsize()}")
                 try:
                     data_queue.put(data, block=False)
+                    print(f"[ACQ Process] Sent data. Queue size after put: {data_queue.qsize()}")
+                except queue.Full:
+                    print("[ACQ Process] Data queue is full. Could not enqueue data.")
                 except Exception as e:
                     print(f"[ACQ Process] Error sending data to queue: {e}")
                 
@@ -539,9 +554,9 @@ class App(ctk.CTk):
             # Use variable delay based on current page
             # Main page with plots needs less frequent updates
             if self.current_page == "MainPage":
-                update_delay = 3000  # 500ms (2 FPS) for plot-heavy main page
+                update_delay = 100 # plot-heavy main page
             else:
-                update_delay = 250  # 250ms (4 FPS) for other pages
+                update_delay = 50  # for other pages
                 
             self.after(update_delay, update_loop)
         
