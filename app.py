@@ -544,7 +544,7 @@ class App(ctk.CTk):
             # Use variable delay based on current page
             # Main page with plots needs less frequent updates
             if self.current_page == "MainPage":
-                update_delay = 500  # 500ms (2 FPS) for plot-heavy main page
+                update_delay = 3000  # 500ms (2 FPS) for plot-heavy main page
             else:
                 update_delay = 250  # 250ms (4 FPS) for other pages
                 
