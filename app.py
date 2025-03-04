@@ -217,12 +217,23 @@ class App(ctk.CTk):
                 ui_refresh_counter += 1
                 if ui_refresh_counter >= 10:  # Refresh every 10 processing cycles
                     ui_refresh_counter = 0
-                    # Update cached values from UI
+                    # Update cached values from UI using the safer methods if available
                     if hasattr(self, 'main_page'):
                         try:
-                            batch_cache = self.main_page.entry_batch.get() if hasattr(self.main_page, 'entry_batch') else "XABC1566"
-                            product_cache = self.main_page.entry_product.get() if hasattr(self.main_page, 'entry_product') else "18X0600"
-                            speed_cache = getattr(self.main_page, 'production_speed', 50.0)
+                            # Check if UI is busy - if so, skip refreshing
+                            if not hasattr(self.main_page, 'ui_busy') or not self.main_page.ui_busy:
+                                # Use safe getter methods if available
+                                if hasattr(self.main_page, 'get_batch_name'):
+                                    batch_cache = self.main_page.get_batch_name()
+                                else:
+                                    batch_cache = self.main_page.entry_batch.get() if hasattr(self.main_page, 'entry_batch') else "XABC1566"
+                                    
+                                if hasattr(self.main_page, 'get_product_name'):
+                                    product_cache = self.main_page.get_product_name()
+                                else:
+                                    product_cache = self.main_page.entry_product.get() if hasattr(self.main_page, 'entry_product') else "18X0600"
+                                    
+                                speed_cache = getattr(self.main_page, 'production_speed', 50.0)
                         except Exception as e:
                             print(f"[Data Receiver] UI access error: {e}")
                 
@@ -235,11 +246,57 @@ class App(ctk.CTk):
                 self.logic.poll_plc_data(data)
                 self.latest_data = data
                 
-                if self.db_connected:
-                    try:
-                        self.db_queue.put_nowait((self.db_params, data))
-                    except queue.Full:
-                        pass
+                # Database saving, but now based on flaw detection conditions
+                if self.db_connected and hasattr(self, 'main_page'):
+                    # Check if we need to save based on user thresholds
+                    save_to_db = False
+                    
+                    # Get current window flaw counts from the flaw detector
+                    if hasattr(self.main_page, 'flaw_detector'):
+                        # Get user-defined thresholds if available
+                        max_lumps = 30  # Default
+                        max_necks = 7   # Default
+                        
+                        if hasattr(self.main_page, 'get_max_lumps'):
+                            max_lumps = self.main_page.get_max_lumps()
+                        elif hasattr(self.main_page, 'entry_max_lumps'):
+                            try:
+                                max_lumps = int(self.main_page.entry_max_lumps.get() or "30")
+                            except (ValueError, AttributeError):
+                                pass
+                                
+                        if hasattr(self.main_page, 'get_max_necks'):
+                            max_necks = self.main_page.get_max_necks()
+                        elif hasattr(self.main_page, 'entry_max_necks'):
+                            try:
+                                max_necks = int(self.main_page.entry_max_necks.get() or "7")
+                            except (ValueError, AttributeError):
+                                pass
+                        
+                        # Get current flaw counts from the detector
+                        window_lumps = getattr(self.main_page.flaw_detector, 'window_lumps_count', 0)
+                        window_necks = getattr(self.main_page.flaw_detector, 'window_necks_count', 0)
+                        
+                        # Save if thresholds are exceeded
+                        if window_lumps >= max_lumps or window_necks >= max_necks:
+                            save_to_db = True
+                            print(f"[Data Receiver] Saving to DB: Window flaws exceed thresholds (Lumps: {window_lumps}/{max_lumps}, Necks: {window_necks}/{max_necks})")
+                            
+                    # Immediate data (from the current sample)
+                    current_lumps = data.get("lumps", 0)
+                    current_necks = data.get("necks", 0)
+                    
+                    # Also save when we detect immediate flaws
+                    if current_lumps > 0 or current_necks > 0:
+                        save_to_db = True
+                    
+                    # If we decide to save, add to DB queue
+                    if save_to_db:
+                        try:
+                            self.db_queue.put_nowait((self.db_params, data))
+                        except queue.Full:
+                            print("[Data Receiver] DB queue full, couldn't save data")
+                            pass
                 
                 samples_processed += 1
                 
@@ -257,11 +314,36 @@ class App(ctk.CTk):
                         self.logic.poll_plc_data(data)
                         self.latest_data = data
                         
-                        if self.db_connected:
-                            try:
-                                self.db_queue.put_nowait((self.db_params, data))
-                            except queue.Full:
-                                pass
+                        # Use same database saving logic for batch items
+                        if self.db_connected and hasattr(self, 'main_page'):
+                            # Check if we need to save based on user thresholds
+                            save_to_db = False
+                            
+                            # Get current window flaw counts from the flaw detector
+                            if hasattr(self.main_page, 'flaw_detector'):
+                                # Use cached values from previous check
+                                window_lumps = getattr(self.main_page.flaw_detector, 'window_lumps_count', 0)
+                                window_necks = getattr(self.main_page.flaw_detector, 'window_necks_count', 0)
+                                
+                                # We already checked thresholds in first sample, so continue using those
+                                if window_lumps >= max_lumps or window_necks >= max_necks:
+                                    save_to_db = True
+                                    
+                            # Immediate data (from the current sample)
+                            current_lumps = data.get("lumps", 0)
+                            current_necks = data.get("necks", 0)
+                            
+                            # Also save when we detect immediate flaws
+                            if current_lumps > 0 or current_necks > 0:
+                                save_to_db = True
+                            
+                            # If we decide to save, add to DB queue
+                            if save_to_db:
+                                try:
+                                    self.db_queue.put_nowait((self.db_params, data))
+                                except queue.Full:
+                                    # Just drop it if queue is full
+                                    pass
                         
                         samples_processed += 1
                     except queue.Empty:

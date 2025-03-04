@@ -54,6 +54,11 @@ class MainPage(ctk.CTkFrame):
         self.last_plot_update = None  # <-- new attribute for plot update frequency
         self.plc_sample_time = 0.0  # Time taken to retrieve a sample from PLC
         
+        # UI interaction state
+        self.ui_busy = False  # Flag to indicate UI interaction is in progress
+        self.last_save_time = 0  # Track last database save time
+        self.save_in_progress = False  # Flag to prevent multiple simultaneous saves
+        
         # Counters for flaws in the window
         self.flaw_lumps_count = 0  # Lumps in the current flaw window
         self.flaw_necks_count = 0  # Necks in the current flaw window
@@ -219,14 +224,24 @@ class MainPage(ctk.CTkFrame):
         self.label_batch = ctk.CTkLabel(self.left_panel, text="Batch")
         self.label_batch.grid(row=0, column=0, padx=5, pady=5, sticky="w")
 
-        self.entry_batch = ctk.CTkEntry(self.left_panel, placeholder_text="IADTX0000", width=180)
+        self.batch_var = ctk.StringVar(value="IADTX0000")  # Default value
+        self.entry_batch = ctk.CTkEntry(self.left_panel, placeholder_text="IADTX0000", width=180, textvariable=self.batch_var)
         self.entry_batch.grid(row=1, column=0, padx=5, pady=5)
+        
+        # Bind a custom handler to reduce UI thread blocking
+        self.entry_batch.bind("<FocusIn>", self._on_entry_focus)
+        self.entry_batch.bind("<FocusOut>", self._on_entry_unfocus)
 
         self.label_product = ctk.CTkLabel(self.left_panel, text="Produkt")
         self.label_product.grid(row=2, column=0, padx=5, pady=5, sticky="w")
 
-        self.entry_product = ctk.CTkEntry(self.left_panel, placeholder_text="18X0600", width=180)
+        self.product_var = ctk.StringVar(value="18X0600")  # Default value
+        self.entry_product = ctk.CTkEntry(self.left_panel, placeholder_text="18X0600", width=180, textvariable=self.product_var)
         self.entry_product.grid(row=3, column=0, padx=5, pady=5)
+        
+        # Bind a custom handler to reduce UI thread blocking
+        self.entry_product.bind("<FocusIn>", self._on_entry_focus)
+        self.entry_product.bind("<FocusOut>", self._on_entry_unfocus)
 
         self.btn_typowy = ctk.CTkButton(
             self.left_panel,
@@ -680,11 +695,51 @@ class MainPage(ctk.CTkFrame):
         self.production_speed = float(value)
         self.speed_label.configure(text=f"Speed: {self.production_speed:.1f}")
 
+    def _on_entry_focus(self, event=None):
+        """Handler for entry field focus - marks UI as busy to reduce processing"""
+        # Signal to data receiver that UI might be busy
+        self.ui_busy = True
+        # This method intentionally does minimal work to avoid blocking
+        
+    def _on_entry_unfocus(self, event=None):
+        """Handler for entry field unfocus - releases UI busy flag"""
+        # Use after() to delay the UI busy flag reset to ensure all UI operations complete
+        self.after(100, self._release_ui_busy)
+    
+    def _release_ui_busy(self):
+        """Release the UI busy flag after all pending operations complete"""
+        self.ui_busy = False
+        
+    def get_batch_name(self):
+        """Safely get the batch name using StringVar to avoid UI thread blocking"""
+        return self.batch_var.get() or "XABC1566"
+        
+    def get_product_name(self):
+        """Safely get the product name using StringVar to avoid UI thread blocking"""
+        return self.product_var.get() or "18X0600"
+        
+    def get_max_lumps(self):
+        """Safely get the max lumps setting"""
+        try:
+            return int(self.entry_max_lumps.get() or "30")
+        except (ValueError, AttributeError):
+            return 30
+            
+    def get_max_necks(self):
+        """Safely get the max necks setting"""
+        try:
+            return int(self.entry_max_necks.get() or "7")
+        except (ValueError, AttributeError):
+            return 7
+
     def _on_typowy_click(self):
         """Set example settings with batch UI update to avoid blocking data processing"""
         # First ensure measurement continues without blocking
         if hasattr(self.controller, 'run_measurement_flag'):
             self.controller.run_measurement_flag.value = 1
+            
+        # Signal that UI is busy to reduce impact on acquisition
+        self.ui_busy = True
             
         # Use after() to schedule UI updates in the next idle cycle, avoiding thread blocking
         def update_ui_fields():
@@ -693,10 +748,12 @@ class MainPage(ctk.CTkFrame):
             now = datetime.datetime.now()
             date_time_str = f"{now.day:02d}_{now.month:02d}_{now.hour:02d}_{now.minute:02d}"
             
-            # Prepare all values first (batch operations)
+            # Update StringVars for batch and product which will trigger less UI blocking
+            self.batch_var.set(f"btch_{date_time_str}")
+            self.product_var.set(f"prdct_{date_time_str}")
+            
+            # Prepare all values first (batch operations) for other fields
             field_values = {
-                "entry_batch": f"btch_{date_time_str}",
-                "entry_product": f"prdct_{date_time_str}",
                 "entry_recipe_name": f"recipe_{date_time_str}",
                 "entry_diameter_setpoint": "39",
                 "entry_tolerance_plus": "0.5",
@@ -717,6 +774,9 @@ class MainPage(ctk.CTkFrame):
                     field.insert(0, value)
             
             print("[GUI] Example settings applied without blocking")
+            
+            # Release UI busy flag after all operations complete
+            self.after(100, self._release_ui_busy)
         
         # Schedule the UI update for the next idle cycle
         self.after(10, update_ui_fields)
