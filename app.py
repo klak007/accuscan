@@ -49,6 +49,9 @@ class App(QMainWindow):
     def __init__(self):
         # Inicjalizacja aplikacji    
         super().__init__()
+        #Inicjalizacja flagi PLC
+        from multiprocessing import Value
+        self.plc_connected_flag = Value('i', 0)
         print("[App] Inicjalizacja aplikacji...")
         
         # Ustawienia okna
