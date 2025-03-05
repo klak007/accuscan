@@ -15,6 +15,7 @@ from data_processing import FastAcquisitionBuffer
 # Import stron
 from main_page import MainPage
 from settings_page import SettingsPage
+from config import OFFLINE_MODE
 
 
 # Configuration settings (originally from config.py)
@@ -39,8 +40,6 @@ if __name__ == "__main__":
     # Use spawn method for Windows compatibility
     # This should be set before any other multiprocessing code runs
     mp.set_start_method('spawn', force=True)
-
-OFFLINE_MODE = True
 
 class App(QMainWindow):
     """
@@ -836,6 +835,10 @@ class App(QMainWindow):
             self.update_timer.setInterval(100)  # plot-heavy main page
         else:
             self.update_timer.setInterval(50)   # for other pages
+        
+        # New line: update the PLC connection indicator
+        if hasattr(self, 'main_page'):
+            self.main_page.update_connection_indicators()
     
     def get_current_page(self):
         if self.current_page == "MainPage":

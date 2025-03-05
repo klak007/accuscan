@@ -6,6 +6,7 @@ from snap7.util import (
     get_bool, get_byte, get_word, get_real,
     set_bool, set_word, set_real
 )
+from config import OFFLINE_MODE
 
 class PLCConnectionError(Exception):
     """Wyjątek rzucany, gdy nie uda się nawiązać lub utrzymać połączenia z PLC."""
@@ -16,8 +17,6 @@ _plc_connections = {}
 _plc_last_used = {}
 _connection_locks = {}  # For thread safety on connection level
 import threading
-
-OFFLINE_MODE = True
 
 def connect_plc(ip: str, rack: int = 0, slot: int = 1, delay: int = 2, max_attempts: int = 3) -> snap7.client.Client:
     """

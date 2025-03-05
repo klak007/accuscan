@@ -917,6 +917,11 @@ class MainPage(QWidget):
 
     def _on_start(self):
         print("[GUI] Start pressed!")
+        if hasattr(self.controller, "run_measurement_flag"):
+            self.controller.run_measurement_flag.value = True
+        if hasattr(self.controller, "process_running_flag"):
+            self.controller.process_running_flag.value = True
+
         self.controller.run_measurement = True
 
         # Wysyłamy komendę do PLC writer
@@ -1118,7 +1123,7 @@ class MainPage(QWidget):
         
         # Display production speed (potentially with fluctuation)
         try:
-            if fluctuation_percent > 0:
+            if (fluctuation_percent > 0):
                 # Calculate a representative speed value
                 import random
                 fluctuation_factor = 1.0 + random.uniform(-fluctuation_percent/100, fluctuation_percent/100)
@@ -1198,35 +1203,39 @@ class MainPage(QWidget):
         }
         
         # Add debug log if we have data but no visible updates
-        if window_data['x_history'] and len(window_data['x_history']) > 0:
-            num_points = len(window_data['x_history'])
-            print(f"[MainPage] Plot data ready: {num_points} points, X range: {window_data['x_history'][0]:.1f}-{self.current_x:.1f}m")
-        
-        # Force a direct update in the main thread to ensure plots are visible even if process is not working
-        if not hasattr(self.plot_manager, 'plot_process') or not self.plot_manager.plot_process or not self.plot_manager.plot_process.is_alive():
-            print("[MainPage] Plot process not active, updating in main thread")
-            # Do direct updates for the important plots
-            self.plot_manager.update_status_plot(
-                plot_data['x_history'], 
-                plot_data['lumps_history'], 
-                plot_data['necks_history'],
-                plot_data['current_x'],
-                plot_data['batch_name'],
-                plot_data['plc_sample_time']
-            )
+        if self.controller.run_measurement:
+            if window_data['x_history'] and len(window_data['x_history']) > 0:
+                num_points = len(window_data['x_history'])
+                # print(f"[MainPage] Plot data ready: {num_points} points, X range: {window_data['x_history'][0]:.1f}-{self.current_x:.1f}m")
             
-            self.plot_manager.update_diameter_plot(
-                plot_data['diameter_x'],
-                plot_data['diameter_history'],
-                plot_data['current_x'],
-                plot_data['diameter_preset'],
-                plot_data['plc_sample_time']
-            )
-            
+            # Force a direct update in the main thread to ensure plots are visible even if process is not working
+            if not hasattr(self.plot_manager, 'plot_process') or not self.plot_manager.plot_process or not self.plot_manager.plot_process.is_alive():
+                # print("[MainPage] Plot process not active, updating in main thread")
+                # Do direct updates for the important plots
+                self.plot_manager.update_status_plot(
+                    plot_data['x_history'], 
+                    plot_data['lumps_history'], 
+                    plot_data['necks_history'],
+                    plot_data['current_x'],
+                    plot_data['batch_name'],
+                    plot_data['plc_sample_time']
+                )
+                
+                self.plot_manager.update_diameter_plot(
+                    plot_data['diameter_x'],
+                    plot_data['diameter_history'],
+                    plot_data['current_x'],
+                    plot_data['diameter_preset'],
+                    plot_data['plc_sample_time']
+                )
+                
+            else:
+                # Normal case - update through PlotManager process 
+                self.plot_manager.update_all_plots(plot_data)
         else:
-            # Normal case - update through PlotManager process 
-            self.plot_manager.update_all_plots(plot_data)
-            
+            # Optionally clear or skip plot updates when measurement is stopped.
+            pass
+
         plot_update_time = time.perf_counter() - plot_update_start
         
         # Performance logging (only for slow updates)
@@ -1270,11 +1279,16 @@ class MainPage(QWidget):
             self.update_readings(data)
 
     def update_connection_indicators(self):
-        import plc_helper
-        plc_connected = plc_helper.is_plc_connected(self.controller.logic)
-        if plc_connected:
-            self.ind_plc.setText("PLC: OK")
-            self.ind_plc.setStyleSheet("color: green;")
+        # Use timestamp from latest_data to check PLC connection status.
+        if hasattr(self, "latest_data") and self.latest_data and "timestamp" in self.latest_data:
+            # If last sample is recent (< 2 seconds old), assume connection is OK.
+            age = (datetime.now() - self.latest_data["timestamp"]).total_seconds()
+            if age < 2:
+                self.ind_plc.setText("PLC: OK")
+                self.ind_plc.setStyleSheet("color: green;")
+            else:
+                self.ind_plc.setText("PLC: OFF")
+                self.ind_plc.setStyleSheet("color: red;")
         else:
             self.ind_plc.setText("PLC: OFF")
             self.ind_plc.setStyleSheet("color: red;")
