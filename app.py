@@ -40,6 +40,8 @@ if __name__ == "__main__":
     # This should be set before any other multiprocessing code runs
     mp.set_start_method('spawn', force=True)
 
+OFFLINE_MODE = True
+
 class App(QMainWindow):
     """
     Główne okno aplikacji, dawniej dziedziczące po ctk.CTk,
@@ -132,6 +134,7 @@ class App(QMainWindow):
             
             self.last_plc_retry = 0
             print("[App] Inicjalizacja zakończona.")
+            self._closing = False   # <-- new flag to prevent recursion
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -148,6 +151,10 @@ class App(QMainWindow):
     def init_database_connection(self):
         try:
             print("[App] Inicjalizacja połączenia z bazą...")
+            if OFFLINE_MODE:
+                self.db_connected = True
+                print("[App] Offline mode: Skipped DB initialization.")
+                return
             # Próba połączenia z bazą
             if init_database(self.db_params):
                 self.db_connected = True
@@ -182,6 +189,9 @@ class App(QMainWindow):
     
     def start_acquisition_process(self):
         """Start dedicated process for high-speed data acquisition from PLC"""
+        if OFFLINE_MODE:
+            print("[App] Offline mode: Skipped acquisition process.")
+            return
         import multiprocessing as mp
         from multiprocessing import Process, Value, Array, Event
         
@@ -655,6 +665,9 @@ class App(QMainWindow):
 
     def start_plc_writer(self):
         """Start worker thread for PLC write operations."""
+        if OFFLINE_MODE:
+            print("[App] Offline mode: Skipped PLC writer.")
+            return
         self.plc_writer_running = True
         self.plc_writer_thread = threading.Thread(target=self._plc_writer, daemon=True)
         self.plc_writer_thread.start()
@@ -689,6 +702,9 @@ class App(QMainWindow):
 
     def start_db_worker(self):
         """Start worker thread for database operations"""
+        if OFFLINE_MODE:
+            print("[App] Offline mode: Skipped DB worker.")
+            return
         # Start database worker thread
         self.db_worker_running = True
         self.db_worker_thread = threading.Thread(target=self._db_worker, daemon=True)
@@ -722,7 +738,9 @@ class App(QMainWindow):
                     pass
     
     def _on_closing(self):
-        """Zamykanie aplikacji – rozłączenie z PLC, zamknięcie okna."""
+        if self._closing:
+            return  # Already closing, avoid recursion
+        self._closing = True
         print("[App] Zamykanie aplikacji...")
         
         # Stop acquisition process
@@ -773,6 +791,17 @@ class App(QMainWindow):
         # Destroy window
         self.destroy()
     
+    def destroy(self):
+        """Safe method to exit the application"""
+        # Instead of calling _on_closing again, just close the window.
+        try:
+            self.close()  # This will trigger closeEvent only once since _closing is already True
+        except Exception as e:
+            print(f"[App] Error while closing: {e}")
+            # Force close as last resort
+            import sys
+            sys.exit(0)
+
     def start_update_loop(self):
         """Start a separate update loop for UI with lower frequency than data collection"""
         self.update_timer = QTimer(self)

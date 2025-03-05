@@ -17,6 +17,8 @@ _plc_last_used = {}
 _connection_locks = {}  # For thread safety on connection level
 import threading
 
+OFFLINE_MODE = True
+
 def connect_plc(ip: str, rack: int = 0, slot: int = 1, delay: int = 2, max_attempts: int = 3) -> snap7.client.Client:
     """
     Łączy się z PLC za pomocą Snap7.
@@ -36,6 +38,10 @@ def connect_plc(ip: str, rack: int = 0, slot: int = 1, delay: int = 2, max_attem
     Raises:
         PLCConnectionError: If connection cannot be established after max_attempts
     """
+    if OFFLINE_MODE:
+        print("[PLC Helper] Offline mode: Skipped PLC connection.")
+        return None
+
     global _plc_connections, _plc_last_used, _connection_locks
     import time
     
@@ -160,6 +166,9 @@ def read_accuscan_data(client: snap7.client.Client, db_number: int = 2) -> dict:
     
     Handles "Job pending" errors with retries.
     """
+    if OFFLINE_MODE or not client:
+        return {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "lumps": 0, "necks": 0}
+
     size = 48  # Rozmiar w bajtach, wymagany do odczytu offsetu 0..47
     start = 0
     

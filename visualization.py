@@ -299,3 +299,12 @@ class PlotManager:
             self.plot_widgets['diameter'].setTitle("Diameter Plot")
         if self.plot_widgets['fft']:
             self.plot_widgets['fft'].setTitle("FFT Plot")
+
+    def stop_plot_process(self):
+        """
+        Clean method to stop any plotting processes.
+        This is called during application shutdown.
+        """
+        # For PyQtGraph we're using the main thread, so this is a no-op
+        print("[PlotManager] No separate process to stop in PyQtGraph mode")
+        return True

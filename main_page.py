@@ -105,8 +105,17 @@ class MainPage(QWidget):
         self._create_middle_panel()
         self._create_right_panel()
 
-        self.layout.addWidget(self.left_panel)
-        self.layout.addWidget(self.top_bar)
+        # Pasek u góry, wiersz=0, od kolumny 0 do 2 (czyli colSpan=3)
+        self.layout.addWidget(self.top_bar, 0, 0, 1, 3)
+
+        # Panel lewy: wiersz=1, kolumna=0
+        self.layout.addWidget(self.left_panel, 1, 0)
+
+        # Panel środkowy: wiersz=1, kolumna=1
+        self.layout.addWidget(self.middle_panel, 1, 1)
+
+        # Panel prawy: wiersz=1, kolumna=2
+        self.layout.addWidget(self.right_panel, 1, 2)
         # Initialize new components after right panel is created
         self.window_processor = WindowProcessor(max_samples=self.MAX_POINTS)
         self.flaw_detector = FlawDetector(flaw_window_size=0.5)
@@ -193,10 +202,12 @@ class MainPage(QWidget):
         print("[GUI] Kliknięto przycisk 'Accuscan'.")
 
     def _on_exit_click(self):
-        # Stop measurements
-        self.controller.run_measurement_flag.value = 0  # if you have such a flag
-        self.controller.process_running_flag.value = 0  # to signal child process to exit
-        # Optionally, wait a moment or join the process if needed
+        # Stop measurements if flags exist
+        if hasattr(self.controller, "run_measurement_flag"):
+            self.controller.run_measurement_flag.value = 0
+        if hasattr(self.controller, "process_running_flag"):
+            self.controller.process_running_flag.value = 0
+        # Exit application
         self.controller.destroy()
 
 
@@ -738,9 +749,10 @@ class MainPage(QWidget):
     # 3. Środkowa kolumna (row=1, col=1) – parametry symulacji
     # ---------------------------------------------------------------------------------
     def _create_middle_panel(self):
-        # Utwórz panel środkowy o minimalnej szerokości 800
+        # Utwórz panel środkowy o minimalnej szerokości 1200
         self.middle_panel = QFrame(self)
-        self.middle_panel.setMinimumWidth(800)
+        self.middle_panel.setMinimumWidth(400)
+        self.middle_panel.setMaximumWidth(400)
         middle_layout = QGridLayout(self.middle_panel)
         self.middle_panel.setLayout(middle_layout)
         middle_layout.setColumnStretch(0, 1)  # Jedna kolumna, rozciągnięta
@@ -838,9 +850,13 @@ class MainPage(QWidget):
     def _create_right_panel(self):
         # Utwórz prawy panel jako QFrame i ustaw layout grid
         self.right_panel = QFrame(self)
+        self.right_panel.setMinimumWidth(400)
+        self.right_panel.setMaximumWidth(800)
         right_layout = QGridLayout(self.right_panel)
         self.right_panel.setLayout(right_layout)
         right_layout.setContentsMargins(10, 10, 10, 10)
+        # max width to 800, min width to 400
+        
         
         # Ustawienie gridu:
         # Rząd 0 – przyciski (jeśli będą), rzędy 1-3 – wykresy

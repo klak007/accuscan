@@ -3,11 +3,15 @@ import mysql.connector
 from mysql.connector import Error
 from datetime import datetime
 
+OFFLINE_MODE = True
+
 def check_database(db_params: dict) -> bool:
     """
     Sprawdza czy można połączyć się z bazą danych.
     Zwraca True jeśli połączenie jest możliwe, False w przeciwnym przypadku.
     """
+    if OFFLINE_MODE:
+        return True
     connection = None
     try:
         connection = mysql.connector.connect(**db_params)
@@ -26,6 +30,8 @@ def init_database(db_params: dict) -> bool:
     Inicjuje bazę danych: łączy się z MySQL 
     Zwraca True jeśli inicjalizacja się powiodła, False w przeciwnym przypadku.
     """
+    if OFFLINE_MODE:
+        return True
     print("init_database()")
     connection = None
     try:
@@ -54,6 +60,8 @@ def save_measurement_sample(db_params: dict, data: dict) -> bool:
       ID_Measurement (auto), Statusword, D1..D4, lumps number of, necks number of
     Zwraca True jeśli zapis się powiódł, False w przeciwnym przypadku.
     """
+    if OFFLINE_MODE:
+        return True
     if not check_database(db_params):
         return False
         
@@ -96,6 +104,8 @@ def save_event(db_params: dict, event_data: dict) -> bool:
       Alarm Statusword, D1..D4, lumps number of, necks number of
     Zwraca True jeśli zapis się powiódł, False w przeciwnym przypadku.
     """
+    if OFFLINE_MODE:
+        return True
     if not check_database(db_params):
         return False
 
@@ -148,6 +158,8 @@ def save_settings(db_params: dict, settings_data: dict) -> int:
       Id Settings, Product nr, Preset Diameter, Diameter Over tolerance, ...
     Zwraca ID rekordu w przypadku powodzenia, None w przeciwnym przypadku.
     """
+    if OFFLINE_MODE:
+        return 1
     if not check_database(db_params):
         return None
 
@@ -269,6 +281,8 @@ def save_settings_history(db_params: dict, settings_data: dict) -> bool:
       Id register Settings, Date time, Product nr, Preset Diameter, ...
     Zwraca True jeśli zapis się powiódł, False w przeciwnym przypadku.
     """
+    if OFFLINE_MODE:
+        return True
     if not check_database(db_params):
         return False
 
@@ -326,6 +340,8 @@ def load_settings(db_params: dict, settings_id: int) -> dict:
     """
     Odczytuje jeden rekord z tabeli settings.
     """
+    if OFFLINE_MODE:
+        return {}
     if not check_database(db_params):
         return {}
 
@@ -354,6 +370,8 @@ def save_detection_event(db_params: dict, event_data: dict) -> bool:
     product, batch, alarm_status_word, D1, D2, D3, D4, lumps, necks, result.
     Zwraca True jeśli zapis się powiódł, False w przeciwnym przypadku.
     """
+    if OFFLINE_MODE:
+        return True
     if not check_database(db_params):
         return False
 
