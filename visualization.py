@@ -290,3 +290,12 @@ class PlotManager:
 
             except Exception as e:
                 print(f"[PlotManager] Error updating plots: {e}")
+
+    def initialize_plots(self):
+        # Configure each plot widget
+        if self.plot_widgets['status']:
+            self.plot_widgets['status'].setTitle("Status Plot")
+        if self.plot_widgets['diameter']:
+            self.plot_widgets['diameter'].setTitle("Diameter Plot")
+        if self.plot_widgets['fft']:
+            self.plot_widgets['fft'].setTitle("FFT Plot")

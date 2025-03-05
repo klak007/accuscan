@@ -88,6 +88,17 @@ class MainPage(QWidget):
         self.plot_dirty = False  # Set to True when data changes
         self.min_plot_interval = 0.8  # Minimum seconds between plot updates
 
+        # Initialize the plot manager BEFORE creating the panels
+        self.plot_manager = PlotManager(
+            plot_widgets={
+                'status': None,
+                'diameter': None,
+                'fft': None
+            }, 
+            min_update_interval=0.2  # Reduce interval for more responsive updates
+        )
+        print("[MainPage] Plot manager initialized for PyQtGraph")
+
         # Tworzenie poszczególnych części interfejsu
         self._create_top_bar()
         self._create_left_panel()
@@ -99,18 +110,6 @@ class MainPage(QWidget):
         # Initialize new components after right panel is created
         self.window_processor = WindowProcessor(max_samples=self.MAX_POINTS)
         self.flaw_detector = FlawDetector(flaw_window_size=0.5)
-
-        # Initialize the plot manager and pass the figures
-        # (Zakładam, że metody tworzące wykresy w right panelu ustawiają self.fig, self.ax, etc.)
-        self.plot_manager = PlotManager(
-            plot_widgets={
-                'status': None,
-                'diameter': None,
-                'fft': None
-            }, 
-            min_update_interval=0.2  # Reduce interval for more responsive updates
-        )
-        print("[MainPage] Plot manager initialized for PyQtGraph")
 
 
     # ---------------------------------------------------------------------------------
@@ -656,8 +655,8 @@ class MainPage(QWidget):
         
     def _on_entry_unfocus(self, event=None):
         """Handler for entry field unfocus - releases UI busy flag"""
-        # Use after() to delay the UI busy flag reset to ensure all UI operations complete
-        self.after(100, self._release_ui_busy)
+        # Use QTimer.singleShot instead of after() to delay the UI busy flag reset
+        QTimer.singleShot(100, self._release_ui_busy)
     
     def _release_ui_busy(self):
         """Release the UI busy flag after all pending operations complete"""
@@ -692,16 +691,16 @@ class MainPage(QWidget):
         # Signal that UI is busy to reduce impact on acquisition
         self.ui_busy = True
             
-        # Use after() to schedule UI updates in the next idle cycle, avoiding thread blocking
+        # Use QTimer.singleShot instead of after() to schedule UI updates in the next idle cycle
         def update_ui_fields():
             # Get current date/time string
             import datetime
             now = datetime.datetime.now()
             date_time_str = f"{now.day:02d}_{now.month:02d}_{now.hour:02d}_{now.minute:02d}"
             
-            # Update StringVars for batch and product which will trigger less UI blocking
-            self.batch_var.set(f"btch_{date_time_str}")
-            self.product_var.set(f"prdct_{date_time_str}")
+            # Update entry fields - in PyQt we directly set text instead of using StringVars
+            self.entry_batch.setText(f"btch_{date_time_str}")
+            self.entry_product.setText(f"prdct_{date_time_str}")
             
             # Prepare all values first (batch operations) for other fields
             field_values = {
@@ -727,10 +726,10 @@ class MainPage(QWidget):
             print("[GUI] Example settings applied without blocking")
             
             # Release UI busy flag after all operations complete
-            self.after(100, self._release_ui_busy)
+            QTimer.singleShot(100, self._release_ui_busy)
         
         # Schedule the UI update for the next idle cycle
-        self.after(10, update_ui_fields)
+        QTimer.singleShot(10, update_ui_fields)
         
         # Immediately return to avoid blocking
         return
@@ -893,6 +892,12 @@ class MainPage(QWidget):
         self.fft_plot.setLabel('bottom', "Frequency")
         self.fft_plot.showGrid(x=True, y=True)
         fft_frame_layout.addWidget(self.fft_plot)
+
+        self.plot_manager.plot_widgets['status'] = self.status_plot
+        self.plot_manager.plot_widgets['diameter'] = self.diameter_plot
+        self.plot_manager.plot_widgets['fft'] = self.fft_plot
+
+        self.plot_manager.initialize_plots()
 
     def _on_start(self):
         print("[GUI] Start pressed!")
