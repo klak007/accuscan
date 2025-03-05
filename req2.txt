@@ -1,4 +1,4 @@
-mysql-connector-python==9.2.0
+mysql-connector-python==8.4.0
 numpy==2.0.2
 pandas==2.2.3
 psutil==7.0.0
