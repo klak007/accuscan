@@ -124,8 +124,10 @@ class App(QMainWindow):
         self.start_acquisition_process()
         print("[App] Proces akwizycji uruchomiony.")
         
-        self.update_timer = QTimer()
+        self.update_timer = QTimer(self)
+        print("[App] Timer aktualizacji utworzony.", flush=True)
         self.update_timer.timeout.connect(self.update_plc_status)
+        print("[App] Metoda update_plc_status przypisana do timera.", flush=True)
         self.update_timer.start(1000)  # check every 1 second
 
         self.start_update_loop()
@@ -137,15 +139,15 @@ class App(QMainWindow):
 
     def update_plc_status(self):
         # Debug print to show the current flag value
-        print(f"[DEBUG] update_plc_status: plc_connected_flag = {self.plc_connected_flag.value}")
+        print(f"[PLC CONNECT FLAG] update_plc_status: plc_connected_flag = {self.plc_connected_flag.value}")
         if self.plc_connected_flag.value == 1:
             self.main_page.plc_status_label.setText("PLC Status: CONNECTED")
             self.main_page.plc_status_label.setStyleSheet("color: green;")
-            print("[DEBUG] PLC is connected according to flag")
+            print("[PLC CONNECT FLAG] PLC is connected according to flag")
         else:
             self.main_page.plc_status_label.setText("PLC Status: DISCONNECTED")
             self.main_page.plc_status_label.setStyleSheet("color: red;")
-            print("[DEBUG] PLC is disconnected according to flag")
+            print("[PLC CONNECT FLAG] PLC is disconnected according to flag")
 
     def closeEvent(self, event):
         """
@@ -407,7 +409,9 @@ class App(QMainWindow):
         plc_client = None
         try:
             plc_client = connect_plc(plc_ip, plc_rack, plc_slot)
-            print(f"[ACQ Process] Connected to PLC at {plc_ip}")
+            if plc_client and plc_client.get_connected():
+                plc_connected_flag.value = 1
+                print(f"[ACQ Process] Connected to PLC at {plc_ip}")
             
             # Immediately perform initial reset to clear any lingering values
             if plc_client and plc_client.get_connected():
@@ -672,6 +676,15 @@ class App(QMainWindow):
                 except:
                     pass
                 time.sleep(0.1)  # Small delay before next attempt
+            
+            if plc_client and plc_client.get_connected():
+                try:
+                    # Force a small read to ensure the connection is still valid
+                    _ = read_accuscan_data(plc_client, db_number=2)
+                except:
+                    plc_connected_flag.value = 0
+                    plc_client = None
+                    print("[ACQ Process] PLC connection lost during forced read, setting flag to 0.")
         
         print("[ACQ Process] Acquisition process worker exiting")
         # Clean up PLC connection before exiting
