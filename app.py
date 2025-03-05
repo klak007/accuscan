@@ -47,97 +47,105 @@ class App(QMainWindow):
     teraz po QMainWindow (PyQt5).
     """
     def __init__(self):
-        try:
-            # Inicjalizacja aplikacji    
-            super().__init__()
-            print("[App] Inicjalizacja aplikacji...")
-            
-            # Ustawienia okna
-            self.setWindowTitle("AccuScan GUI")
-            self.setGeometry(0, 0, 1920, 700)
-            print("[App] Tytuł i geometria ustawione.")
-            
-            # -----------------------------------
-            # Flagi i parametry sterujące
-            # -----------------------------------
-            self.run_measurement = False
-            self.current_page = "MainPage"
-            self.db_connected = False
-            self.log_counter = 0
-            self.log_frequency = 10
-            self.last_log_time = time.time()
-            print("[App] Parametry sterujące zainicjowane.")
-            
-            # -----------------------------------
-            # Kolejki, wątki/procesy
-            # -----------------------------------
-            self.acquisition_thread_running = False
-            self.acquisition_thread = None
-            self.db_queue = queue.Queue(maxsize=100)
-            self.plc_write_queue = queue.Queue(maxsize=20)
-            print("[App] Kolejki utworzone.")
-            
-            # Start PLC writer thread
-            self.start_plc_writer()
-            
-            # Używamy mp.Queue dla między-procesowego przesyłu danych
-            self.data_queue = mp.Queue(maxsize=250)
-            print("[App] Kolejka danych międzyprocesowych utworzona.")
-            
-            # -----------------------------------
-            # Parametry bazy danych
-            # -----------------------------------
-            self.db_params = DB_PARAMS
-            print("[App] Parametry bazy danych ustawione.")
-            self.init_database_connection()
-            print("[App] Połączenie z bazą danych sprawdzone.")
-            
-            # -----------------------------------
-            # Bufor akwizycji
-            # -----------------------------------
-            self.acquisition_buffer = FastAcquisitionBuffer(max_samples=1024)
-            print("[App] Bufor akwizycji utworzony.")
-            
-            # -----------------------------------
-            # Kontener na strony (MainPage, SettingsPage)
-            # -----------------------------------
-            central_widget = QWidget(self)
-            self.setCentralWidget(central_widget)
-            self.layout = QVBoxLayout(central_widget)
-            print("[App] Centralny widget i layout utworzone.")
-            
-            # Inicjalizacja stron
-            self.main_page = MainPage(parent=central_widget, controller=self)
-            self.settings_page = SettingsPage(parent=central_widget, controller=self)
-            print("[App] Strony MainPage i SettingsPage zainicjowane.")
-            
-            # Na razie dodajemy tylko main_page do layoutu
-            self.layout.addWidget(self.main_page)
-            self.settings_page.hide()
-            print("[App] MainPage dodana, SettingsPage ukryta.")
-            
-            # -----------------------------------
-            # Obsługa zamknięcia okna
-            # (Metoda closeEvent zostanie nadpisana, gdy zajdzie potrzeba)
-            # -----------------------------------
-            
-            # Start workerów
-            self.start_db_worker()
-            print("[App] Worker bazy danych uruchomiony.")
-            
-            self.start_acquisition_process()
-            print("[App] Proces akwizycji uruchomiony.")
-            
-            self.start_update_loop()
-            print("[App] Pętla aktualizacyjna (UI loop) uruchomiona.")
-            
-            self.last_plc_retry = 0
-            print("[App] Inicjalizacja zakończona.")
-            self._closing = False   # <-- new flag to prevent recursion
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            raise
+        # Inicjalizacja aplikacji    
+        super().__init__()
+        print("[App] Inicjalizacja aplikacji...")
+        
+        # Ustawienia okna
+        self.setWindowTitle("AccuScan GUI")
+        self.setGeometry(0, 0, 1920, 700)
+        print("[App] Tytuł i geometria ustawione.")
+        
+        # -----------------------------------
+        # Flagi i parametry sterujące
+        # -----------------------------------
+        self.run_measurement = False
+        self.current_page = "MainPage"
+        self.db_connected = False
+        self.log_counter = 0
+        self.log_frequency = 10
+        self.last_log_time = time.time()
+        print("[App] Parametry sterujące zainicjowane.")
+        
+        # -----------------------------------
+        # Kolejki, wątki/procesy
+        # -----------------------------------
+        self.acquisition_thread_running = False
+        self.acquisition_thread = None
+        self.db_queue = queue.Queue(maxsize=100)
+        self.plc_write_queue = queue.Queue(maxsize=20)
+        print("[App] Kolejki utworzone.")
+        
+        # Start PLC writer thread
+        self.start_plc_writer()
+        
+        # Używamy mp.Queue dla między-procesowego przesyłu danych
+        self.data_queue = mp.Queue(maxsize=250)
+        print("[App] Kolejka danych międzyprocesowych utworzona.")
+        
+        # -----------------------------------
+        # Parametry bazy danych
+        # -----------------------------------
+        self.db_params = DB_PARAMS
+        self.init_database_connection()
+        # -----------------------------------
+        # Bufor akwizycji
+        # -----------------------------------
+        self.acquisition_buffer = FastAcquisitionBuffer(max_samples=1024)
+        print("[App] Bufor akwizycji utworzony.")
+        
+        # -----------------------------------
+        # Kontener na strony (MainPage, SettingsPage)
+        # -----------------------------------
+        central_widget = QWidget(self)
+        self.setCentralWidget(central_widget)
+        self.layout = QVBoxLayout(central_widget)
+        print("[App] Centralny widget i layout utworzone.")
+        
+        # Inicjalizacja stron
+        self.main_page = MainPage(parent=central_widget, controller=self)
+        self.settings_page = SettingsPage(parent=central_widget, controller=self)
+        print("[App] Strony MainPage i SettingsPage zainicjowane.")
+        
+        # Na razie dodajemy tylko main_page do layoutu
+        self.layout.addWidget(self.main_page)
+        self.settings_page.hide()
+        print("[App] MainPage dodana, SettingsPage ukryta.")
+        
+        # -----------------------------------
+        # Obsługa zamknięcia okna
+        # (Metoda closeEvent zostanie nadpisana, gdy zajdzie potrzeba)
+        # -----------------------------------
+        
+        # Start workerów
+        self.start_db_worker()
+        print("[App] Worker bazy danych uruchomiony.")
+        
+        self.start_acquisition_process()
+        print("[App] Proces akwizycji uruchomiony.")
+        
+        self.update_timer = QTimer()
+        self.update_timer.timeout.connect(self.update_plc_status)
+        self.update_timer.start(1000)  # check every 1 second
+
+        self.start_update_loop()
+        print("[App] Pętla aktualizacyjna (UI loop) uruchomiona.")
+        
+        self.last_plc_retry = 0
+        print("[App] Inicjalizacja zakończona.")
+        self._closing = False   # <-- new flag to prevent recursion
+
+    def update_plc_status(self):
+        # Debug print to show the current flag value
+        print(f"[DEBUG] update_plc_status: plc_connected_flag = {self.plc_connected_flag.value}")
+        if self.plc_connected_flag.value == 1:
+            self.main_page.plc_status_label.setText("PLC Status: CONNECTED")
+            self.main_page.plc_status_label.setStyleSheet("color: green;")
+            print("[DEBUG] PLC is connected according to flag")
+        else:
+            self.main_page.plc_status_label.setText("PLC Status: DISCONNECTED")
+            self.main_page.plc_status_label.setStyleSheet("color: red;")
+            print("[DEBUG] PLC is disconnected according to flag")
 
     def closeEvent(self, event):
         """
@@ -198,6 +206,7 @@ class App(QMainWindow):
         self.run_measurement_flag = Value('i', 0)  # 0 = False, 1 = True
         
         self.process_running_flag = Value('i', 1)  # 1 = True, 0 = False
+        self.plc_connected_flag = Value('i', 0)
         
         # Create a separate process for data acquisition
         self.acquisition_process = Process(
@@ -209,7 +218,8 @@ class App(QMainWindow):
                 self.data_queue,
                 PLC_IP,
                 PLC_RACK,
-                PLC_SLOT
+                PLC_SLOT,
+                self.plc_connected_flag
             ),
             daemon=True
         )
@@ -371,7 +381,7 @@ class App(QMainWindow):
                 time.sleep(0.01)
     
     @staticmethod
-    def _acquisition_process_worker(process_running, run_measurement, data_queue, plc_ip, plc_rack, plc_slot):
+    def _acquisition_process_worker(process_running, run_measurement, data_queue, plc_ip, plc_rack, plc_slot, plc_connected_flag):
         """
         Worker function for high-speed data acquisition process.
         This runs in a separate process to avoid GIL limitations.
@@ -445,11 +455,20 @@ class App(QMainWindow):
                 
             # Check PLC connection and retry if needed
             if not (plc_client and plc_client.get_connected()):
+                plc_connected_flag.value = 0
+                print("[ACQ Process] PLC not connected, attempting to reconnect...")
                 try:
                     plc_client = connect_plc(plc_ip, plc_rack, plc_slot, max_attempts=1)
-                    print(f"[ACQ Process] Reconnected to PLC at {plc_ip}")
-                    initial_reset_needed = True  # Need to reset after reconnection
+                    if plc_client and plc_client.get_connected():
+                        plc_connected_flag.value = 1
+                        print(f"[ACQ Process] Reconnected to PLC at {plc_ip}")
+                        initial_reset_needed = True  # Need to reset after reconnection
+                    else:
+                        plc_connected_flag.value = 0
+                        time.sleep(0.5)  # Wait before retrying
+                        continue
                 except Exception as e:
+                    plc_connected_flag.value = 0
                     print(f"[ACQ Process] PLC reconnection failed: {e}")
                     time.sleep(0.5)  # Wait before retrying
                     continue
@@ -656,6 +675,7 @@ class App(QMainWindow):
         
         print("[ACQ Process] Acquisition process worker exiting")
         # Clean up PLC connection before exiting
+        plc_connected_flag.value = 0
         if plc_client:
             try:
                 plc_client.disconnect()

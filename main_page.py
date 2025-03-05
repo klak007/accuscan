@@ -182,6 +182,9 @@ class MainPage(QWidget):
         self.btn_exit.clicked.connect(self._on_exit_click)
         top_bar_layout.addWidget(self.btn_exit, 0, Qt.AlignRight)
         
+        # NEW: Dodaj etykietę statusu PLC
+        self.plc_status_label = QLabel("PLC Status: Unknown", self.top_bar)
+        top_bar_layout.addWidget(self.plc_status_label, 0, Qt.AlignRight)
 
     def _on_pomiary_click(self):
         print("[GUI] Kliknięto przycisk 'pomiary'.")
