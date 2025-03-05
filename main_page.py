@@ -3,7 +3,6 @@ import customtkinter as ctk
 import matplotlib
 matplotlib.use("TkAgg")  # wymagane dla matplotlib + tkinter
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from db_helper import save_settings, save_settings_history
 import matplotlib.pyplot as plt
 from datetime import datetime
 from tkinter import messagebox
@@ -209,7 +208,7 @@ class MainPage(ctk.CTkFrame):
         # =============================
         # NOWE POLE NASTAW DLA RECEPTURY
         # =============================
-        
+
         row_start = 8  # Wstawiamy poniżej lumps/necks
 
         self.label_recipe_name = ctk.CTkLabel(self.left_panel, text="Nazwa receptury:")
@@ -779,7 +778,7 @@ class MainPage(ctk.CTkFrame):
 
 
     # ---------------------------------------------------------------------------------
-    # 4. Prawa kolumna (row=1, col=2) – Wykres + przyciski
+    # 4. Prawa kolumna (row=1, col=2) – Wykres 
     # ---------------------------------------------------------------------------------
     def _create_right_panel(self):
         self.right_panel = ctk.CTkFrame(self)
@@ -1156,6 +1155,7 @@ class MainPage(ctk.CTkFrame):
             # This is a fallback if the process isn't drawing
             if not hasattr(self, 'last_forced_draw') or time.time() - self.last_forced_draw > 2.0:
                 print("[MainPage] Forcing canvas draw to ensure visibility")
+                print("DEBUG: Forcing canvas draw, x_history size=", len(self.x_history))
                 self.fig.canvas.draw()
                 self.fig_diameter.canvas.draw() 
                 self.last_forced_draw = time.time()

@@ -208,7 +208,7 @@ class PlotManager:
                         print(f"[Plot Process] Generated plot data in {processing_time:.4f}s")
                         
                     # Mark the item as processed
-                    data_queue.task_done()
+                    # data_queue.task_done()
                     
                 except mp.queues.Empty:
                     # No data to process
@@ -340,12 +340,11 @@ class PlotManager:
         # Only proceed if we have enough data
         if len(diameter_history) > 0:
             # Convert to numpy array for FFT analysis
-            import numpy as np
+            
             diameter_array = np.array(diameter_history[-fft_buffer_size:], dtype=np.float32)
             
             if len(diameter_array) > 0:
                 # Calculate FFT
-                from window_fft_analysis import analyze_window_fft
                 diameter_fft = analyze_window_fft(diameter_array)
                 
                 # Plot FFT results

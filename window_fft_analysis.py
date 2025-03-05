@@ -28,7 +28,7 @@ def analyze_window_fft(data_array, cache_ttl=5):
     now = time.time()
     if now - _last_fft_calc < 0.2 and _fft_cache:
         # Return most recent result from cache
-        return list(_fft_cache.values())[-1]
+        return list(_fft_cache.values())[-1]['result']
     
     # Check if we already calculated this exact data recently
     data_hash = hash(data_array.tobytes())
