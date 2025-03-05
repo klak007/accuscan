@@ -182,12 +182,6 @@ class MainPage(QWidget):
         self.btn_exit.clicked.connect(self._on_exit_click)
         top_bar_layout.addWidget(self.btn_exit, 0, Qt.AlignRight)
         
-        # Etykieta statusu PLC
-        self.ind_plc = QLabel("PLC: Unknown", self.top_bar)
-        top_bar_layout.addWidget(self.ind_plc, 0, Qt.AlignRight)
-        
-        # Na koniec, top_bar powinien zostać dodany do głównego layoutu
-        # (np. przez self.layout.addWidget(self.top_bar) w konstruktorze)
 
     def _on_pomiary_click(self):
         print("[GUI] Kliknięto przycisk 'pomiary'.")
@@ -1277,18 +1271,3 @@ class MainPage(QWidget):
                 
             # Process data through our pipeline
             self.update_readings(data)
-
-    def update_connection_indicators(self):
-        # Use timestamp from latest_data to check PLC connection status.
-        if hasattr(self, "latest_data") and self.latest_data and "timestamp" in self.latest_data:
-            # If last sample is recent (< 2 seconds old), assume connection is OK.
-            age = (datetime.now() - self.latest_data["timestamp"]).total_seconds()
-            if age < 2:
-                self.ind_plc.setText("PLC: OK")
-                self.ind_plc.setStyleSheet("color: green;")
-            else:
-                self.ind_plc.setText("PLC: OFF")
-                self.ind_plc.setStyleSheet("color: red;")
-        else:
-            self.ind_plc.setText("PLC: OFF")
-            self.ind_plc.setStyleSheet("color: red;")

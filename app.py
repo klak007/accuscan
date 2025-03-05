@@ -836,9 +836,7 @@ class App(QMainWindow):
         else:
             self.update_timer.setInterval(50)   # for other pages
         
-        # New line: update the PLC connection indicator
-        if hasattr(self, 'main_page'):
-            self.main_page.update_connection_indicators()
+        
     
     def get_current_page(self):
         if self.current_page == "MainPage":

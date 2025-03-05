@@ -118,15 +118,6 @@ class SettingsPage(QFrame):
         spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
         top_bar_layout.addItem(spacer)
         
-        # Etykiety wskaźników po prawej stronie
-        self.ind_plc = QLabel("PLC: Unknown", self.top_bar)
-        self.ind_plc.setStyleSheet("color: orange; background-color: transparent;")
-        top_bar_layout.addWidget(self.ind_plc, 0, Qt.AlignRight)
-        
-        self.ind_db = QLabel("DB: Unknown", self.top_bar)
-        self.ind_db.setStyleSheet("color: orange; background-color: transparent;")
-        top_bar_layout.addWidget(self.ind_db, 0, Qt.AlignRight)
-        
         # Przycisk Exit
         self.btn_exit = QPushButton("Exit", self.top_bar)
         # Ustawienie stylu można zrealizować poprzez CSS
@@ -136,23 +127,6 @@ class SettingsPage(QFrame):
         
         # Na koniec dodajemy top_bar do głównego layoutu (np. przez self.layout.addWidget(self.top_bar))
 
-    def update_connection_indicators(self):
-        """Aktualizuje wskaźniki połączeń PLC i bazy danych."""
-        # Update PLC indicator if plc_client exists and can report connection status.
-        plc_connected = hasattr(self.controller.logic, "plc_client") and self.controller.logic.plc_client.get_connected() if getattr(self.controller.logic, "plc_client", None) else False
-        if plc_connected:
-            self.ind_plc.setText("PLC: OK")
-            self.ind_plc.setStyleSheet("color: green;")
-        else:
-            self.ind_plc.setText("PLC: OFF")
-            self.ind_plc.setStyleSheet("color: red;")
-        # Update DB indicator based on controller's db_connected flag.
-        if self.controller.db_connected:
-            self.ind_db.setText("DB: OK")
-            self.ind_db.setStyleSheet("color: green;")
-        else:
-            self.ind_db.setText("DB: OFF")
-            self.ind_db.setStyleSheet("color: red;")
 
     def _on_nastawy_click(self):
         print("[GUI] Kliknięto przycisk 'nastawy'.")
