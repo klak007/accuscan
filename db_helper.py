@@ -26,15 +26,19 @@ def init_database(db_params: dict) -> bool:
     Inicjuje bazę danych: łączy się z MySQL 
     Zwraca True jeśli inicjalizacja się powiodła, False w przeciwnym przypadku.
     """
+    print("init_database()")
     connection = None
     try:
         # Uwaga: klucz w db_params powinien nazywać się "database" zamiast "db"
         # jeśli stosujemy standardowe argumenty MySQL Connector
+        print("db_params:", db_params)
         connection = mysql.connector.connect(**db_params)
+        print("Połączono z bazą danych.")
         cursor = connection.cursor()
         
         # Zatwierdź zmiany
         connection.commit()
+        print("init_database() - Inicjalizacja bazy danych zakończona sukcesem.")
         return True
 
     except Error as e:

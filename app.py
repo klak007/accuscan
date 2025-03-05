@@ -1,13 +1,12 @@
 # app.py
-
-import customtkinter as ctk
+from PyQt5.QtWidgets import QApplication, QMessageBox, QVBoxLayout, QMainWindow, QWidget
+import sys
 from datetime import datetime
 import time
 import threading
 import queue
-import multiprocessing
+import multiprocessing as mp
 from multiprocessing import Process, Value, Event, Queue
-from tkinter import messagebox
 # Import modułów
 from plc_helper import read_accuscan_data, connect_plc
 from db_helper import init_database, save_measurement_sample, check_database
@@ -15,6 +14,7 @@ from data_processing import FastAcquisitionBuffer
 # Import stron
 from main_page import MainPage
 from settings_page import SettingsPage
+
 
 # Configuration settings (originally from config.py)
 # PLC connection parameters
@@ -27,109 +27,157 @@ DB_PARAMS = {
     "host": "localhost",
     "user": "root",
     "password": "root",
-    "db": "accuscan_db",
-    "port": 3306
+    "database": "accuscan_db",
+    "port": 3306,
+    "raise_on_warnings": True,
+    "connect_timeout": 5
+
 }
 
 # Set multiprocessing start method to 'spawn' for better compatibility
 if __name__ == "__main__":
     # Use spawn method for Windows compatibility
     # This should be set before any other multiprocessing code runs
-    multiprocessing.set_start_method('spawn', force=True)
+    mp.set_start_method('spawn', force=True)
 
-class App(ctk.CTk):
+class App(QMainWindow):
     """
-    Główne okno aplikacji CustomTkinter.
+    Główne okno aplikacji, dawniej dziedziczące po ctk.CTk,
+    teraz po QMainWindow (PyQt5).
     """
     def __init__(self):
-        super().__init__()
-        self.title("AccuScan GUI")
-        self.geometry("1920x700+0+0")
-        
-        # Flagi sterujące
-        self.run_measurement = False
-        
-        self.current_page = "MainPage"
-        self.db_connected = False
-        
-        # Performance monitoring
-        self.log_counter = 0
-        self.log_frequency = 10  # Log every 10 cycles
-        self.last_log_time = time.time()
-        
-        # Thread and process control
-        self.acquisition_thread_running = False
-        self.acquisition_thread = None
-        self.db_queue = queue.Queue(maxsize=100)  # Queue for database operations
-        self.plc_write_queue = queue.Queue(maxsize=20)  # Queue for PLC write operations
-        
-        # Start PLC writer thread
-        self.start_plc_writer()
+        try:
+            # Inicjalizacja aplikacji    
+            super().__init__()
+            print("[App] Inicjalizacja aplikacji...")
+            
+            # Ustawienia okna
+            self.setWindowTitle("AccuScan GUI")
+            self.setGeometry(0, 0, 1920, 700)
+            print("[App] Tytuł i geometria ustawione.")
+            
+            # -----------------------------------
+            # Flagi i parametry sterujące
+            # -----------------------------------
+            self.run_measurement = False
+            self.current_page = "MainPage"
+            self.db_connected = False
+            self.log_counter = 0
+            self.log_frequency = 10
+            self.last_log_time = time.time()
+            print("[App] Parametry sterujące zainicjowane.")
+            
+            # -----------------------------------
+            # Kolejki, wątki/procesy
+            # -----------------------------------
+            self.acquisition_thread_running = False
+            self.acquisition_thread = None
+            self.db_queue = queue.Queue(maxsize=100)
+            self.plc_write_queue = queue.Queue(maxsize=20)
+            print("[App] Kolejki utworzone.")
+            
+            # Start PLC writer thread
+            self.start_plc_writer()
+            
+            # Używamy mp.Queue dla między-procesowego przesyłu danych
+            self.data_queue = mp.Queue(maxsize=250)
+            print("[App] Kolejka danych międzyprocesowych utworzona.")
+            
+            # -----------------------------------
+            # Parametry bazy danych
+            # -----------------------------------
+            self.db_params = DB_PARAMS
+            print("[App] Parametry bazy danych ustawione.")
+            self.init_database_connection()
+            print("[App] Połączenie z bazą danych sprawdzone.")
+            
+            # -----------------------------------
+            # Bufor akwizycji
+            # -----------------------------------
+            self.acquisition_buffer = FastAcquisitionBuffer(max_samples=1024)
+            print("[App] Bufor akwizycji utworzony.")
+            
+            # -----------------------------------
+            # Kontener na strony (MainPage, SettingsPage)
+            # -----------------------------------
+            central_widget = QWidget(self)
+            self.setCentralWidget(central_widget)
+            self.layout = QVBoxLayout(central_widget)
+            print("[App] Centralny widget i layout utworzone.")
+            
+            # Inicjalizacja stron
+            self.main_page = MainPage(parent=central_widget, controller=self)
+            self.settings_page = SettingsPage(parent=central_widget, controller=self)
+            print("[App] Strony MainPage i SettingsPage zainicjowane.")
+            
+            # Na razie dodajemy tylko main_page do layoutu
+            self.layout.addWidget(self.main_page)
+            self.settings_page.hide()
+            print("[App] MainPage dodana, SettingsPage ukryta.")
+            
+            # -----------------------------------
+            # Obsługa zamknięcia okna
+            # (Metoda closeEvent zostanie nadpisana, gdy zajdzie potrzeba)
+            # -----------------------------------
+            
+            # Start workerów
+            self.start_db_worker()
+            print("[App] Worker bazy danych uruchomiony.")
+            
+            self.start_acquisition_process()
+            print("[App] Proces akwizycji uruchomiony.")
+            
+            self.start_update_loop()
+            print("[App] Pętla aktualizacyjna (UI loop) uruchomiona.")
+            
+            self.last_plc_retry = 0
+            print("[App] Inicjalizacja zakończona.")
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            raise
 
-        # Use multiprocessing.Queue for sharing data between processes
-        # unlike threading.Queue, this is safe for interprocess communication
-        import multiprocessing as mp
-        # Smaller queue size to prevent memory buildup - we'll implement throttling instead
-        self.data_queue = mp.Queue(maxsize=250)  # Queue for sending acquisition data to UI
-        
-        # Zapisanie parametrów bazy danych jako atrybut
-        self.db_params = DB_PARAMS
-        
-        # Inicjalizacja bazy danych
-        self.init_database_connection()
-        
-        # FastAcquisitionBuffer for high-speed acquisition
-        self.acquisition_buffer = FastAcquisitionBuffer(max_samples=1024)
-        
-        # --- Tworzymy kontener na strony ---
-        self.container = ctk.CTkFrame(self)
-        self.container.pack(fill="both", expand=True)
-        
-        # Inicjalizacja stron
-        self.main_page = MainPage(self.container, self)
-        self.settings_page = SettingsPage(self.container, self)
-        
-        # Pokazujemy domyślnie MainPage
-        self.main_page.pack(fill="both", expand=True)
-        self.settings_page.pack_forget()
-        
-        # Obsługa zamknięcia okna
-        self.protocol("WM_DELETE_WINDOW", self._on_closing)
-        
-        # Start database worker thread
-        self.start_db_worker()
-        
-        # Start data acquisition process (not thread)
-        self.start_acquisition_process()
-        
-        # Startujemy pętlę aktualizacyjną z niższą częstotliwością odświeżania UI
-        self.start_update_loop()
-
-        self.last_plc_retry = 0  # Track last retry attempt for PLC
+    def closeEvent(self, event):
+        """
+        Zamiast self.protocol("WM_DELETE_WINDOW", self._on_closing),
+        w PyQt robimy override closeEvent().
+        """
+        self._on_closing()
+        event.accept()  # lub event.ignore(), zależnie od Twojej logiki
     
     def init_database_connection(self):
-        """Inicjalizuje połączenie z bazą danych, wyświetla ostrzeżenie jeśli jest problem."""
-        self.db_connected = init_database(self.db_params)
-        if not self.db_connected:
-            message = "Nie można połączyć się z bazą danych. Program będzie działać w trybie ograniczonym.\n\n"
-            message += "Funkcje zapisu i odczytu danych z bazy nie będą dostępne."
-            messagebox.showwarning("Problem z bazą danych", message)
-            print("[App] Program działa w trybie ograniczonym - brak dostępu do bazy danych.")
-    
+        try:
+            print("[App] Inicjalizacja połączenia z bazą...")
+            # Próba połączenia z bazą
+            if init_database(self.db_params):
+                self.db_connected = True
+                print("[App] Połączenie z bazą nawiązane.")
+            else:
+                self.db_connected = False
+                print("[App] Brak połączenia z bazą. Aplikacja działa w trybie ograniczonym.")
+                QMessageBox.warning(self, "Brak połączenia z bazą",
+                                    "Nie można nawiązać połączenia z bazą danych. Aplikacja będzie działać w trybie ograniczonym.")
+        except Exception as e:
+            self.db_connected = False
+            print("[App] Błąd przy inicjalizacji połączenia z bazą:", e)
+            QMessageBox.warning(self, "Błąd połączenia",
+                                f"Wystąpił błąd przy łączeniu z bazą danych: {str(e)}\nAplikacja będzie działać w trybie ograniczonym.")
+
+
     def toggle_page(self, page_name):
         """Przełącza widoczność stron."""
         if page_name == "MainPage":
-            self.main_page.pack(fill="both", expand=True)
-            self.settings_page.pack_forget()
+            self.main_page.show()
+            self.settings_page.hide()
             self.current_page = "MainPage"
         elif page_name == "SettingsPage":
             # Sprawdź połączenie z bazą przed przejściem do strony ustawień
             if not self.db_connected and not check_database(self.db_params):
-                messagebox.showwarning("Brak dostępu do bazy danych", 
-                                      "Dostęp do strony ustawień jest ograniczony bez połączenia z bazą danych.")
+                QMessageBox.warning(self, "Brak dostępu do bazy danych", 
+                                    "Dostęp do strony ustawień jest ograniczony bez połączenia z bazą danych.")
                 return
-            self.main_page.pack_forget()
-            self.settings_page.pack(fill="both", expand=True)
+            self.main_page.hide()
+            self.settings_page.show()
             self.current_page = "SettingsPage"
     
     def start_acquisition_process(self):
@@ -205,7 +253,7 @@ class App(ctk.CTk):
                         try:
                             # Get and discard samples - multiprocessing Queue doesn't have task_done
                             _ = self.data_queue.get_nowait()
-                            # Note: multiprocessing.Queue doesn't have task_done method
+                            # Note: mp.Queue doesn't have task_done method
                         except queue.Empty:
                             break
                     print(f"[Data Receiver] Dropped {samples_to_drop} samples, new queue size: {self.data_queue.qsize()}")
@@ -260,7 +308,7 @@ class App(ctk.CTk):
                 self.acquisition_buffer.add_sample(data)
                 self.latest_data = data
                 
-                # Note: multiprocessing.Queue doesn't have task_done method
+                # Note: mp.Queue doesn't have task_done method
                 samples_processed += 1
                 
                 # Database saving removed - no longer saving measurement samples
@@ -281,7 +329,7 @@ class App(ctk.CTk):
                         # Update latest data
                         self.latest_data = data
                         
-                        # Note: multiprocessing.Queue doesn't have task_done method
+                        # Note: mp.Queue doesn't have task_done method
                         samples_processed += 1
                         
                         # Database saving removed - no longer saving measurement samples
@@ -758,10 +806,22 @@ class App(ctk.CTk):
             return None
 
 if __name__ == "__main__":
-    # Initialize multiprocessing with 'spawn' method for cross-platform compatibility
-    multiprocessing.freeze_support()  # Needed for Windows executable support
+    import multiprocessing as mp
+    mp.freeze_support()  # Wymagane dla Windows
+    print("[App] Uruchamianie aplikacji po freeze ...")
     
-    ctk.set_appearance_mode("dark")
-    ctk.set_default_color_theme("blue")
-    app = App()
-    app.mainloop()
+
+    # Inicjalizacja aplikacji PyQt
+    app = QApplication(sys.argv)
+    print("[App] Inicjalizacja aplikacji PyQt qapplication")
+    # Opcjonalnie można ustawić styl, np. "Fusion"
+    app.setStyle("Fusion")
+    print("[App] Ustawienie stylu aplikacji na Fusion")
+
+    main_window = App()  # App to Twoja klasa dziedzicząca po QMainWindow
+    print("DEBUG: Created main_window, about to show()")
+    main_window.show()
+    print("[App] Wyświetlenie głównego okna aplikacji")
+
+    sys.exit(app.exec_())
+    print("[App] Aplikacja zakończona")

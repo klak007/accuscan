@@ -138,19 +138,6 @@ class FastAcquisitionBuffer:
             # Return the latest complete sample directly
             return self.samples[-1]
             
-    def get_current_data(self):
-        """
-        DataManager compatibility method - returns data in DataFrame-like structure
-        for eventual transition away from DataManager
-        """
-        import pandas as pd
-        with self.lock:
-            if not self.samples:
-                # Return empty DataFrame with expected columns
-                return pd.DataFrame(columns=["timestamp","D1","D2","D3","D4","lumps","necks","xCoord","speed"])
-            
-            # Convert samples to DataFrame
-            return pd.DataFrame(list(self.samples))
             
     def get_statistics(self, last_n=100):
         """Calculate statistics from recent samples (with caching)"""

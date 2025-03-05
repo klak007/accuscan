@@ -1,11 +1,13 @@
-import customtkinter as ctk
-from tkinter import ttk, messagebox
 import mysql.connector
 from mysql.connector import Error
 from datetime import datetime
 from db_helper import check_database
-
-class SettingsPage(ctk.CTkFrame):
+from PyQt5.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QMessageBox, QLineEdit, QTableWidgetItem, QDialog
+from PyQt5.QtWidgets import QWidget, QHBoxLayout, QPushButton, QLabel, QSpacerItem, QSizePolicy, QTableWidget, QHeaderView
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QDialogButtonBox
+from edit_setting import EditSettingDialog  # import klasy dialogu
+class SettingsPage(QFrame):
     """
     Strona ustawień aplikacji – umożliwia przeglądanie, filtrowanie, edycję i zarządzanie recepturami (ustawieniami) dla danego produktu.
     """
@@ -13,44 +15,55 @@ class SettingsPage(ctk.CTkFrame):
         super().__init__(parent)
         self.controller = controller
 
-        # Zachowujemy istniejący top bar
+        # Utwórz główny layout (np. grid) dla tego widgetu
+        main_layout = QGridLayout(self)
+        self.setLayout(main_layout)
+
+        # Zachowujemy istniejący top bar (przy założeniu, że _create_top_bar zostało przepisane na PyQt)
         self._create_top_bar()
 
         # Dodajemy nowy panel zarządzania recepturami poniżej top baru
-        self.main_frame = ctk.CTkFrame(self)
-        self.main_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
-        self.main_frame.grid_rowconfigure(1, weight=1)
-        self.main_frame.grid_columnconfigure(0, weight=1)
+        self.main_frame = QFrame(self)
+        main_frame_layout = QGridLayout(self.main_frame)
+        self.main_frame.setLayout(main_frame_layout)
+        main_layout.addWidget(self.main_frame, 1, 0)  # np. w wierszu 1, kolumna 0
 
         self._create_filter_panel()
         self._create_table()
         self._create_action_buttons()
 
         # Status bazy danych
-        self.status_frame = ctk.CTkFrame(self.main_frame)
-        self.status_frame.grid(row=3, column=0, sticky="ew", padx=5, pady=5)
-        self.db_status_label = ctk.CTkLabel(self.status_frame, text="Status bazy danych: Sprawdzanie...")
-        self.db_status_label.pack(side="left", padx=5)
-        self.btn_check_db = ctk.CTkButton(self.status_frame, text="Sprawdź połączenie", command=self.check_db_connection)
-        self.btn_check_db.pack(side="left", padx=5)
+        self.status_frame = QFrame(self.main_frame)
+        status_layout = QHBoxLayout(self.status_frame)
+        self.status_frame.setLayout(status_layout)
+        status_layout.setContentsMargins(5, 5, 5, 5)
 
-        # Załaduj dane przy inicjalizacji jeśli baza jest dostępna
+        self.db_status_label = QLabel("Status bazy danych: Sprawdzanie...", self.status_frame)
+        status_layout.addWidget(self.db_status_label)
+
+        self.btn_check_db = QPushButton("Sprawdź połączenie", self.status_frame)
+        self.btn_check_db.clicked.connect(self.check_db_connection)
+        status_layout.addWidget(self.btn_check_db)
+
+        # Dodaj status_frame do main_frame – przykładowo w wierszu 3, kolumna 0
+        main_frame_layout.addWidget(self.status_frame, 3, 0)
+        self.layout.addWidget(self.top_bar)
+        # Załaduj dane przy inicjalizacji, jeśli baza jest dostępna
         if controller.db_connected:
             self.load_data()
         else:
             self.show_offline_message()
             self.update_db_status()
-    
+
     def check_db_connection(self):
         """Sprawdza połączenie z bazą danych i aktualizuje status."""
         self.controller.db_connected = check_database(self.controller.db_params)
         self.update_db_status()
         if self.controller.db_connected:
-            messagebox.showinfo("Połączenie z bazą danych", "Połączenie z bazą danych jest aktywne.")
+            QMessageBox.information(self, "Połączenie z bazą danych", "Połączenie z bazą danych jest aktywne.")
             self.load_data()
         else:
-            messagebox.showwarning("Problem z bazą danych", 
-                                 "Nie można połączyć się z bazą danych. Dostęp do ustawień jest ograniczony.")
+            QMessageBox.warning(self, "Problem z bazą danych", "Nie można połączyć się z bazą danych. Dostęp do ustawień jest ograniczony.")    
     
     def update_db_status(self):
         """Aktualizuje etykietę statusu połączenia z bazą."""
@@ -69,24 +82,54 @@ class SettingsPage(ctk.CTkFrame):
         ))
 
     def _create_top_bar(self):
-        """Tworzy górny pasek nawigacyjny z przyciskami (dotychczasowa wersja)."""
-        self.top_bar = ctk.CTkFrame(self)
-        self.top_bar.grid(row=0, column=0, sticky="ew", padx=5, pady=(5, 0))
-        self.btn_pomiary = ctk.CTkButton(self.top_bar, text="Back to Main", command=lambda: self.controller.toggle_page("MainPage"))
-        self.btn_pomiary.pack(side="left", padx=5)
-        self.btn_nastawy  = ctk.CTkButton(self.top_bar, text="nastawy",  command=self._on_nastawy_click)
-        self.btn_nastawy.pack(side="left", padx=5)
-        self.btn_historia  = ctk.CTkButton(self.top_bar, text="historia",  command=self._on_historia_click)
-        self.btn_historia.pack(side="left", padx=5)
-        self.btn_accuscan  = ctk.CTkButton(self.top_bar, text="Accuscan",  command=self._on_accuscan_click)
-        self.btn_accuscan.pack(side="left", padx=5)
-        # --- New indicators placed to the right of btn_auth ---
-        self.ind_plc = ctk.CTkLabel(self.top_bar, text="PLC: Unknown", fg_color="transparent", text_color="orange")
-        self.ind_plc.pack(side="right", padx=5)
-        self.ind_db = ctk.CTkLabel(self.top_bar, text="DB: Unknown", fg_color="transparent", text_color="orange")
-        self.ind_db.pack(side="right", padx=5)
-        self.btn_exit = ctk.CTkButton(self.top_bar, text="Exit", command=self.controller.destroy, fg_color="red", hover_color="darkred")
-        self.btn_exit.pack(side="right", padx=5)
+        """Tworzy górny pasek nawigacyjny z przyciskami."""
+        # Utwórz kontener dla top bara jako QWidget
+        self.top_bar = QWidget(self)
+        top_bar_layout = QHBoxLayout(self.top_bar)
+        top_bar_layout.setContentsMargins(5, 5, 5, 0)
+        top_bar_layout.setSpacing(5)
+        
+        # Przycisk "Back to Main"
+        self.btn_pomiary = QPushButton("Back to Main", self.top_bar)
+        self.btn_pomiary.clicked.connect(lambda: self.controller.toggle_page("MainPage"))
+        top_bar_layout.addWidget(self.btn_pomiary, 0, Qt.AlignLeft)
+        
+        # Przycisk "nastawy"
+        self.btn_nastawy = QPushButton("nastawy", self.top_bar)
+        self.btn_nastawy.clicked.connect(self._on_nastawy_click)
+        top_bar_layout.addWidget(self.btn_nastawy, 0, Qt.AlignLeft)
+        
+        # Przycisk "historia"
+        self.btn_historia = QPushButton("historia", self.top_bar)
+        self.btn_historia.clicked.connect(self._on_historia_click)
+        top_bar_layout.addWidget(self.btn_historia, 0, Qt.AlignLeft)
+        
+        # Przycisk "Accuscan"
+        self.btn_accuscan = QPushButton("Accuscan", self.top_bar)
+        self.btn_accuscan.clicked.connect(self._on_accuscan_click)
+        top_bar_layout.addWidget(self.btn_accuscan, 0, Qt.AlignLeft)
+        
+        # Dodaj rozciągacz, aby wypchnąć elementy po prawej stronie
+        spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
+        top_bar_layout.addItem(spacer)
+        
+        # Etykiety wskaźników po prawej stronie
+        self.ind_plc = QLabel("PLC: Unknown", self.top_bar)
+        self.ind_plc.setStyleSheet("color: orange; background-color: transparent;")
+        top_bar_layout.addWidget(self.ind_plc, 0, Qt.AlignRight)
+        
+        self.ind_db = QLabel("DB: Unknown", self.top_bar)
+        self.ind_db.setStyleSheet("color: orange; background-color: transparent;")
+        top_bar_layout.addWidget(self.ind_db, 0, Qt.AlignRight)
+        
+        # Przycisk Exit
+        self.btn_exit = QPushButton("Exit", self.top_bar)
+        # Ustawienie stylu można zrealizować poprzez CSS
+        self.btn_exit.setStyleSheet("background-color: red; color: white;")
+        self.btn_exit.clicked.connect(self.controller.destroy)
+        top_bar_layout.addWidget(self.btn_exit, 0, Qt.AlignRight)
+        
+        # Na koniec dodajemy top_bar do głównego layoutu (np. przez self.layout.addWidget(self.top_bar))
 
     def update_connection_indicators(self):
         """Aktualizuje wskaźniki połączeń PLC i bazy danych."""
@@ -112,30 +155,54 @@ class SettingsPage(ctk.CTkFrame):
         print("[GUI] Kliknięto przycisk 'Accuscan'.")
 
     def _create_filter_panel(self):
-        self.filter_frame = ctk.CTkFrame(self.main_frame)
-        self.filter_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
-        self.filter_label = ctk.CTkLabel(self.filter_frame, text="Filtruj po produkcie:")
-        self.filter_label.pack(side="left", padx=5)
-        self.filter_entry = ctk.CTkEntry(self.filter_frame, width=200)
-        self.filter_entry.pack(side="left", padx=5)
-        self.btn_filter = ctk.CTkButton(self.filter_frame, text="Filtruj", command=self.load_data)
-        self.btn_filter.pack(side="left", padx=5)
-        self.btn_all = ctk.CTkButton(self.filter_frame, text="Wszystkie", command=self.clear_filter)
-        self.btn_all.pack(side="left", padx=5)
-        self.btn_reload = ctk.CTkButton(self.filter_frame, text="Załaduj", command=self.load_data)
-        self.btn_reload.pack(side="left", padx=5)
+        # Utwórz kontener (QFrame) dla panelu filtru w ramach main_frame
+        self.filter_frame = QFrame(self.main_frame)
+        filter_layout = QHBoxLayout(self.filter_frame)
+        filter_layout.setContentsMargins(5, 5, 5, 5)
+        filter_layout.setSpacing(5)
+        
+        # Etykieta "Filtruj po produkcie:"
+        self.filter_label = QLabel("Filtruj po produkcie:", self.filter_frame)
+        filter_layout.addWidget(self.filter_label)
+        
+        # Pole tekstowe do wpisywania filtru, o stałej szerokości 200 pikseli
+        self.filter_entry = QLineEdit(self.filter_frame)
+        self.filter_entry.setFixedWidth(200)
+        filter_layout.addWidget(self.filter_entry)
+        
+        # Przycisk "Filtruj" – po kliknięciu wywołuje metodę load_data
+        self.btn_filter = QPushButton("Filtruj", self.filter_frame)
+        self.btn_filter.clicked.connect(self.load_data)
+        filter_layout.addWidget(self.btn_filter)
+        
+        # Przycisk "Wszystkie" – wywołuje metodę clear_filter
+        self.btn_all = QPushButton("Wszystkie", self.filter_frame)
+        self.btn_all.clicked.connect(self.clear_filter)
+        filter_layout.addWidget(self.btn_all)
+        
+        # Przycisk "Załaduj" – wywołuje metodę load_data
+        self.btn_reload = QPushButton("Załaduj", self.filter_frame)
+        self.btn_reload.clicked.connect(self.load_data)
+        filter_layout.addWidget(self.btn_reload)
+        
+        # Dodaj panel filtru do głównego layoutu main_frame
+        # Załóżmy, że main_frame ma przypisany QGridLayout; przykładowo dodajemy w wierszu 0, kolumnie 0
+        self.main_frame.layout().addWidget(self.filter_frame, 0, 0)
 
     def clear_filter(self):
         self.filter_entry.delete(0, "end")
         self.load_data()
 
     def _create_table(self):
-        self.table_container = ctk.CTkFrame(self.main_frame)
-        self.table_container.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
-        self.table_container.grid_rowconfigure(0, weight=1)
-        self.table_container.grid_columnconfigure(0, weight=1)
-        # Definiujemy kolumny – przykładowo:
-        columns = (
+        # Utwórz kontener dla tabeli
+        self.table_container = QFrame(self.main_frame)
+        table_layout = QGridLayout(self.table_container)
+        self.table_container.setLayout(table_layout)
+        table_layout.setRowStretch(0, 1)
+        table_layout.setColumnStretch(0, 1)
+        
+        # Definicja kolumn – przykładowo
+        columns = [
             "id",
             "recipe_name",
             "product_nr",
@@ -148,31 +215,57 @@ class SettingsPage(ctk.CTkFrame):
             "max_lumps_in_flaw_window",
             "max_necks_in_flaw_window",
             "created_at"
-        )
-        self.tree = ttk.Treeview(self.table_container, columns=columns, show="headings", selectmode="browse")
-        for col in columns:
-            self.tree.heading(col, text=col.replace("_", " ").title())
-            self.tree.column(col, anchor="center", width=100)
-        self.tree.grid(row=0, column=0, sticky="nsew")
-        vsb = ttk.Scrollbar(self.table_container, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=vsb.set)
-        vsb.grid(row=0, column=1, sticky="ns")
+        ]
+        
+        # Utwórz QTableWidget z odpowiednią liczbą kolumn
+        self.table = QTableWidget(0, len(columns), self.table_container)
+        self.table.setHorizontalHeaderLabels([col.replace("_", " ").title() for col in columns])
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setSelectionMode(QTableWidget.SingleSelection)
+        
+        # Opcjonalnie: ustawienie centralnego wyrównania i szerokości kolumn
+        header = self.table.horizontalHeader()
+        for i in range(len(columns)):
+            header.setSectionResizeMode(i, QHeaderView.Interactive)
+            self.table.setColumnWidth(i, 100)
+        header.setStretchLastSection(True)
+        
+        table_layout.addWidget(self.table, 0, 0)
+        # QTableWidget ma wbudowane paski przewijania – dodatkowy scrollbar nie jest potrzebny.
+
+        # Dodaj table_container do main_frame
+        self.main_frame.layout().addWidget(self.table_container, 1, 0)
 
     def _create_action_buttons(self):
-        self.actions_frame = ctk.CTkFrame(self.main_frame)
-        self.actions_frame.grid(row=2, column=0, sticky="ew", padx=5, pady=5)
-        self.btn_new = ctk.CTkButton(self.actions_frame, text="Nowa", command=self.new_setting)
-        self.btn_new.pack(side="left", padx=5)
-        self.btn_clone = ctk.CTkButton(self.actions_frame, text="Klonuj", command=self.clone_setting)
-        self.btn_clone.pack(side="left", padx=5)
-        self.btn_edit = ctk.CTkButton(self.actions_frame, text="Edytuj", command=self.edit_setting)
-        self.btn_edit.pack(side="left", padx=5)
-        self.btn_delete = ctk.CTkButton(self.actions_frame, text="Usuń", command=self.delete_setting)
-        self.btn_delete.pack(side="left", padx=5)
+        # Utwórz kontener dla przycisków akcji
+        self.actions_frame = QFrame(self.main_frame)
+        actions_layout = QHBoxLayout(self.actions_frame)
+        actions_layout.setContentsMargins(5, 5, 5, 5)
+        actions_layout.setSpacing(5)
+        self.actions_frame.setLayout(actions_layout)
+        
+        self.btn_new = QPushButton("Nowa", self.actions_frame)
+        self.btn_new.clicked.connect(self.new_setting)
+        actions_layout.addWidget(self.btn_new)
+        
+        self.btn_clone = QPushButton("Klonuj", self.actions_frame)
+        self.btn_clone.clicked.connect(self.clone_setting)
+        actions_layout.addWidget(self.btn_clone)
+        
+        self.btn_edit = QPushButton("Edytuj", self.actions_frame)
+        self.btn_edit.clicked.connect(self.edit_setting)
+        actions_layout.addWidget(self.btn_edit)
+        
+        self.btn_delete = QPushButton("Usuń", self.actions_frame)
+        self.btn_delete.clicked.connect(self.delete_setting)
+        actions_layout.addWidget(self.btn_delete)
+        
+        # Dodaj actions_frame do main_frame – przykładowo w wierszu 2, kolumna 0
+        self.main_frame.layout().addWidget(self.actions_frame, 2, 0)
 
     def load_data(self):
-        for item in self.tree.get_children():
-            self.tree.delete(item)
+        # Usuń wszystkie wiersze w tabeli
+        self.table.setRowCount(0)
         
         # Sprawdzamy, czy jest połączenie z bazą
         if not check_database(self.controller.db_params):
@@ -180,13 +273,12 @@ class SettingsPage(ctk.CTkFrame):
             self.show_offline_message()
             self.update_db_status()
             return
-        
+
         try:
             connection = mysql.connector.connect(**self.controller.db_params)
             cursor = connection.cursor(dictionary=True)
             
-            filter_text = self.filter_entry.get().strip()
-            
+            filter_text = self.filter_entry.text().strip()
             if filter_text:
                 sql = "SELECT * FROM settings WHERE `Product nr` LIKE %s ORDER BY `Id Settings` DESC"
                 cursor.execute(sql, (f"%{filter_text}%",))
@@ -204,7 +296,7 @@ class SettingsPage(ctk.CTkFrame):
             rows = cursor.fetchall()
             
             for row in rows:
-                # Jeśli alias został użyty, pobieraj 'id_settings'
+                # Pobieramy wartości z wiersza
                 id_val = row.get("id_settings") or row.get("Id Settings")
                 recipe_name = row.get("Recipe name") or ""
                 product_nr = row.get("Product nr") or ""
@@ -217,18 +309,26 @@ class SettingsPage(ctk.CTkFrame):
                 max_lumps_in_flaw_window = row.get("Max lumps in flaw window") or 3
                 max_necks_in_flaw_window = row.get("Max necks in flaw window") or 3
                 created_at = row.get("created_at")
-                
                 if created_at:
                     created_at = created_at.strftime("%Y-%m-%d %H:%M:%S")
                 else:
                     created_at = ""
                 
-                self.tree.insert("", "end", values=(
-                    id_val, recipe_name, product_nr, preset_diameter,
-                    diameter_over_tol, diameter_under_tol, lump_threshold,
-                    neck_threshold, flaw_window, max_lumps_in_flaw_window,
-                    max_necks_in_flaw_window, created_at
-                 ))
+                # Wstaw nowy wiersz do QTableWidget
+                current_row = self.table.rowCount()
+                self.table.insertRow(current_row)
+                
+                values = [
+                    str(id_val), recipe_name, product_nr, str(preset_diameter),
+                    str(diameter_over_tol), str(diameter_under_tol), str(lump_threshold),
+                    str(neck_threshold), str(flaw_window), str(max_lumps_in_flaw_window),
+                    str(max_necks_in_flaw_window), created_at
+                ]
+                
+                for col, value in enumerate(values):
+                    item = QTableWidgetItem(value)
+                    item.setTextAlignment(Qt.AlignCenter)
+                    self.table.setItem(current_row, col, item)
             
             if connection and connection.is_connected():
                 connection.close()
@@ -236,240 +336,113 @@ class SettingsPage(ctk.CTkFrame):
             # Aktualizacja statusu bazy danych
             self.controller.db_connected = True
             self.update_db_status()
-                
-        except Error as e:
-            print("Błąd bazy:", e)  
-            messagebox.showwarning("Błąd połączenia z bazą", 
-                                 f"Nie można połączyć się z bazą danych: {str(e)}\nAplikacja będzie działać w trybie ograniczonym.")
-            # Insert placeholder data to show UI structure
+                    
+        except mysql.connector.Error as e:
+            print("Błąd bazy:", e)
+            QMessageBox.warning(self, "Błąd połączenia z bazą", 
+                f"Nie można połączyć się z bazą danych: {str(e)}\nAplikacja będzie działać w trybie ograniczonym.")
             self.show_offline_message()
-            # Aktualizacja statusu bazy danych
             self.controller.db_connected = False
             self.update_db_status()
         except Exception as e:
             print("Nieoczekiwany błąd:", e)
-            messagebox.showwarning("Błąd", f"Wystąpił nieoczekiwany błąd: {str(e)}")
+            QMessageBox.warning(self, "Błąd", f"Wystąpił nieoczekiwany błąd: {str(e)}")
+
+    def open_edit_modal(self, values=None, clone=False):
+        # Tworzymy i wyświetlamy nasz dialog
+        dialog = EditSettingDialog(
+            controller=self.controller,  # przekazujemy referencję do kontrolera
+            parent=self,
+            values=values,
+            clone=clone
+        )
+        # Uruchamiamy dialog modalnie
+        if dialog.exec_() == QDialog.Accepted:
+            # Jeśli użytkownik zatwierdził zmiany (dialog wywołał self.accept()),
+            # odświeżamy tabelę:
+            self.load_data()
 
     def new_setting(self):
-        # Sprawdź połączenie przed operacją
         if not self.controller.db_connected and not check_database(self.controller.db_params):
-            messagebox.showwarning("Brak połączenia z bazą",
-                               "Nie można dodać nowej receptury bez połączenia z bazą danych.")
+            QMessageBox.warning(self, "Brak połączenia z bazą",
+                                "Nie można dodać nowej receptury bez połączenia z bazą danych.")
             return
-        self.open_edit_modal(None)
+        self.open_edit_modal(values=None, clone=False)
 
     def clone_setting(self):
         # Sprawdź połączenie przed operacją
         if not self.controller.db_connected and not check_database(self.controller.db_params):
-            messagebox.showwarning("Brak połączenia z bazą",
-                               "Nie można klonować receptury bez połączenia z bazą danych.")
+            QMessageBox.warning(self, "Brak połączenia z bazą",
+                                "Nie można klonować receptury bez połączenia z bazą danych.")
             return
-        selected = self.tree.selection()
-        if not selected:
-            print("Ostrzeżenie: Wybierz recepturę do klonowania.")  # Added console logging
-            messagebox.showwarning("Ostrzeżenie", "Wybierz recepturę do klonowania.")
+        selected_rows = self.table.selectionModel().selectedRows()
+        if not selected_rows:
+            print("Ostrzeżenie: Wybierz recepturę do klonowania.")
+            QMessageBox.warning(self, "Ostrzeżenie", "Wybierz recepturę do klonowania.")
             return
-        item = self.tree.item(selected)
-        values = item["values"]
+        row = selected_rows[0].row()
+        # Pobierz dane z wybranego wiersza
+        values = []
+        for col in range(self.table.columnCount()):
+            item = self.table.item(row, col)
+            values.append(item.text() if item else "")
         self.open_edit_modal(values, clone=True)
 
     def edit_setting(self):
         # Sprawdź połączenie przed operacją
         if not self.controller.db_connected and not check_database(self.controller.db_params):
-            messagebox.showwarning("Brak połączenia z bazą",
-                               "Nie można edytować receptury bez połączenia z bazą danych.")
+            QMessageBox.warning(self, "Brak połączenia z bazą",
+                                "Nie można edytować receptury bez połączenia z bazą danych.")
             return
-        selected = self.tree.selection()
-        if not selected:
-            print("Ostrzeżenie: Wybierz recepturę do edycji.")  # Added console logging
-            messagebox.showwarning("Ostrzeżenie", "Wybierz recepturę do edycji.")
+        selected_rows = self.table.selectionModel().selectedRows()
+        if not selected_rows:
+            print("Ostrzeżenie: Wybierz recepturę do edycji.")
+            QMessageBox.warning(self, "Ostrzeżenie", "Wybierz recepturę do edycji.")
             return
-        item = self.tree.item(selected)
-        values = item["values"]
+        row = selected_rows[0].row()
+        values = []
+        for col in range(self.table.columnCount()):
+            item = self.table.item(row, col)
+            values.append(item.text() if item else "")
         self.open_edit_modal(values, clone=False)
 
     def delete_setting(self):
         # Sprawdź połączenie przed operacją
         if not self.controller.db_connected and not check_database(self.controller.db_params):
-            messagebox.showwarning("Brak połączenia z bazą",
-                               "Nie można usunąć receptury bez połączenia z bazą danych.")
+            QMessageBox.warning(self, "Brak połączenia z bazą",
+                                "Nie można usunąć receptury bez połączenia z bazą danych.")
             return
-        selected = self.tree.selection()
-        if not selected:
+        selected_rows = self.table.selectionModel().selectedRows()
+        if not selected_rows:
             print("Ostrzeżenie: Wybierz recepturę do usunięcia.")
-            messagebox.showwarning("Ostrzeżenie", "Wybierz recepturę do usunięcia.")
+            QMessageBox.warning(self, "Ostrzeżenie", "Wybierz recepturę do usunięcia.")
             return
-        if messagebox.askyesno("Potwierdzenie", "Czy na pewno chcesz usunąć wybraną recepturę?"):
-            item = self.tree.item(selected)
-            setting_id = item["values"][0]
+        reply = QMessageBox.question(self, "Potwierdzenie", 
+                                    "Czy na pewno chcesz usunąć wybraną recepturę?",
+                                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            row = selected_rows[0].row()
+            # Załóżmy, że pierwsza kolumna zawiera ID receptury
+            setting_id_item = self.table.item(row, 0)
+            setting_id = setting_id_item.text() if setting_id_item else None
+            if setting_id is None:
+                QMessageBox.warning(self, "Błąd", "Nie udało się uzyskać ID receptury.")
+                return
             try:
                 connection = mysql.connector.connect(**self.controller.db_params)
                 cursor = connection.cursor()
-                # Updated SQL with backticks around 'Id Settings'
                 sql = "DELETE FROM settings WHERE `Id Settings` = %s"
                 cursor.execute(sql, (setting_id,))
                 connection.commit()
                 print("Sukces: Receptura usunięta.")
-                messagebox.showinfo("Sukces", "Receptura usunięta.")
+                QMessageBox.information(self, "Sukces", "Receptura usunięta.")
                 self.load_data()
-                
                 if connection and connection.is_connected():
                     connection.close()
-            except Error as e:
+            except mysql.connector.Error as e:
                 print("Błąd bazy:", e)
-                messagebox.showwarning("Błąd połączenia z bazą", 
+                QMessageBox.warning(self, "Błąd połączenia z bazą", 
                                     f"Nie można połączyć się z bazą danych: {str(e)}\nOperacja nie została wykonana.")
             except Exception as e:
                 print("Nieoczekiwany błąd:", e)
-                messagebox.showwarning("Błąd", f"Wystąpił nieoczekiwany błąd: {str(e)}")
-
-    def open_edit_modal(self, values, clone=False):
-        modal = ctk.CTkToplevel(self)
-        if values is None:
-            modal.title("Nowa Receptura")
-        else:
-            modal.title("Klonuj Recepturę" if clone else "Edytuj Recepturę")
-        modal.geometry("400x600")  # Increased height for new fields
-        modal.resizable(False, False)
-        fields = [
-            ("Nazwa receptury", "recipe_name"),
-            ("Nazwa produktu", "product_nr"),
-            ("Preset Diameter", "preset_diameter"),
-            ("Diameter Over tolerance", "diameter_over_tol"),
-            ("Diameter Under tolerance", "diameter_under_tol"),
-            ("Lump threshold", "lump_threshold"),
-            ("Neck threshold", "neck_threshold"),
-            ("Flaw Window", "flaw_window"),
-            ("Max lumps in flaw window", "max_lumps_in_flaw_window"),
-            ("Max necks in flaw window", "max_necks_in_flaw_window")
-        ]
-        entries = {}
-        for label_text, key in fields:
-            lbl = ctk.CTkLabel(modal, text=label_text)
-            lbl.pack(pady=(10, 0))
-            ent = ctk.CTkEntry(modal)
-            ent.pack(pady=(0, 10), fill="x", padx=20)
-            if values is not None:
-                mapping = {
-                    "recipe_name": values[1],
-                    "product_nr": values[2],
-                    "preset_diameter": values[3],
-                    "diameter_over_tol": values[4],
-                    "diameter_under_tol": values[5],
-                    "lump_threshold": values[6],
-                    "neck_threshold": values[7],
-                    "flaw_window": values[8],
-                    "max_lumps_in_flaw_window": values[9],
-                    "max_necks_in_flaw_window": values[10],
-                }
-                if key in mapping:
-                    ent.insert(0, str(mapping[key]))
-            entries[key] = ent
-
-        def save_modal():
-            try:
-                new_data = {
-                    "recipe_name": entries["recipe_name"].get(),
-                    "product_nr": entries["product_nr"].get(),
-                    "preset_diameter": float(entries["preset_diameter"].get()),
-                    "diameter_over_tol": float(entries["diameter_over_tol"].get()),
-                    "diameter_under_tol": float(entries["diameter_under_tol"].get()),
-                    "lump_threshold": float(entries["lump_threshold"].get()),
-                    "neck_threshold": float(entries["neck_threshold"].get()),
-                    "flaw_window": float(entries["flaw_window"].get()),
-                    "max_lumps_in_flaw_window": int(entries["max_lumps_in_flaw_window"].get()),
-                    "max_necks_in_flaw_window": int(entries["max_necks_in_flaw_window"].get()),
-                    "diameter_window": 0.0,
-                    "diameter_std_dev": 0.0,
-                    "num_scans": 128,
-                    "diameter_histeresis": 0.0,
-                    "lump_histeresis": 0.0,
-                    "neck_histeresis": 0.0,
-                }
-            except ValueError:
-                print("Błąd: Niepoprawne wartości numeryczne.")  # Added console logging
-                messagebox.showerror("Błąd", "Niepoprawne wartości numeryczne.")
-                return
-            
-            connection = None
-            try:
-                connection = mysql.connector.connect(**self.controller.db_params)
-                cursor = connection.cursor()
-                if values is None or clone:
-                    sql = """
-                    INSERT INTO settings (
-                        `Recipe name`, `Product nr`, `Preset Diameter`, `Diameter Over tolerance`,
-                        `Diameter Under tolerance`, `Diameter window`, `Diameter standard deviation`,
-                        `Lump threshold`, `Neck threshold`, `Flaw Window`,
-                        `Number of scans for gauge to average`, `Diameter histeresis`,
-                        `Lump histeresis`, `Neck histeresis`, `Max lumps in flaw window`,
-                        `Max necks in flaw window`
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """
-                    cursor.execute(sql, (
-                        new_data["recipe_name"],
-                        new_data["product_nr"],
-                        new_data["preset_diameter"],
-                        new_data["diameter_over_tol"],
-                        new_data["diameter_under_tol"],
-                        new_data["diameter_window"],
-                        new_data["diameter_std_dev"],
-                        new_data["lump_threshold"],
-                        new_data["neck_threshold"],
-                        new_data["flaw_window"],
-                        new_data["num_scans"],
-                        new_data["diameter_histeresis"],
-                        new_data["lump_histeresis"],
-                        new_data["neck_histeresis"],
-                        new_data["max_lumps_in_flaw_window"],
-                        new_data["max_necks_in_flaw_window"],
-                    ))
-                else:
-                    setting_id = values[0]
-                    sql = """
-                    UPDATE settings
-                    SET `Recipe name`=%s, `Product nr`=%s, `Preset Diameter`=%s, `Diameter Over tolerance`=%s,
-                        `Diameter Under tolerance`=%s, `Diameter window`=%s, `Diameter standard deviation`=%s,
-                        `Lump threshold`=%s, `Neck threshold`=%s, `Flaw Window`=%s,
-                        `Number of scans for gauge to average`=%s, `Diameter histeresis`=%s,
-                        `Lump histeresis`=%s, `Neck histeresis`=%s, `Max lumps in flaw window`=%s,
-                        `Max necks in flaw window`=%s
-                    WHERE `Id Settings`=%s
-                    """
-                    cursor.execute(sql, (
-                        new_data["recipe_name"],
-                        new_data["product_nr"],
-                        new_data["preset_diameter"],
-                        new_data["diameter_over_tol"],
-                        new_data["diameter_under_tol"],
-                        new_data["diameter_window"],
-                        new_data["diameter_std_dev"],
-                        new_data["lump_threshold"],
-                        new_data["neck_threshold"],
-                        new_data["flaw_window"],
-                        new_data["num_scans"],
-                        new_data["diameter_histeresis"],
-                        new_data["lump_histeresis"],
-                        new_data["neck_histeresis"],
-                        new_data["max_lumps_in_flaw_window"],
-                        new_data["max_necks_in_flaw_window"],
-                        setting_id
-                    ))
-                connection.commit()
-                print("Sukces: Receptura zapisana.")  # Added console logging
-                messagebox.showinfo("Sukces", "Receptura zapisana.")
-                modal.destroy()
-                self.load_data()
-                
-                if connection and connection.is_connected():
-                    connection.close()
-            except Error as e:
-                print("Błąd bazy:", e)
-                messagebox.showwarning("Błąd połączenia z bazą", 
-                                     f"Nie można połączyć się z bazą danych: {str(e)}\nZmiany nie zostały zapisane.")
-            except Exception as e:
-                print("Nieoczekiwany błąd:", e)
-                messagebox.showwarning("Błąd", f"Wystąpił nieoczekiwany błąd: {str(e)}")
-
-        btn_save = ctk.CTkButton(modal, text="Zapisz", command=save_modal)
-        btn_save.pack(pady=20)
+                QMessageBox.warning(self, "Błąd", f"Wystąpił nieoczekiwany błąd: {str(e)}")
