@@ -19,7 +19,7 @@ class PlotManager:
     Handles throttling of plot updates to improve performance.
     """
     
-    def __init__(self, plot_widgets, min_update_interval=0.5):
+    def __init__(self, plot_widgets=None, min_update_interval=0.2):
         """
         Initialize the PlotManager with pyqtgraph plot widgets.
         
@@ -29,7 +29,11 @@ class PlotManager:
             min_update_interval: Minimum time between plot updates in seconds.
         """
         # Store plot widget references (instead of matplotlib figures/axes)
-        self.plot_widgets = plot_widgets
+        self.plot_widgets = {}
+        self.plot_widgets['status'] = pg.PlotWidget()
+        self.plot_widgets['status'].setTitle("Status Plot")
+        self.plot_widgets['diameter'] = pg.PlotWidget()
+        self.plot_widgets['fft'] = pg.PlotWidget()
         self.min_update_interval = min_update_interval
         self.last_update_time = None
         self.plot_dirty = False
@@ -46,13 +50,6 @@ class PlotManager:
         # If desired, you can still set up queues for decoupling heavy calculations,
         # but here we assume that plot updates occur directly in the UI.
         print("[PlotManager] Initialized for PyQtGraph; using main thread for updates.")
-    
-    def start_plot_process(self):
-        print("[PlotManager] Separate plot process not used – updating plots in main thread.")
-
-    def stop_plot_process(self):
-        print("[PlotManager] No separate plot process to stop.")
-
     
     def process_plot_data(plot_data, fft_buffer_size=64):
         """
@@ -118,33 +115,32 @@ class PlotManager:
             batch_name: Nazwa bieżącej partii
             plc_sample_time: Czas pobierania próbki z PLC (w sekundach)
         """
-        if 'status' not in self.plot_widgets:
-            return
-        plot_widget = self.plot_widgets['status']
-        plot_widget.clear()
+        plot_widget = self.plot_widgets.get('status')
+        if plot_widget is not None:
+            plot_widget.clear()
         
-        sample_time_ms = plc_sample_time * 1000  # konwersja do ms
-        plot_widget.setTitle(f"Last {len(x_history)} samples - Batch: {batch_name} - PLC: {sample_time_ms:.1f}ms")
-        plot_widget.setLabel('bottom', "X-Coord [m]")
-        plot_widget.setLabel('left', "Błędy w cyklu")
-        
-        if x_history:
-            x_min = x_history[0]
-            x_max = current_x
-            plot_widget.setXRange(x_min, x_max)
-        
-        # Używamy BarGraphItem, aby narysować słupki dla lumps i necks
-        if x_history:
-            x_vals = np.array(x_history)
-            width = 0.1  # Szerokość słupka w metrach
-            lumps_vals = np.array(lumps_history)
-            necks_vals = np.array(necks_history)
+            sample_time_ms = plc_sample_time * 1000  # konwersja do ms
+            plot_widget.setTitle(f"Last {len(x_history)} samples - Batch: {batch_name} - PLC: {sample_time_ms:.1f}ms")
+            plot_widget.setLabel('bottom', "X-Coord [m]")
+            plot_widget.setLabel('left', "Błędy w cyklu")
             
-            lumps_bar = pg.BarGraphItem(x=x_vals - width/2, height=lumps_vals, width=width, brush='r')
-            necks_bar = pg.BarGraphItem(x=x_vals + width/2, height=necks_vals, width=width, brush='b')
+            if x_history:
+                x_min = x_history[0]
+                x_max = current_x
+                plot_widget.setXRange(x_min, x_max)
             
-            plot_widget.addItem(lumps_bar)
-            plot_widget.addItem(necks_bar)
+            # Używamy BarGraphItem, aby narysować słupki dla lumps i necks
+            if x_history:
+                x_vals = np.array(x_history)
+                width = 0.1  # Szerokość słupka w metrach
+                lumps_vals = np.array(lumps_history)
+                necks_vals = np.array(necks_history)
+                
+                lumps_bar = pg.BarGraphItem(x=x_vals - width/2, height=lumps_vals, width=width, brush='r')
+                necks_bar = pg.BarGraphItem(x=x_vals + width/2, height=necks_vals, width=width, brush='b')
+                
+                plot_widget.addItem(lumps_bar)
+                plot_widget.addItem(necks_bar)
 
             
     def update_diameter_plot(self, diameter_x, diameter_history, current_x, diameter_preset=0, plc_sample_time=0):

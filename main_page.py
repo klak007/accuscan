@@ -13,7 +13,7 @@ import pyqtgraph as pg
 from PyQt5.QtWidgets import QFrame, QGridLayout, QVBoxLayout
 from PyQt5.QtWidgets import QWidget, QGridLayout, QMessageBox, QSlider
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QPushButton, QLabel, QSpacerItem, QSizePolicy
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtWidgets import (
     QFrame, QLabel, QLineEdit, QPushButton, QGridLayout, QHBoxLayout
 )
@@ -103,14 +103,14 @@ class MainPage(QWidget):
         # Initialize the plot manager and pass the figures
         # (Zakładam, że metody tworzące wykresy w right panelu ustawiają self.fig, self.ax, etc.)
         self.plot_manager = PlotManager(
-            figures_dict={
-                'status': (self.fig, self.ax),
-                'diameter': (self.fig_diameter, self.ax_diameter),
-                'fft': (self.fig_fft, self.ax_fft)
+            plot_widgets={
+                'status': None,
+                'diameter': None,
+                'fft': None
             }, 
             min_update_interval=0.2  # Reduce interval for more responsive updates
         )
-        print("[MainPage] Plot manager initialized with separate process")
+        print("[MainPage] Plot manager initialized for PyQtGraph")
 
 
     # ---------------------------------------------------------------------------------
@@ -494,76 +494,76 @@ class MainPage(QWidget):
         max_necks_layout.addWidget(self.btn_max_necks_inc)
 
     def _adjust_diameter(self, delta: float):
-        val_str = self.entry_diameter_setpoint.get() or "0"
+        val_str = self.entry_diameter_setpoint.text() or "0"
         try:
             val = float(val_str)
         except ValueError:
             val = 0.0
         new_val = val + delta
-        self.entry_diameter_setpoint.delete(0, "end")
-        self.entry_diameter_setpoint.insert(0, f"{new_val:.1f}")
+        self.entry_diameter_setpoint.clear()
+        self.entry_diameter_setpoint.setText(f"{new_val:.1f}")
 
     def _adjust_tolerance_plus(self, delta: float):
-        val_str = self.entry_tolerance_plus.get() or "0"
+        val_str = self.entry_tolerance_plus.text() or "0"
         try:
             val = float(val_str)
         except ValueError:
             val = 0.0
         new_val = val + delta
-        self.entry_tolerance_plus.delete(0, "end")
-        self.entry_tolerance_plus.insert(0, f"{new_val:.1f}")
+        self.entry_tolerance_plus.clear()
+        self.entry_tolerance_plus.setText(f"{new_val:.1f}")
 
     def _adjust_tolerance_minus(self, delta: float):
-        val_str = self.entry_tolerance_minus.get() or "0"
+        val_str = self.entry_tolerance_minus.text() or "0"
         try:
             val = float(val_str)
         except ValueError:
             val = 0.0
         new_val = val + delta
-        self.entry_tolerance_minus.delete(0, "end")
-        self.entry_tolerance_minus.insert(0, f"{new_val:.1f}")
+        self.entry_tolerance_minus.clear()
+        self.entry_tolerance_minus.setText(f"{new_val:.1f}")
 
     def _adjust_lump_threshold(self, delta: float):
-        val_str = self.entry_lump_threshold.get() or "0"
+        val_str = self.entry_lump_threshold.text() or "0"
         try:
             val = float(val_str)
         except ValueError:
             val = 0.0
         new_val = val + delta
-        self.entry_lump_threshold.delete(0, "end")
-        self.entry_lump_threshold.insert(0, f"{new_val:.1f}")
+        self.entry_lump_threshold.clear()
+        self.entry_lump_threshold.setText(f"{new_val:.1f}")
 
     def _adjust_neck_threshold(self, delta: float):
-        val_str = self.entry_neck_threshold.get() or "0"
+        val_str = self.entry_neck_threshold.text() or "0"
         try:
             val = float(val_str)
         except ValueError:
             val = 0.0
         new_val = val + delta
-        self.entry_neck_threshold.delete(0, "end")
-        self.entry_neck_threshold.insert(0, f"{new_val:.1f}")
+        self.entry_neck_threshold.clear()
+        self.entry_neck_threshold.setText(f"{new_val:.1f}")
 
     def _adjust_max_lumps(self, delta: int):
         """Adjust the max lumps in flaw window value"""
-        val_str = self.entry_max_lumps.get() or "0"
+        val_str = self.entry_max_lumps.text() or "0"
         try:
             val = int(val_str)
         except ValueError:
             val = 0
         new_val = max(0, val + delta)  # Ensure the value is not negative
-        self.entry_max_lumps.delete(0, "end")
-        self.entry_max_lumps.insert(0, f"{new_val}")
+        self.entry_max_lumps.clear()
+        self.entry_max_lumps.setText(f"{new_val}")
 
     def _adjust_max_necks(self, delta: int):
         """Adjust the max necks in flaw window value"""
-        val_str = self.entry_max_necks.get() or "0"
+        val_str = self.entry_max_necks.text() or "0"
         try:
             val = int(val_str)
         except ValueError:
             val = 0
         new_val = max(0, val + delta)  # Ensure the value is not negative
-        self.entry_max_necks.delete(0, "end")
-        self.entry_max_necks.insert(0, f"{new_val}")
+        self.entry_max_necks.clear()
+        self.entry_max_necks.setText(f"{new_val}")
 
     def _save_settings(self):
         """
@@ -646,7 +646,7 @@ class MainPage(QWidget):
 
     def _on_speed_change(self, value: float):
         self.production_speed = float(value)
-        self.speed_label.configure(text=f"Speed: {self.production_speed:.1f}")
+        self.speed_label.setText(f"Speed: {self.production_speed:.1f}")
 
     def _on_entry_focus(self, event=None):
         """Handler for entry field focus - marks UI as busy to reduce processing"""
@@ -664,24 +664,22 @@ class MainPage(QWidget):
         self.ui_busy = False
         
     def get_batch_name(self):
-        """Safely get the batch name using StringVar to avoid UI thread blocking"""
-        return self.batch_var.get() or "XABC1566"
+        return self.entry_batch.text() or "XABC1566"
         
     def get_product_name(self):
-        """Safely get the product name using StringVar to avoid UI thread blocking"""
-        return self.product_var.get() or "18X0600"
+        return self.entry_product.text() or "18X0600"
         
     def get_max_lumps(self):
         """Safely get the max lumps setting"""
         try:
-            return int(self.entry_max_lumps.get() or "30")
+            return int(self.entry_max_lumps.text() or "30")
         except (ValueError, AttributeError):
             return 30
             
     def get_max_necks(self):
         """Safely get the max necks setting"""
         try:
-            return int(self.entry_max_necks.get() or "7")
+            return int(self.entry_max_necks.text() or "7")
         except (ValueError, AttributeError):
             return 7
 
@@ -723,8 +721,8 @@ class MainPage(QWidget):
             for field_name, value in field_values.items():
                 if hasattr(self, field_name):
                     field = getattr(self, field_name)
-                    field.delete(0, "end")
-                    field.insert(0, value)
+                    field.clear()
+                    field.setText(value)
             
             print("[GUI] Example settings applied without blocking")
             
@@ -935,7 +933,7 @@ class MainPage(QWidget):
                 }
                 self.controller.plc_write_queue.put_nowait(clear_cmd)
                 print("[GUI] Clear reset command sent to PLC via queue.")
-            self.after(100, clear_reset)
+            QTimer.singleShot(100, clear_reset)
         except Exception as e:
             print(f"[GUI] Error sending reset command: {e}")
         
@@ -1007,7 +1005,7 @@ class MainPage(QWidget):
                 self.controller.plc_write_queue.put_nowait(clear_ack_cmd)
                 print("[GUI] Ack clear reset command sent asynchronously.")
             
-            self.after(100, clear_ack)
+            QTimer.singleShot(100, clear_ack)
             
         except Exception as e:
             print(f"[GUI] Error during asynchronous Kwituj reset: {e}")
@@ -1063,19 +1061,19 @@ class MainPage(QWidget):
 
         # Update labels - this is fast
         label_update_start = time.perf_counter()
-        self.label_d1.configure(text=f"D1 [mm]: {d1:.2f}")
-        self.label_d2.configure(text=f"D2 [mm]: {d2:.2f}")
-        self.label_d3.configure(text=f"D3 [mm]: {d3:.2f}")
-        self.label_d4.configure(text=f"D4 [mm]: {d4:.2f}")
-        self.label_davg.configure(text=f"dAVG [mm]: {davg:.2f}")
-        self.label_dmin.configure(text=f"Dmin [mm]: {dmin:.2f}")
-        self.label_dmax.configure(text=f"Dmax [mm]: {dmax:.2f}")
-        self.label_dsd.configure(text=f"dSD [mm]: {dsd:.3f}")
-        self.label_dov.configure(text=f"dOV [%]: {dov:.2f}")
+        self.label_d1.setText(f"D1 [mm]: {d1:.2f}")
+        self.label_d2.setText(f"D2 [mm]: {d2:.2f}")
+        self.label_d3.setText(f"D3 [mm]: {d3:.2f}")
+        self.label_d4.setText(f"D4 [mm]: {d4:.2f}")
+        self.label_davg.setText(f"dAVG [mm]: {davg:.2f}")
+        self.label_dmin.setText(f"Dmin [mm]: {dmin:.2f}")
+        self.label_dmax.setText(f"Dmax [mm]: {dmax:.2f}")
+        self.label_dsd.setText(f"dSD [mm]: {dsd:.3f}")
+        self.label_dov.setText(f"dOV [%]: {dov:.2f}")
         
         # Get fluctuation percentage for speed calculation
         try:
-            fluctuation_percent = float(self.speed_fluct_entry.get() or "0")
+            fluctuation_percent = float(self.speed_fluct_entry.text() or "0")
         except ValueError:
             fluctuation_percent = 0
             
@@ -1095,7 +1093,7 @@ class MainPage(QWidget):
         self.current_x = window_data['current_x']
         
         # Update xCoord and speed labels
-        self.label_xcoord.configure(text=f"xCoord [m]: {self.current_x:.1f}")
+        self.label_xcoord.setText(f"xCoord [m]: {self.current_x:.1f}")
         
         # Display production speed (potentially with fluctuation)
         try:
@@ -1104,16 +1102,16 @@ class MainPage(QWidget):
                 import random
                 fluctuation_factor = 1.0 + random.uniform(-fluctuation_percent/100, fluctuation_percent/100)
                 current_speed = self.production_speed * fluctuation_factor
-                self.label_speed.configure(text=f"Speed [m/min]: {current_speed:.1f} (±{fluctuation_percent}%)")
+                self.label_speed.setText(f"Speed [m/min]: {current_speed:.1f} (±{fluctuation_percent}%)")
             else:
-                self.label_speed.configure(text=f"Speed [m/min]: {self.production_speed:.1f}")
+                self.label_speed.setText(f"Speed [m/min]: {self.production_speed:.1f}")
         except ValueError:
-            self.label_speed.configure(text=f"Speed [m/min]: {self.production_speed:.1f}")
+            self.label_speed.setText(f"Speed [m/min]: {self.production_speed:.1f}")
 
         # Process flaw detection - this is fast
         # Update flaw window size from UI
         try:
-            flaw_window_size = float(self.entry_flaw_window.get() or "0.5")
+            flaw_window_size = float(self.entry_flaw_window.text() or "0.5")
             self.flaw_detector.update_flaw_window_size(flaw_window_size)
         except ValueError:
             pass
@@ -1124,30 +1122,37 @@ class MainPage(QWidget):
         lumps = data.get("lumps", 0)
         necks = data.get("necks", 0)
         if lumps:
-            self.label_lump_indicator.configure(text="Lump ON", text_color="red")
+            self.label_lump_indicator.setText("Lump ON")
+            self.label_lump_indicator.setStyleSheet("color: red;")
         else:
-            self.label_lump_indicator.configure(text="Lump OFF", text_color="green")
+            self.label_lump_indicator.setText("Lump OFF")
+            self.label_lump_indicator.setStyleSheet("color: green;")
         if necks:
-            self.label_neck_indicator.configure(text="Neck ON", text_color="red")
+            self.label_neck_indicator.setText("Neck ON")
+            self.label_neck_indicator.setStyleSheet("color: red;")
         else:
-            self.label_neck_indicator.configure(text="Neck OFF", text_color="green")
+            self.label_neck_indicator.setText("Neck OFF")
+            self.label_neck_indicator.setStyleSheet("color: green;")
         
         label_update_time = time.perf_counter() - label_update_start
 
         # Check diameter tolerance - this is fast
-        diameter_preset = float(self.entry_diameter_setpoint.get() or 0.0)
-        tolerance_plus = float(self.entry_tolerance_plus.get() or 0.5)
-        tolerance_minus = float(self.entry_tolerance_minus.get() or 0.5)
+        diameter_preset = float(self.entry_diameter_setpoint.text() or 0.0)
+        tolerance_plus = float(self.entry_tolerance_plus.text() or 0.5)
+        tolerance_minus = float(self.entry_tolerance_minus.text() or 0.5)
         
         deviation = davg - diameter_preset
-        self.diameter_deviation_label.configure(text=f"Dev: {deviation:.2f} mm")
+        self.diameter_deviation_label.setText(f"Dev: {deviation:.2f} mm")
         
         if deviation > tolerance_plus:
-            self.label_diameter_indicator.configure(text="Diameter: HIGH", text_color="red")
+            self.label_diameter_indicator.setText("Diameter: HIGH")
+            self.label_diameter_indicator.setStyleSheet("color: red;")
         elif deviation < -tolerance_minus:
-            self.label_diameter_indicator.configure(text="Diameter: LOW", text_color="red")
+            self.label_diameter_indicator.setText("Diameter: LOW")
+            self.label_diameter_indicator.setStyleSheet("color: red;")
         else:
-            self.label_diameter_indicator.configure(text="Diameter: OK", text_color="green")
+            self.label_diameter_indicator.setText("Diameter: OK")
+            self.label_diameter_indicator.setStyleSheet("color: green;")
 
         # Prepare plot data and update plots - this is the slower part
         plot_update_start = time.perf_counter()
@@ -1161,7 +1166,7 @@ class MainPage(QWidget):
             'lumps_history': window_data['lumps_history'],
             'necks_history': window_data['necks_history'],
             'current_x': self.current_x,
-            'batch_name': self.entry_batch.get() or "NO BATCH",
+            'batch_name': self.entry_batch.text() or "NO BATCH",
             'plc_sample_time': self.plc_sample_time,
             'diameter_x': window_data['diameter_x'],
             'diameter_history': window_data['diameter_history'],
@@ -1197,21 +1202,10 @@ class MainPage(QWidget):
                 plot_data['plc_sample_time']
             )
             
-            # Draw the canvases
-            self.fig.canvas.draw()
-            self.fig_diameter.canvas.draw()
         else:
             # Normal case - update through PlotManager process 
             self.plot_manager.update_all_plots(plot_data)
             
-            # Force drawing the existing figures to ensure we see something
-            # This is a fallback if the process isn't drawing
-            if not hasattr(self, 'last_forced_draw') or time.time() - self.last_forced_draw > 2.0:
-                print("[MainPage] Forcing canvas draw to ensure visibility")
-                print("DEBUG: Forcing canvas draw, x_history size=", len(self.x_history))
-                self.fig.canvas.draw()
-                self.fig_diameter.canvas.draw() 
-                self.last_forced_draw = time.time()
         plot_update_time = time.perf_counter() - plot_update_start
         
         # Performance logging (only for slow updates)
@@ -1233,12 +1227,12 @@ class MainPage(QWidget):
 
     def _on_speed_change(self, value: float):
         self.production_speed = float(value)
-        self.speed_value_label.configure(text=f"Speed: {self.production_speed:.1f}")
+        self.speed_value_label.setText(f"Speed: {self.production_speed:.1f}")
         
     def _on_prod_speed_change(self, value: float):
         """Handle production speed slider change"""
         self.production_speed = value
-        self.prod_speed_value.configure(text=f"{self.production_speed:.1f}")
+        self.prod_speed_value.setText(f"{self.production_speed:.1f}")
 
     def update_data(self):
         # Get latest data directly from the acquisition buffer instead of data_mgr
@@ -1246,7 +1240,7 @@ class MainPage(QWidget):
         if data:  # If there's data available
             # Update flaw window size from UI before processing
             try:
-                flaw_window_size = float(self.entry_flaw_window.get() or "0.5")
+                flaw_window_size = float(self.entry_flaw_window.text() or "0.5")
                 self.flaw_detector.update_flaw_window_size(flaw_window_size)
             except ValueError:
                 pass
@@ -1258,6 +1252,8 @@ class MainPage(QWidget):
         import plc_helper
         plc_connected = plc_helper.is_plc_connected(self.controller.logic)
         if plc_connected:
-            self.ind_plc.configure(text="PLC: OK", text_color="green")
+            self.ind_plc.setText("PLC: OK")
+            self.ind_plc.setStyleSheet("color: green;")
         else:
-            self.ind_plc.configure(text="PLC: OFF", text_color="red")
+            self.ind_plc.setText("PLC: OFF")
+            self.ind_plc.setStyleSheet("color: red;")

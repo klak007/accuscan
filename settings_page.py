@@ -47,7 +47,7 @@ class SettingsPage(QFrame):
 
         # Dodaj status_frame do main_frame – przykładowo w wierszu 3, kolumna 0
         main_frame_layout.addWidget(self.status_frame, 3, 0)
-        self.layout.addWidget(self.top_bar)
+        main_layout.addWidget(self.top_bar, 0, 0) # FIXED: Changed self.layout to main_layout
         # Załaduj dane przy inicjalizacji, jeśli baza jest dostępna
         if controller.db_connected:
             self.load_data()
@@ -68,18 +68,23 @@ class SettingsPage(QFrame):
     def update_db_status(self):
         """Aktualizuje etykietę statusu połączenia z bazą."""
         if self.controller.db_connected:
-            self.db_status_label.configure(text="Status bazy danych: Połączono", text_color="green")
+            self.db_status_label.setText("Status bazy danych: Połączono")
+            self.db_status_label.setStyleSheet("color: green;")
         else:
-            self.db_status_label.configure(text="Status bazy danych: Brak połączenia", text_color="red")
+            self.db_status_label.setText("Status bazy danych: Brak połączenia")
+            self.db_status_label.setStyleSheet("color: red;")
 
     def show_offline_message(self):
         """Wyświetla informację o braku dostępu do bazy danych w widoku tabeli."""
-        for item in self.tree.get_children():
-            self.tree.delete(item)
-        
-        self.tree.insert("", "end", values=(
-            "-", "<Brak połączenia z bazą>", "Funkcje edycji niedostępne", "-", "-", "-", "-", "-", "-", "-", "-", "-"
-        ))
+        # Note: No equivalent in QTableWidget like tree.delete/insert - need to clear and add rows
+        self.table.setRowCount(0)
+        self.table.insertRow(0)
+        for col in range(self.table.columnCount()):
+            text = "<Brak połączenia z bazą>" if col == 1 else "-"
+            if col == 2:
+                text = "Funkcje edycji niedostępne"
+            item = QTableWidgetItem(text)
+            self.table.setItem(0, col, item)
 
     def _create_top_bar(self):
         """Tworzy górny pasek nawigacyjny z przyciskami."""
@@ -136,14 +141,18 @@ class SettingsPage(QFrame):
         # Update PLC indicator if plc_client exists and can report connection status.
         plc_connected = hasattr(self.controller.logic, "plc_client") and self.controller.logic.plc_client.get_connected() if getattr(self.controller.logic, "plc_client", None) else False
         if plc_connected:
-            self.ind_plc.configure(text="PLC: OK", text_color="green")
+            self.ind_plc.setText("PLC: OK")
+            self.ind_plc.setStyleSheet("color: green;")
         else:
-            self.ind_plc.configure(text="PLC: OFF", text_color="red")
+            self.ind_plc.setText("PLC: OFF")
+            self.ind_plc.setStyleSheet("color: red;")
         # Update DB indicator based on controller's db_connected flag.
         if self.controller.db_connected:
-            self.ind_db.configure(text="DB: OK", text_color="green")
+            self.ind_db.setText("DB: OK")
+            self.ind_db.setStyleSheet("color: green;")
         else:
-            self.ind_db.configure(text="DB: OFF", text_color="red")
+            self.ind_db.setText("DB: OFF")
+            self.ind_db.setStyleSheet("color: red;")
 
     def _on_nastawy_click(self):
         print("[GUI] Kliknięto przycisk 'nastawy'.")
@@ -190,7 +199,7 @@ class SettingsPage(QFrame):
         self.main_frame.layout().addWidget(self.filter_frame, 0, 0)
 
     def clear_filter(self):
-        self.filter_entry.delete(0, "end")
+        self.filter_entry.clear()  # Use clear() instead of delete(0, "end")
         self.load_data()
 
     def _create_table(self):
@@ -338,14 +347,12 @@ class SettingsPage(QFrame):
             self.update_db_status()
                     
         except mysql.connector.Error as e:
-            print("Błąd bazy:", e)
             QMessageBox.warning(self, "Błąd połączenia z bazą", 
                 f"Nie można połączyć się z bazą danych: {str(e)}\nAplikacja będzie działać w trybie ograniczonym.")
             self.show_offline_message()
             self.controller.db_connected = False
             self.update_db_status()
         except Exception as e:
-            print("Nieoczekiwany błąd:", e)
             QMessageBox.warning(self, "Błąd", f"Wystąpił nieoczekiwany błąd: {str(e)}")
 
     def open_edit_modal(self, values=None, clone=False):
@@ -377,7 +384,6 @@ class SettingsPage(QFrame):
             return
         selected_rows = self.table.selectionModel().selectedRows()
         if not selected_rows:
-            print("Ostrzeżenie: Wybierz recepturę do klonowania.")
             QMessageBox.warning(self, "Ostrzeżenie", "Wybierz recepturę do klonowania.")
             return
         row = selected_rows[0].row()
@@ -396,7 +402,6 @@ class SettingsPage(QFrame):
             return
         selected_rows = self.table.selectionModel().selectedRows()
         if not selected_rows:
-            print("Ostrzeżenie: Wybierz recepturę do edycji.")
             QMessageBox.warning(self, "Ostrzeżenie", "Wybierz recepturę do edycji.")
             return
         row = selected_rows[0].row()
@@ -414,7 +419,6 @@ class SettingsPage(QFrame):
             return
         selected_rows = self.table.selectionModel().selectedRows()
         if not selected_rows:
-            print("Ostrzeżenie: Wybierz recepturę do usunięcia.")
             QMessageBox.warning(self, "Ostrzeżenie", "Wybierz recepturę do usunięcia.")
             return
         reply = QMessageBox.question(self, "Potwierdzenie", 
@@ -434,15 +438,12 @@ class SettingsPage(QFrame):
                 sql = "DELETE FROM settings WHERE `Id Settings` = %s"
                 cursor.execute(sql, (setting_id,))
                 connection.commit()
-                print("Sukces: Receptura usunięta.")
                 QMessageBox.information(self, "Sukces", "Receptura usunięta.")
                 self.load_data()
                 if connection and connection.is_connected():
                     connection.close()
             except mysql.connector.Error as e:
-                print("Błąd bazy:", e)
                 QMessageBox.warning(self, "Błąd połączenia z bazą", 
                                     f"Nie można połączyć się z bazą danych: {str(e)}\nOperacja nie została wykonana.")
             except Exception as e:
-                print("Nieoczekiwany błąd:", e)
                 QMessageBox.warning(self, "Błąd", f"Wystąpił nieoczekiwany błąd: {str(e)}")

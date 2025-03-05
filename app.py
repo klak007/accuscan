@@ -1,5 +1,6 @@
 # app.py
 from PyQt5.QtWidgets import QApplication, QMessageBox, QVBoxLayout, QMainWindow, QWidget
+from PyQt5.QtCore import QTimer  # Add this import
 import sys
 from datetime import datetime
 import time
@@ -31,7 +32,6 @@ DB_PARAMS = {
     "port": 3306,
     "raise_on_warnings": True,
     "connect_timeout": 5
-
 }
 
 # Set multiprocessing start method to 'spawn' for better compatibility
@@ -744,6 +744,10 @@ class App(QMainWindow):
             except Exception as e:
                 print(f"[App] Error stopping plot process: {e}")
         
+        # Stop the update timer
+        if hasattr(self, 'update_timer'):
+            self.update_timer.stop()
+        
         # Wait for threads to finish (with timeout)
         if hasattr(self, 'acquisition_thread') and self.acquisition_thread and self.acquisition_thread.is_alive():
             self.acquisition_thread.join(timeout=1.0)
@@ -771,31 +775,38 @@ class App(QMainWindow):
     
     def start_update_loop(self):
         """Start a separate update loop for UI with lower frequency than data collection"""
-        def update_loop():
-            # Limit UI updates to improve performance
-            now = time.time()
-            if hasattr(self, 'latest_data'):
-                current_page = self.get_current_page()
-                ui_start = time.perf_counter()
-                if hasattr(current_page, 'update_data'):
-                    current_page.update_data()
-                ui_time = time.perf_counter() - ui_start
-                
-                # Log UI update time if it's slow (>100ms)
-                if ui_time > 0.1 and (now - self.last_log_time) > 5:
-                    print(f"[PERF] UI Update time: {ui_time:.4f}s")
-                    self.last_log_time = now
-            
-            # Use variable delay based on current page
-            # Main page with plots needs less frequent updates
-            if self.current_page == "MainPage":
-                update_delay = 100 # plot-heavy main page
-            else:
-                update_delay = 50  # for other pages
-                
-            self.after(update_delay, update_loop)
+        self.update_timer = QTimer(self)
+        self.update_timer.timeout.connect(self.update_ui)
         
-        update_loop()
+        # Set initial update delay - will be adjusted in the update method
+        # Main page with plots needs less frequent updates
+        if self.current_page == "MainPage":
+            update_delay = 100  # plot-heavy main page
+        else:
+            update_delay = 50   # for other pages
+            
+        self.update_timer.start(update_delay)
+    
+    def update_ui(self):
+        # Limit UI updates to improve performance
+        now = time.time()
+        if hasattr(self, 'latest_data'):
+            current_page = self.get_current_page()
+            ui_start = time.perf_counter()
+            if hasattr(current_page, 'update_data'):
+                current_page.update_data()
+            ui_time = time.perf_counter() - ui_start
+            
+            # Log UI update time if it's slow (>100ms)
+            if ui_time > 0.1 and (now - self.last_log_time) > 5:
+                print(f"[PERF] UI Update time: {ui_time:.4f}s")
+                self.last_log_time = now
+        
+        # Adjust timer interval based on current page
+        if self.current_page == "MainPage":
+            self.update_timer.setInterval(100)  # plot-heavy main page
+        else:
+            self.update_timer.setInterval(50)   # for other pages
     
     def get_current_page(self):
         if self.current_page == "MainPage":
