@@ -651,17 +651,16 @@ class MainPage(QWidget):
 
         # 4. Wysyłanie komendy do PLC asynchronicznie poprzez kolejkę:
         write_cmd = {
-            "command": "write_settings",
-            "params": {
-                "db_number": 2,
-                "lump_threshold": lump_threshold,
-                "neck_threshold": neck_threshold,
-                "flaw_preset_diameter": diameter_setpoint,
-                "upper_tol": tolerance_plus,
-                "under_tol": tolerance_minus
-                # Nie przekazujemy tu dodatkowych parametrów, bo reset jest cykliczny
-            }
+            "command": "write_accuscan_out_settings",
+            "db_number": 2,
+            "lump_threshold": lump_threshold,
+            "neck_threshold": neck_threshold,
+            "flaw_preset_diameter": diameter_setpoint,
+            "upper_tol": tolerance_plus,
+            "under_tol": tolerance_minus
         }
+        self.controller.plc_write_queue.put_nowait(write_cmd)
+
         try:
             self.controller.plc_write_queue.put_nowait(write_cmd)
             print("[GUI] Komenda zapisu nastaw do PLC wysłana asynchronicznie.")

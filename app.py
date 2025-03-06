@@ -1,5 +1,5 @@
 # app.py
-from PyQt5.QtWidgets import QApplication, QMessageBox, QVBoxLayout, QMainWindow, QWidget
+from PyQt5.QtWidgets import QApplication, QMessageBox, QVBoxLayout, QMainWindow, QWidget, QStackedWidget
 from PyQt5.QtCore import QTimer  # Add this import
 import sys
 from datetime import datetime
@@ -12,6 +12,7 @@ from multiprocessing import Process, Value, Event, Queue
 from plc_helper import read_accuscan_data, connect_plc
 from db_helper import init_database, save_measurement_sample, check_database
 from data_processing import FastAcquisitionBuffer
+from flaw_detection import FlawDetector
 # Import stron
 from main_page import MainPage
 from settings_page import SettingsPage
@@ -78,6 +79,12 @@ class App(QMainWindow):
         self.db_queue = queue.Queue(maxsize=100)
         self.plc_write_queue = queue.Queue(maxsize=20)
         
+        if not OFFLINE_MODE:
+            self.plc_client = connect_plc(PLC_IP, PLC_RACK, PLC_SLOT)
+            if self.plc_client and self.plc_client.get_connected():
+                print("[Main] PLC connected in main process.")
+            else:
+                print("[Main] Failed to connect to PLC in main process.")
         
         # Start PLC writer thread
         self.start_plc_writer()
@@ -96,6 +103,7 @@ class App(QMainWindow):
         # -----------------------------------
         self.acquisition_buffer = FastAcquisitionBuffer(max_samples=1024)
         
+        self.flaw_detector = FlawDetector()
         
         # -----------------------------------
         # Kontener na strony (MainPage, SettingsPage)
@@ -103,6 +111,7 @@ class App(QMainWindow):
         central_widget = QWidget(self)
         self.setCentralWidget(central_widget)
         self.layout = QVBoxLayout(central_widget)
+        self.stacked_widget = QStackedWidget(central_widget)
         
         
         # Inicjalizacja stron
@@ -111,7 +120,9 @@ class App(QMainWindow):
         
         
         # Na razie dodajemy tylko main_page do layoutu
-        self.layout.addWidget(self.main_page)
+        self.stacked_widget.addWidget(self.main_page)
+        self.stacked_widget.addWidget(self.settings_page)
+        self.layout.addWidget(self.stacked_widget)
         self.settings_page.hide()
         
         
@@ -186,8 +197,7 @@ class App(QMainWindow):
     def toggle_page(self, page_name):
         """Przełącza widoczność stron."""
         if page_name == "MainPage":
-            self.main_page.show()
-            self.settings_page.hide()
+            self.stacked_widget.setCurrentWidget(self.main_page)
             self.current_page = "MainPage"
         elif page_name == "SettingsPage":
             # Sprawdź połączenie z bazą przed przejściem do strony ustawień
@@ -195,8 +205,7 @@ class App(QMainWindow):
                 QMessageBox.warning(self, "Brak dostępu do bazy danych", 
                                     "Dostęp do strony ustawień jest ograniczony bez połączenia z bazą danych.")
                 return
-            self.main_page.hide()
-            self.settings_page.show()
+            self.stacked_widget.setCurrentWidget(self.settings_page)
             self.current_page = "SettingsPage"
     
     def start_acquisition_process(self):
@@ -267,6 +276,8 @@ class App(QMainWindow):
             try:
                 # Check if we need to handle queue overflow situation
                 current_queue_size = self.data_queue.qsize()
+                if current_queue_size > 0:
+                    print(f"[Data Receiver] Current queue size: {current_queue_size}")
                 
                 # Critical overflow - need to drop samples to catch up
                 if current_queue_size > QUEUE_CRITICAL_THRESHOLD:
@@ -352,6 +363,11 @@ class App(QMainWindow):
                         
                         # Update latest data
                         self.latest_data = data
+                        
+                        self.flaw_detector.process_flaws(data, 0)
+                        print(f"[Flaws] Lumps = {self.flaw_detector.total_lumps_count}, "
+                              f"Necks = {self.flaw_detector.total_necks_count}, "
+                              f"Total = {self.flaw_detector.get_total_flaws_count()}")
                         
                         # Note: mp.Queue doesn't have task_done method
                         samples_processed += 1
@@ -580,6 +596,8 @@ class App(QMainWindow):
                 try:
                     # Check queue size and implement dynamic throttling
                     current_size = data_queue.qsize()
+                    if current_size > 0 and cycle_count % 20 == 0:
+                        print(f"[ACQ Process] Queue size: {current_size}")
                     
                     # Define throttling thresholds
                     LOW_THRESHOLD = 20      # Normal operation
@@ -587,45 +605,26 @@ class App(QMainWindow):
                     HIGH_THRESHOLD = 200    # Aggressive throttling
                     CRITICAL_THRESHOLD = 500 # Drop samples
                     
-                    # Normal operation - queue is handling the load
                     if current_size < LOW_THRESHOLD:
                         data_queue.put(data, block=False)
-                        # Only log occasionally during normal operation
-                        if cycle_count % 20 == 0:
-                            print(f"[ACQ Process] Queue size: {current_size}")
-                            
-                    # Warning level - begin throttling by adding delay proportional to queue size
                     elif current_size < HIGH_THRESHOLD:
                         data_queue.put(data, block=False)
-                        # Log warning
-                        if cycle_count % 5 == 0:
+                        if cycle_count % 5 == 0 and current_size > 0:
                             print(f"[ACQ Process] WARNING: Queue growing - size: {current_size}")
-                        # Add small delay proportional to queue size
                         delay_factor = (current_size - LOW_THRESHOLD) / (HIGH_THRESHOLD - LOW_THRESHOLD)
                         throttle_delay = 0.005 * delay_factor  # max ~5ms delay
                         time.sleep(throttle_delay)
-                        
-                    # High level - aggressive throttling and selective sampling
                     elif current_size < CRITICAL_THRESHOLD:
-                        # Only add data with flaws or every 3rd sample
                         if data.get("lumps", 0) > 0 or data.get("necks", 0) > 0 or cycle_count % 3 == 0:
                             data_queue.put(data, block=False)
-                        # Always log high threshold warnings
-                        if cycle_count % 2 == 0:
+                        if cycle_count % 2 == 0 and current_size > 0:
                             print(f"[ACQ Process] HIGH LOAD: Queue size {current_size} - throttling and selective sampling")
-                        # Add larger delay to let receiver catch up
                         time.sleep(0.010)  # 10ms delay
-                        
-                    # Critical level - drop samples and let receiver catch up
                     else:
-                        # Only keep samples with flaws
                         if data.get("lumps", 0) > 0 or data.get("necks", 0) > 0:
                             data_queue.put(data, block=False)
-                        # Always log critical warnings
                         print(f"[ACQ Process] CRITICAL: Queue size at {current_size} - dropping samples, adding delay")
-                        # Add significant delay to allow receiver to catch up
                         time.sleep(0.050)  # 50ms delay
-                        
                 except queue.Full:
                     print("[ACQ Process] Data queue is full. Could not enqueue data.")
                     time.sleep(0.050)  # Add delay when queue is completely full
@@ -637,7 +636,7 @@ class App(QMainWindow):
                 if cycle_count >= log_frequency:
                     cycle_count = 0
                     total_time = time.perf_counter() - cycle_start
-                    if total_time > 0.025:  # Log if taking >25ms (over 75% of our budget)
+                    if total_time > 0.031:  # Only print if cycle time exceeded 31ms
                         print(f"[ACQ Process] Total: {total_time:.4f}s | Read: {read_time:.4f}s | Reset: {reset_time:.4f}s")
                 
                 # Calculate sleep time to maintain 32ms cycle
@@ -651,18 +650,15 @@ class App(QMainWindow):
                     time_since_reset = current_time - last_reset_time
                     
                     if time_since_reset < 0.1 and has_flaws:
-                        # The overrun is likely due to a recent lump/neck reset
-                        print(f"[ACQ Process] Cycle time exceeded due to lump/neck reset: {elapsed:.4f}s, Lumps={lumps}, Necks={necks}")
+                        print(f"[ACQ Process] Cycle time exceeded due to lump/neck reset: {elapsed:.4f}s, Read: {read_time:.4f}s, Reset: {reset_time:.4f}s, Lumps={lumps}, Necks={necks}")
                     elif elapsed > 0.1:
-                        # Severe delay - this might indicate something more serious
-                        print(f"[ACQ Process] SEVERE DELAY: Cycle time {elapsed:.4f}s is significantly over budget!")
+                        print(f"[ACQ Process] SEVERE DELAY: Cycle time {elapsed:.4f}s, Read: {read_time:.4f}s, Reset: {reset_time:.4f}s is significantly over budget!")
                     else:
-                        # Regular overrun - just log it
-                        print(f"[ACQ Process] Cycle time exceeded: {elapsed:.4f}s")
+                        print(f"[ACQ Process] Cycle time exceeded: {elapsed:.4f}s, Read: {read_time:.4f}s, Reset: {reset_time:.4f}s")
                     
-                    # For severe delays, try sleeping a tiny bit to let system recover
-                    if elapsed > 0.2:
-                        time.sleep(0.01)
+                    # # For severe delays, try sleeping a tiny bit to let system recover
+                    # if elapsed > 0.2:
+                    #     time.sleep(0.01)
                 else:
                     # Normal case - sleep to maintain timing
                     if sleep_time > 0:

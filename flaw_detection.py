@@ -154,3 +154,9 @@ class FlawDetector:
         self.flaw_necks_coords.clear()
         self.total_lumps_count = 0
         self.total_necks_count = 0
+
+    def get_total_flaws_count(self):
+        """
+        Return total lumps + necks encountered since the start.
+        """
+        return self.total_lumps_count + self.total_necks_count

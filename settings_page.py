@@ -87,46 +87,50 @@ class SettingsPage(QFrame):
             self.table.setItem(0, col, item)
 
     def _create_top_bar(self):
-        """Tworzy górny pasek nawigacyjny z przyciskami."""
-        # Utwórz kontener dla top bara jako QWidget
-        self.top_bar = QWidget(self)
+        self.top_bar = QFrame(self)
+        self.top_bar.setFrameShape(QFrame.Box)
+        self.top_bar.setLineWidth(2)
+        self.top_bar.setFrameShadow(QFrame.Raised)
+        self.top_bar.setStyleSheet("fusion")
         top_bar_layout = QHBoxLayout(self.top_bar)
-        top_bar_layout.setContentsMargins(5, 5, 5, 0)
+        top_bar_layout.setContentsMargins(5, 5, 5, 5)
         top_bar_layout.setSpacing(5)
-        
-        # Przycisk "Back to Main"
-        self.btn_pomiary = QPushButton("Back to Main", self.top_bar)
-        self.btn_pomiary.clicked.connect(lambda: self.controller.toggle_page("MainPage"))
+
+        self.btn_pomiary = QPushButton("Pomiary", self.top_bar)
+        self.btn_pomiary.setFixedSize(100, 40)
+        self.btn_pomiary.clicked.connect(self._on_pomiary_click)  # changed handler
         top_bar_layout.addWidget(self.btn_pomiary, 0, Qt.AlignLeft)
-        
-        # Przycisk "nastawy"
-        self.btn_nastawy = QPushButton("nastawy", self.top_bar)
+
+        self.btn_nastawy = QPushButton("Nastawy", self.top_bar)
+        self.btn_nastawy.setFixedSize(100, 40)
         self.btn_nastawy.clicked.connect(self._on_nastawy_click)
         top_bar_layout.addWidget(self.btn_nastawy, 0, Qt.AlignLeft)
-        
-        # Przycisk "historia"
-        self.btn_historia = QPushButton("historia", self.top_bar)
+
+        self.btn_historia = QPushButton("Historia", self.top_bar)
+        self.btn_historia.setFixedSize(100, 40)
         self.btn_historia.clicked.connect(self._on_historia_click)
         top_bar_layout.addWidget(self.btn_historia, 0, Qt.AlignLeft)
-        
-        # Przycisk "Accuscan"
+
         self.btn_accuscan = QPushButton("Accuscan", self.top_bar)
+        self.btn_accuscan.setFixedSize(100, 40)
         self.btn_accuscan.clicked.connect(self._on_accuscan_click)
         top_bar_layout.addWidget(self.btn_accuscan, 0, Qt.AlignLeft)
-        
-        # Dodaj rozciągacz, aby wypchnąć elementy po prawej stronie
+
         spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
         top_bar_layout.addItem(spacer)
-        
-        # Przycisk Exit
-        self.btn_exit = QPushButton("Exit", self.top_bar)
-        # Ustawienie stylu można zrealizować poprzez CSS
-        self.btn_exit.setStyleSheet("background-color: red; color: white;")
-        self.btn_exit.clicked.connect(self.controller.destroy)
-        top_bar_layout.addWidget(self.btn_exit, 0, Qt.AlignRight)
-        
-        # Na koniec dodajemy top_bar do głównego layoutu (np. przez self.layout.addWidget(self.top_bar))
 
+        self.btn_exit = QPushButton("Zamknij", self.top_bar)
+        self.btn_exit.setFixedSize(100, 40)
+        self.btn_exit.setStyleSheet("background-color: red;")
+        self.btn_exit.clicked.connect(self.close)  # or another exit method
+        top_bar_layout.addWidget(self.btn_exit, 0, Qt.AlignRight)
+
+        self.plc_status_label = QLabel("PLC Status: Unknown", self.top_bar)
+        top_bar_layout.addWidget(self.plc_status_label, 0, Qt.AlignRight)
+
+    def _on_pomiary_click(self):
+        print("[GUI] Kliknięto przycisk 'pomiary'.")
+        self.controller.toggle_page("MainPage")
 
     def _on_nastawy_click(self):
         print("[GUI] Kliknięto przycisk 'nastawy'.")
