@@ -892,7 +892,7 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     print("[App] Inicjalizacja aplikacji PyQt qapplication")
     # Opcjonalnie można ustawić styl, np. "Fusion"
-    app.setStyle("fusion")
+    app.setStyle("windowsvista")
     print("[App] Ustawienie stylu aplikacji na Fusion")
 
     main_window = App()  # App to Twoja klasa dziedzicząca po QMainWindow

@@ -125,32 +125,36 @@ class MainPage(QWidget):
     # 1. Górna belka nawigacji (row=0, col=0..2)
     # ---------------------------------------------------------------------------------
     def _create_top_bar(self):
-        # Utwórz pasek górny jako QWidget z poziomym layoutem
-        self.top_bar = QWidget(self)
-        self.top_bar.setStyleSheet("background-color: lightgrey;")
+        # Use QFrame to create a frame surrounding the top bar
+        self.top_bar = QFrame(self)
+        self.top_bar.setFrameShape(QFrame.Box)
+        self.top_bar.setLineWidth(2)
         top_bar_layout = QHBoxLayout(self.top_bar)
         top_bar_layout.setContentsMargins(5, 5, 5, 5)
         top_bar_layout.setSpacing(5)
         
-        # Przycisk "pomiary" z zielonym tłem
-        self.btn_pomiary = QPushButton("pomiary", self.top_bar)
+        # Pomiary button: fixed size and green background
+        self.btn_pomiary = QPushButton("Pomiary", self.top_bar)
         self.btn_pomiary.setFixedSize(100, 40)
-        self.btn_pomiary.setStyleSheet("background-color: green; color: white;")
+        self.btn_pomiary.setStyleSheet("background-color: green;")
         self.btn_pomiary.clicked.connect(self._on_pomiary_click)
         
-        self.btn_nastawy = QPushButton("nastawy", self.top_bar)
+        # Nastawy button: fixed size
+        self.btn_nastawy = QPushButton("Nastawy", self.top_bar)
         self.btn_nastawy.setFixedSize(100, 40)
         self.btn_nastawy.clicked.connect(lambda: self.controller.toggle_page("SettingsPage"))
         
-        self.btn_historia = QPushButton("historia", self.top_bar)
+        # Historia button: fixed size
+        self.btn_historia = QPushButton("Historia", self.top_bar)
         self.btn_historia.setFixedSize(100, 40)
         self.btn_historia.clicked.connect(self._on_historia_click)
         
+        # Accuscan button: fixed size
         self.btn_accuscan = QPushButton("Accuscan", self.top_bar)
         self.btn_accuscan.setFixedSize(100, 40)
         self.btn_accuscan.clicked.connect(self._on_accuscan_click)
         
-        # Dodaj przyciski po lewej stronie
+        # Add left-side buttons
         top_bar_layout.addWidget(self.btn_pomiary, 0, Qt.AlignLeft)
         top_bar_layout.addWidget(self.btn_nastawy, 0, Qt.AlignLeft)
         top_bar_layout.addWidget(self.btn_historia, 0, Qt.AlignLeft)
@@ -184,10 +188,10 @@ class MainPage(QWidget):
         
         top_bar_layout.addWidget(self.control_frame, 0, Qt.AlignRight)
         
-        # Przycisk Exit z czerwonym tłem, ustawiony po prawej stronie
-        self.btn_exit = QPushButton("Exit", self.top_bar)
+        # Exit button: fixed size and red background
+        self.btn_exit = QPushButton("x", self.top_bar)
         self.btn_exit.setFixedSize(100, 40)
-        self.btn_exit.setStyleSheet("background-color: red; color: white;")
+        self.btn_exit.setStyleSheet("background-color: red;")
         self.btn_exit.clicked.connect(self._on_exit_click)
         top_bar_layout.addWidget(self.btn_exit, 0, Qt.AlignRight)
         
@@ -275,7 +279,7 @@ class MainPage(QWidget):
 
         # Rząd row_start+1: Pole tekstowe dla nazwy receptury
         self.entry_recipe_name = QLineEdit(self.left_panel)
-        self.entry_recipe_name.setPlaceholderText("Recipe X")
+        self.entry_recipe_name.setPlaceholderText("Receptura X")
         left_layout.addWidget(self.entry_recipe_name, row_start+1, 0)
 
         # Rząd row_start+2: Etykieta "Średnica docelowa [mm]:"
@@ -314,7 +318,7 @@ class MainPage(QWidget):
         diameter_layout.addWidget(self.btn_diam_increase_05)
 
         # Rząd row_start+4: Etykieta "Gorna granica (roznica od dAvg) [mm]:"
-        self.label_tolerance_plus = QLabel("Gorna granica (roznica od dAvg) [mm]:", self.left_panel)
+        self.label_tolerance_plus = QLabel("Górna granica tolerancji (różnica od dAvg) [mm]:", self.left_panel)
         left_layout.addWidget(self.label_tolerance_plus, row_start+4, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
 
         # Rząd row_start+5: Ramka plus
@@ -349,7 +353,7 @@ class MainPage(QWidget):
         plus_layout.addWidget(self.btn_tolerance_plus_inc_05)
 
         # Rząd row_start+6: Etykieta "Dolna granica  (roznica od dAvg) [mm]:"
-        self.label_tolerance_minus = QLabel("Dolna granica (roznica od dAvg) [mm]:", self.left_panel)
+        self.label_tolerance_minus = QLabel("Dolna granica tolerancji (różnica od dAvg) [mm]:", self.left_panel)
         left_layout.addWidget(self.label_tolerance_minus, row_start+6, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
 
         # Rząd row_start+7: Ramka minus
@@ -384,7 +388,7 @@ class MainPage(QWidget):
         minus_layout.addWidget(self.btn_tolerance_minus_inc_05)
 
         # Rząd row_start+8: Etykieta "Próg lumps [mm]:"
-        self.label_lump_threshold = QLabel("Próg lumps [mm]:", self.left_panel)
+        self.label_lump_threshold = QLabel("Próg wybrzuszeń [mm]:", self.left_panel)
         left_layout.addWidget(self.label_lump_threshold, row_start+8, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
 
         # Rząd row_start+9: Ramka dla ustawień progu lumps
@@ -419,7 +423,7 @@ class MainPage(QWidget):
         lumps_threshold_layout.addWidget(self.btn_lump_thres_inc_05)
 
         # Rząd row_start+10: Etykieta "Próg necks [mm]:"
-        self.label_neck_threshold = QLabel("Próg necks [mm]:", self.left_panel)
+        self.label_neck_threshold = QLabel("Próg zagłębienia [mm]:", self.left_panel)
         left_layout.addWidget(self.label_neck_threshold, row_start+10, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
 
         # Rząd row_start+11: Ramka dla ustawień progu necks
@@ -454,7 +458,7 @@ class MainPage(QWidget):
         necks_threshold_layout.addWidget(self.btn_neck_thres_inc_05)
 
         # Rząd row_start+12: Etykieta "Flaw window [m]:"
-        self.label_flaw_window = QLabel("Flaw window [m]:", self.left_panel)
+        self.label_flaw_window = QLabel("Długośc okna defektów [m]:", self.left_panel)
         left_layout.addWidget(self.label_flaw_window, row_start+12, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
 
         # Rząd row_start+13: Pole tekstowe dla flaw window
@@ -464,7 +468,7 @@ class MainPage(QWidget):
         left_layout.addWidget(self.entry_flaw_window, row_start+13, 0)
 
         # Rząd row_start+14: Etykieta "Max lumps in flaw window:"
-        self.label_max_lumps = QLabel("Max lumps in flaw window:", self.left_panel)
+        self.label_max_lumps = QLabel("Maksymalna liczba wybrzuszeń w oknie defektów:", self.left_panel)
         left_layout.addWidget(self.label_max_lumps, row_start+14, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
 
         # Rząd row_start+15: Ramka dla max lumps
@@ -489,7 +493,7 @@ class MainPage(QWidget):
         max_lumps_layout.addWidget(self.btn_max_lumps_inc)
 
         # Rząd row_start+16: Etykieta "Max necks in flaw window:"
-        self.label_max_necks = QLabel("Max necks in flaw window:", self.left_panel)
+        self.label_max_necks = QLabel("Maksymalna liczba zagłębień w oknie defektów:", self.left_panel)
         left_layout.addWidget(self.label_max_necks, row_start+16, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
 
         # Rząd row_start+17: Ramka dla max necks
@@ -779,17 +783,17 @@ class MainPage(QWidget):
         middle_layout.addWidget(self.readings_frame, 0, 0, 1, 1, Qt.AlignTop)
 
         # Dodaj etykiety odczytów (wszystkie ułożone pionowo)
-        self.label_d1 = QLabel("D1 [mm]: --", self.readings_frame)
-        self.label_d2 = QLabel("D2 [mm]: --", self.readings_frame)
-        self.label_d3 = QLabel("D3 [mm]: --", self.readings_frame)
-        self.label_d4 = QLabel("D4 [mm]: --", self.readings_frame)
-        self.label_davg = QLabel("dAVG [mm]: --", self.readings_frame)
-        self.label_dmin = QLabel("Dmin [mm]: --", self.readings_frame)
-        self.label_dmax = QLabel("Dmax [mm]: --", self.readings_frame)
+        self.label_d1 = QLabel("d1 [mm]: --", self.readings_frame)
+        self.label_d2 = QLabel("d2 [mm]: --", self.readings_frame)
+        self.label_d3 = QLabel("d3 [mm]: --", self.readings_frame)
+        self.label_d4 = QLabel("d4 [mm]: --", self.readings_frame)
+        self.label_davg = QLabel("dAvg [mm]: --", self.readings_frame)
+        self.label_dmin = QLabel("dMin [mm]: --", self.readings_frame)
+        self.label_dmax = QLabel("dMax [mm]: --", self.readings_frame)
         self.label_dsd = QLabel("dSD [mm]: --", self.readings_frame)
         self.label_dov = QLabel("dOV [%]: --", self.readings_frame)
         self.label_xcoord = QLabel("xCoord [m]: --", self.readings_frame)
-        self.label_speed = QLabel("Speed [m/min]: --", self.readings_frame)
+        self.label_speed = QLabel("Prędkośc linii [m/min]: --", self.readings_frame)
         
         for lbl in [self.label_d1, self.label_d2, self.label_d3, self.label_d4,
                     self.label_davg, self.label_dmin, self.label_dmax, self.label_dsd,
@@ -797,19 +801,18 @@ class MainPage(QWidget):
             readings_layout.addWidget(lbl)
 
         # Wskaźniki: Lump, Neck, Diameter i ich liczniki
-        self.label_lump_indicator = QLabel("Lump: Off", self.readings_frame)
+        self.label_lump_indicator = QLabel("Wybrzuszenie: Off", self.readings_frame)
         readings_layout.addWidget(self.label_lump_indicator)
-        self.lumps_count_label = QLabel("Count: 0", self.readings_frame)
+        self.lumps_count_label = QLabel("Liczba wybrzuszeń: 0", self.readings_frame)
         readings_layout.addWidget(self.lumps_count_label)
 
-        self.label_neck_indicator = QLabel("Neck: Off", self.readings_frame)
+        self.label_neck_indicator = QLabel("Zagłębienie: Off", self.readings_frame)
         readings_layout.addWidget(self.label_neck_indicator)
-        self.necks_count_label = QLabel("Count: 0", self.readings_frame)
-        readings_layout.addWidget(self.necks_count_label)
+        self.necks_count_label = QLabel("Liczba zagłębień: 0", self.readings_frame)
 
-        self.label_diameter_indicator = QLabel("Diameter: OK", self.readings_frame)
+        self.label_diameter_indicator = QLabel("Średnica: OK", self.readings_frame)
         readings_layout.addWidget(self.label_diameter_indicator)
-        self.diameter_deviation_label = QLabel("Dev: 0.00 mm", self.readings_frame)
+        self.diameter_deviation_label = QLabel("Odchylenie: 0.00 mm", self.readings_frame)
         readings_layout.addWidget(self.diameter_deviation_label)
 
         # --------------------------
@@ -821,7 +824,7 @@ class MainPage(QWidget):
         readings_layout.addWidget(self.speed_control_frame)
 
         # Etykieta prędkości produkcji
-        self.prod_speed_label = QLabel("Production Speed [m/min]:", self.speed_control_frame)
+        self.prod_speed_label = QLabel("Prędkośc linii produkcyjnej [m/min]:", self.speed_control_frame)
         speed_control_layout.addWidget(self.prod_speed_label)
 
         # Ramka dla slidera prędkości
@@ -845,7 +848,7 @@ class MainPage(QWidget):
         fluct_frame.setLayout(fluct_layout)
         speed_control_layout.addWidget(fluct_frame)
 
-        self.fluct_label = QLabel("Speed Fluctuation (%):", fluct_frame)
+        self.fluct_label = QLabel("Wahania prędkości linii (%):", fluct_frame)
         fluct_layout.addWidget(self.fluct_label)
 
         self.speed_fluct_entry = QLineEdit(fluct_frame)
@@ -890,10 +893,10 @@ class MainPage(QWidget):
         self.plot_frame.setLayout(plot_frame_layout)
         right_layout.addWidget(self.plot_frame, 1, 0)
         
-        self.status_plot = pg.PlotWidget(title="Lumps/Necks vs X-Coord", parent=self.plot_frame)
-        self.status_plot.setLabel('left', "Status")
-        self.status_plot.setLabel('bottom', "X-Coord")
-        self.status_plot.setYRange(0, 2.1)
+        self.status_plot = pg.PlotWidget(title="Defekty w dystansie", parent=self.plot_frame)
+        self.status_plot.setLabel('left', "Liczba defektów")
+        self.status_plot.setLabel('bottom', "Dystans [m]")
+        # self.status_plot.setYRange(0, 2.1)
         self.status_plot.showGrid(x=False, y=False)
         plot_frame_layout.addWidget(self.status_plot)
 
@@ -905,9 +908,9 @@ class MainPage(QWidget):
         self.diameter_frame.setLayout(diameter_frame_layout)
         right_layout.addWidget(self.diameter_frame, 2, 0)
         
-        self.diameter_plot = pg.PlotWidget(title="Average Diameter History", parent=self.diameter_frame)
-        self.diameter_plot.setLabel('left', "Diameter [mm]")
-        self.diameter_plot.setLabel('bottom', "Sample")
+        self.diameter_plot = pg.PlotWidget(title="Średnica uśredniona w dystansie", parent=self.diameter_frame)
+        self.diameter_plot.setLabel('left', "Średnica [mm]")
+        self.diameter_plot.setLabel('bottom', "Dystans [m]")
         self.diameter_plot.showGrid(x=True, y=True)
         diameter_frame_layout.addWidget(self.diameter_plot)
         
@@ -919,9 +922,9 @@ class MainPage(QWidget):
         self.fft_frame.setLayout(fft_frame_layout)
         right_layout.addWidget(self.fft_frame, 3, 0)
         
-        self.fft_plot = pg.PlotWidget(title="FFT Analysis", parent=self.fft_frame)
-        self.fft_plot.setLabel('left', "Magnitude")
-        self.fft_plot.setLabel('bottom', "Frequency")
+        self.fft_plot = pg.PlotWidget(title="Analiza FFT", parent=self.fft_frame)
+        self.fft_plot.setLabel('left', "Amplituda")
+        self.fft_plot.setLabel('bottom', "Częstotliwośc [Hz]")
         self.fft_plot.showGrid(x=True, y=True)
         fft_frame_layout.addWidget(self.fft_plot)
 
@@ -1107,7 +1110,7 @@ class MainPage(QWidget):
         self.label_d2.setText(f"D2 [mm]: {d2:.2f}")
         self.label_d3.setText(f"D3 [mm]: {d3:.2f}")
         self.label_d4.setText(f"D4 [mm]: {d4:.2f}")
-        self.label_davg.setText(f"dAVG [mm]: {davg:.2f}")
+        self.label_davg.setText(f"dAvg [mm]: {davg:.2f}")
         self.label_dmin.setText(f"Dmin [mm]: {dmin:.2f}")
         self.label_dmax.setText(f"Dmax [mm]: {dmax:.2f}")
         self.label_dsd.setText(f"dSD [mm]: {dsd:.3f}")
@@ -1135,7 +1138,7 @@ class MainPage(QWidget):
         self.current_x = window_data['current_x']
         
         # Update xCoord and speed labels
-        self.label_xcoord.setText(f"xCoord [m]: {self.current_x:.1f}")
+        self.label_xcoord.setText(f"Dystans [m]: {self.current_x:.1f}")
         
         # Display production speed (potentially with fluctuation)
         try:
@@ -1144,11 +1147,11 @@ class MainPage(QWidget):
                 import random
                 fluctuation_factor = 1.0 + random.uniform(-fluctuation_percent/100, fluctuation_percent/100)
                 current_speed = self.production_speed * fluctuation_factor
-                self.label_speed.setText(f"Speed [m/min]: {current_speed:.1f} (±{fluctuation_percent}%)")
+                self.label_speed.setText(f"Prędkośc linii [m/min]: {current_speed:.1f} (±{fluctuation_percent}%)")
             else:
-                self.label_speed.setText(f"Speed [m/min]: {self.production_speed:.1f}")
+                self.label_speed.setText(f"Prędkośc linii [m/min]: {self.production_speed:.1f}")
         except ValueError:
-            self.label_speed.setText(f"Speed [m/min]: {self.production_speed:.1f}")
+            self.label_speed.setText(f"Prędkośc linii [m/min]: {self.production_speed:.1f}")
 
         # Process flaw detection - this is fast
         # Update flaw window size from UI
@@ -1164,16 +1167,16 @@ class MainPage(QWidget):
         lumps = data.get("lumps", 0)
         necks = data.get("necks", 0)
         if lumps:
-            self.label_lump_indicator.setText("Lump ON")
+            self.label_lump_indicator.setText("Wybrzuszenie ON")
             self.label_lump_indicator.setStyleSheet("color: red;")
         else:
-            self.label_lump_indicator.setText("Lump OFF")
+            self.label_lump_indicator.setText("Wybrzuszenie OFF")
             self.label_lump_indicator.setStyleSheet("color: green;")
         if necks:
-            self.label_neck_indicator.setText("Neck ON")
+            self.label_neck_indicator.setText("Zagłębienie ON")
             self.label_neck_indicator.setStyleSheet("color: red;")
         else:
-            self.label_neck_indicator.setText("Neck OFF")
+            self.label_neck_indicator.setText("Zagłębienie OFF")
             self.label_neck_indicator.setStyleSheet("color: green;")
         
         label_update_time = time.perf_counter() - label_update_start
