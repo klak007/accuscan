@@ -57,7 +57,7 @@ class App(QMainWindow):
         # Ustawienia okna
         self.setWindowTitle("AccuScan GUI")
         self.setGeometry(0, 0, 1920, 700)
-        print("[App] Tytuł i geometria ustawione.")
+        
         
         # -----------------------------------
         # Flagi i parametry sterujące
@@ -68,7 +68,7 @@ class App(QMainWindow):
         self.log_counter = 0
         self.log_frequency = 10
         self.last_log_time = time.time()
-        print("[App] Parametry sterujące zainicjowane.")
+        
         
         # -----------------------------------
         # Kolejki, wątki/procesy
@@ -77,14 +77,14 @@ class App(QMainWindow):
         self.acquisition_thread = None
         self.db_queue = queue.Queue(maxsize=100)
         self.plc_write_queue = queue.Queue(maxsize=20)
-        print("[App] Kolejki utworzone.")
+        
         
         # Start PLC writer thread
         self.start_plc_writer()
         
         # Używamy mp.Queue dla między-procesowego przesyłu danych
         self.data_queue = mp.Queue(maxsize=250)
-        print("[App] Kolejka danych międzyprocesowych utworzona.")
+        
         
         # -----------------------------------
         # Parametry bazy danych
@@ -95,7 +95,7 @@ class App(QMainWindow):
         # Bufor akwizycji
         # -----------------------------------
         self.acquisition_buffer = FastAcquisitionBuffer(max_samples=1024)
-        print("[App] Bufor akwizycji utworzony.")
+        
         
         # -----------------------------------
         # Kontener na strony (MainPage, SettingsPage)
@@ -103,17 +103,17 @@ class App(QMainWindow):
         central_widget = QWidget(self)
         self.setCentralWidget(central_widget)
         self.layout = QVBoxLayout(central_widget)
-        print("[App] Centralny widget i layout utworzone.")
+        
         
         # Inicjalizacja stron
         self.main_page = MainPage(parent=central_widget, controller=self)
         self.settings_page = SettingsPage(parent=central_widget, controller=self)
-        print("[App] Strony MainPage i SettingsPage zainicjowane.")
+        
         
         # Na razie dodajemy tylko main_page do layoutu
         self.layout.addWidget(self.main_page)
         self.settings_page.hide()
-        print("[App] MainPage dodana, SettingsPage ukryta.")
+        
         
         # -----------------------------------
         # Obsługa zamknięcia okna
@@ -122,10 +122,10 @@ class App(QMainWindow):
         
         # Start workerów
         self.start_db_worker()
-        print("[App] Worker bazy danych uruchomiony.")
+        
         
         self.start_acquisition_process()
-        print("[App] Proces akwizycji uruchomiony.")
+        
         
         self.update_timer = QTimer(self)
         print("[App] Timer aktualizacji utworzony.", flush=True)
@@ -134,23 +134,23 @@ class App(QMainWindow):
         self.update_timer.start(1000)  # check every 1 second
 
         self.start_update_loop()
-        print("[App] Pętla aktualizacyjna (UI loop) uruchomiona.")
+        
         
         self.last_plc_retry = 0
-        print("[App] Inicjalizacja zakończona.")
+        
         self._closing = False   # <-- new flag to prevent recursion
 
     def update_plc_status(self):
         # Debug print to show the current flag value
-        print(f"[PLC CONNECT FLAG] update_plc_status: plc_connected_flag = {self.plc_connected_flag.value}")
+        # print(f"[PLC CONNECT FLAG] update_plc_status: plc_connected_flag = {self.plc_connected_flag.value}")
         if self.plc_connected_flag.value == 1:
-            self.main_page.plc_status_label.setText("PLC Status: CONNECTED")
+            self.main_page.plc_status_label.setText("Połączono z PLC")
             self.main_page.plc_status_label.setStyleSheet("color: green;")
-            print("[PLC CONNECT FLAG] PLC is connected according to flag")
+            # print("[PLC CONNECT FLAG] PLC is connected according to flag")
         else:
-            self.main_page.plc_status_label.setText("PLC Status: DISCONNECTED")
+            self.main_page.plc_status_label.setText("Rozłączono z PLC")
             self.main_page.plc_status_label.setStyleSheet("color: red;")
-            print("[PLC CONNECT FLAG] PLC is disconnected according to flag")
+            # print("[PLC CONNECT FLAG] PLC is disconnected according to flag")
 
     def closeEvent(self, event):
         """
@@ -162,7 +162,7 @@ class App(QMainWindow):
     
     def init_database_connection(self):
         try:
-            print("[App] Inicjalizacja połączenia z bazą...")
+            # print("[App] Inicjalizacja połączenia z bazą...")
             if OFFLINE_MODE:
                 self.db_connected = True
                 print("[App] Offline mode: Skipped DB initialization.")
@@ -174,13 +174,13 @@ class App(QMainWindow):
             else:
                 self.db_connected = False
                 print("[App] Brak połączenia z bazą. Aplikacja działa w trybie ograniczonym.")
-                QMessageBox.warning(self, "Brak połączenia z bazą",
-                                    "Nie można nawiązać połączenia z bazą danych. Aplikacja będzie działać w trybie ograniczonym.")
+                # QMessageBox.warning(self, "Brak połączenia z bazą",
+                                    # "Nie można nawiązać połączenia z bazą danych. Aplikacja będzie działać w trybie ograniczonym.")
         except Exception as e:
             self.db_connected = False
             print("[App] Błąd przy inicjalizacji połączenia z bazą:", e)
-            QMessageBox.warning(self, "Błąd połączenia",
-                                f"Wystąpił błąd przy łączeniu z bazą danych: {str(e)}\nAplikacja będzie działać w trybie ograniczonym.")
+            # QMessageBox.warning(self, "Błąd połączenia",
+            #                     f"Wystąpił błąd przy łączeniu z bazą danych: {str(e)}\nAplikacja będzie działać w trybie ograniczonym.")
 
 
     def toggle_page(self, page_name):
@@ -892,13 +892,13 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     print("[App] Inicjalizacja aplikacji PyQt qapplication")
     # Opcjonalnie można ustawić styl, np. "Fusion"
-    app.setStyle("windowsvista")
-    print("[App] Ustawienie stylu aplikacji na Fusion")
+    app.setStyle("fusion")
+    # print("[App] Ustawienie stylu aplikacji na Fusion")
 
     main_window = App()  # App to Twoja klasa dziedzicząca po QMainWindow
-    print("DEBUG: Created main_window, about to show()")
+    # print("DEBUG: Created main_window, about to show()")
     main_window.show()
-    print("[App] Wyświetlenie głównego okna aplikacji")
+    # print("[App] Wyświetlenie głównego okna aplikacji")
 
     sys.exit(app.exec_())
     print("[App] Aplikacja zakończona")

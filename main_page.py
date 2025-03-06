@@ -129,6 +129,8 @@ class MainPage(QWidget):
         self.top_bar = QFrame(self)
         self.top_bar.setFrameShape(QFrame.Box)
         self.top_bar.setLineWidth(2)
+        self.top_bar.setFrameShadow(QFrame.Raised)  # Gives a raised (or Sunken) look
+        self.top_bar.setStyleSheet("fusion")
         top_bar_layout = QHBoxLayout(self.top_bar)
         top_bar_layout.setContentsMargins(5, 5, 5, 5)
         top_bar_layout.setSpacing(5)
@@ -136,7 +138,7 @@ class MainPage(QWidget):
         # Pomiary button: fixed size and green background
         self.btn_pomiary = QPushButton("Pomiary", self.top_bar)
         self.btn_pomiary.setFixedSize(100, 40)
-        self.btn_pomiary.setStyleSheet("background-color: green;")
+        # self.btn_pomiary.setStyleSheet("background-color: rgb(67, 160, 71);")
         self.btn_pomiary.clicked.connect(self._on_pomiary_click)
         
         # Nastawy button: fixed size
@@ -189,7 +191,7 @@ class MainPage(QWidget):
         top_bar_layout.addWidget(self.control_frame, 0, Qt.AlignRight)
         
         # Exit button: fixed size and red background
-        self.btn_exit = QPushButton("x", self.top_bar)
+        self.btn_exit = QPushButton("Zamknij", self.top_bar)
         self.btn_exit.setFixedSize(100, 40)
         self.btn_exit.setStyleSheet("background-color: red;")
         self.btn_exit.clicked.connect(self._on_exit_click)
@@ -765,12 +767,17 @@ class MainPage(QWidget):
     def _create_middle_panel(self):
         # Utwórz panel środkowy o minimalnej szerokości 1200
         self.middle_panel = QFrame(self)
-        self.middle_panel.setFrameShape(QFrame.Box)         # Sets a box around the frame
-        self.middle_panel.setFrameShadow(QFrame.Raised)       # Gives a raised (or Sunken) look
+        self.middle_panel.setFrameShape(QFrame.Box)
+        self.middle_panel.setFrameShadow(QFrame.Raised)
         self.middle_panel.setLineWidth(2) 
-        self.middle_panel.setMinimumWidth(400)
+        # Increase available width to accommodate labels
+        # self.middle_panel.setMinimumWidth(1200)
+        # Remove fixed maximum width to allow expansion
         self.middle_panel.setMaximumWidth(400)
         middle_layout = QGridLayout(self.middle_panel)
+        # Optionally adjust margins and spacing
+        middle_layout.setContentsMargins(10, 10, 10, 10)
+        middle_layout.setSpacing(10)
         self.middle_panel.setLayout(middle_layout)
         middle_layout.setColumnStretch(0, 1)  # Jedna kolumna, rozciągnięta
 
@@ -800,6 +807,9 @@ class MainPage(QWidget):
                     self.label_dov, self.label_xcoord, self.label_speed]:
             readings_layout.addWidget(lbl)
 
+        # Add a fixed vertical spacer so subsequent indicators do not overlap the top labels
+        readings_layout.addItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Fixed))
+
         # Wskaźniki: Lump, Neck, Diameter i ich liczniki
         self.label_lump_indicator = QLabel("Wybrzuszenie: Off", self.readings_frame)
         readings_layout.addWidget(self.label_lump_indicator)
@@ -809,6 +819,7 @@ class MainPage(QWidget):
         self.label_neck_indicator = QLabel("Zagłębienie: Off", self.readings_frame)
         readings_layout.addWidget(self.label_neck_indicator)
         self.necks_count_label = QLabel("Liczba zagłębień: 0", self.readings_frame)
+        readings_layout.addWidget(self.necks_count_label)
 
         self.label_diameter_indicator = QLabel("Średnica: OK", self.readings_frame)
         readings_layout.addWidget(self.label_diameter_indicator)
@@ -893,7 +904,7 @@ class MainPage(QWidget):
         self.plot_frame.setLayout(plot_frame_layout)
         right_layout.addWidget(self.plot_frame, 1, 0)
         
-        self.status_plot = pg.PlotWidget(title="Defekty w dystansie", parent=self.plot_frame)
+        self.status_plot = pg.PlotWidget(title="Defekty na dystansie", parent=self.plot_frame)
         self.status_plot.setLabel('left', "Liczba defektów")
         self.status_plot.setLabel('bottom', "Dystans [m]")
         # self.status_plot.setYRange(0, 2.1)
@@ -908,10 +919,10 @@ class MainPage(QWidget):
         self.diameter_frame.setLayout(diameter_frame_layout)
         right_layout.addWidget(self.diameter_frame, 2, 0)
         
-        self.diameter_plot = pg.PlotWidget(title="Średnica uśredniona w dystansie", parent=self.diameter_frame)
+        self.diameter_plot = pg.PlotWidget(title="Średnica uśredniona na dystansie", parent=self.diameter_frame)
         self.diameter_plot.setLabel('left', "Średnica [mm]")
         self.diameter_plot.setLabel('bottom', "Dystans [m]")
-        self.diameter_plot.showGrid(x=True, y=True)
+        self.diameter_plot.showGrid(x=False, y=False)
         diameter_frame_layout.addWidget(self.diameter_plot)
         
         # ---------------------------
@@ -925,7 +936,7 @@ class MainPage(QWidget):
         self.fft_plot = pg.PlotWidget(title="Analiza FFT", parent=self.fft_frame)
         self.fft_plot.setLabel('left', "Amplituda")
         self.fft_plot.setLabel('bottom', "Częstotliwośc [Hz]")
-        self.fft_plot.showGrid(x=True, y=True)
+        self.fft_plot.showGrid(x=False, y=False)
         fft_frame_layout.addWidget(self.fft_plot)
 
         self.plot_manager.plot_widgets['status'] = self.status_plot

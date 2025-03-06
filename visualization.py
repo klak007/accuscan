@@ -32,7 +32,7 @@ class PlotManager:
         # Store plot widget references (instead of matplotlib figures/axes)
         self.plot_widgets = {}
         self.plot_widgets['status'] = pg.PlotWidget()
-        self.plot_widgets['status'].setTitle("Status Plot")
+        self.plot_widgets['status'].setTitle("Defekty na dystansie")
         self.plot_widgets['diameter'] = pg.PlotWidget()
         self.plot_widgets['fft'] = pg.PlotWidget()
         self.min_update_interval = min_update_interval
@@ -120,10 +120,10 @@ class PlotManager:
         if plot_widget is not None:
             plot_widget.clear()
         
-            sample_time_ms = plc_sample_time * 1000  # konwersja do ms
-            plot_widget.setTitle(f"Last {len(x_history)} samples - Batch: {batch_name} - PLC: {sample_time_ms:.1f}ms")
-            plot_widget.setLabel('bottom', "X-Coord [m]")
-            plot_widget.setLabel('left', "Błędy w cyklu")
+            # sample_time_ms = plc_sample_time * 1000  # konwersja do ms
+            plot_widget.setTitle(f"Defekty na dystansie - ostatnie {len(x_history)} próbek - Batch: {batch_name}")
+            plot_widget.setLabel('bottom', "Dystans [m]")
+            plot_widget.setLabel('left', "Defekty w cyklu")
             
             if x_history:
                 x_min = x_history[0]
@@ -162,7 +162,7 @@ class PlotManager:
         
         if diameter_history:
             # Rysujemy linię – używamy domyślnego pen'a zielonego
-            plot_widget.plot(diameter_x, diameter_history, pen='g', name='Actual')
+            plot_widget.plot(diameter_x, diameter_history, pen='b', name='Actual')
             
             # Dodajemy poziomą linię docelową, jeśli zadana jest wartość średnicy docelowej
             if diameter_preset > 0:
@@ -188,9 +188,9 @@ class PlotManager:
                 sample_count = len(diameter_history)
                 sample_time_ms = plc_sample_time * 1000
                 meters_covered = x_max - x_min
-                plot_widget.setTitle(f"Avg Diameter - {sample_count} samples, {meters_covered:.1f}m - PLC: {sample_time_ms:.1f}ms")
+                plot_widget.setTitle(f"Uśredniona średnica na dystansie - {sample_count} samples, {meters_covered:.1f}m")
             
-            plot_widget.showGrid(x=True, y=True)   
+            
     def update_fft_plot(self, diameter_history, fft_buffer_size=64):
         """
         Aktualizuje wykres analizy FFT średnicy przy użyciu PyQtGraph.
@@ -217,7 +217,7 @@ class PlotManager:
                 plot_widget.plot(np.abs(diameter_fft), pen='g', name="FFT")
                 plot_widget.setLabel('bottom', "Frequency")
                 plot_widget.setLabel('left', "Magnitude")
-                plot_widget.showGrid(x=True, y=True)
+
     
 
     def check_plot_process(self):
@@ -295,9 +295,9 @@ class PlotManager:
     def initialize_plots(self):
         # Configure each plot widget
         if self.plot_widgets['status']:
-            self.plot_widgets['status'].setTitle("Status Plot")
+            self.plot_widgets['status'].setTitle("Liczba defektów na dystansie")
         if self.plot_widgets['diameter']:
-            self.plot_widgets['diameter'].setTitle("Diameter Plot")
+            self.plot_widgets['diameter'].setTitle("Uśredniona średnica na dystansie")
         if self.plot_widgets['fft']:
             self.plot_widgets['fft'].setTitle("FFT Plot")
 
