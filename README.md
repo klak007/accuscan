@@ -1,4 +1,4 @@
-```markdown
+
 # Struktura aplikacji
 
 ## 1. app.py
@@ -132,5 +132,4 @@ Struktura aplikacji pozwala na akwizycję i wizualizację danych z AccuScan (PLC
 - `plc_helper.py` – obsługa PLC (snap7).
 - `visualization.py`, `window_fft_analysis.py` – generowanie wykresów i analiza FFT.
 
-Modułowa budowa ułatwia rozwój i konserwację aplikacji.
-```
+Modułowa budowa ułatwia rozwój i konserwację aplikacji
