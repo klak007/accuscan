@@ -28,6 +28,7 @@ class PlotManager:
                 {'status': status_plot_widget, 'diameter': diameter_plot_widget, 'fft': fft_plot_widget}
             min_update_interval: Minimum time between plot updates in seconds.
         """
+        pg.setConfigOptions(background='w', foreground='k')
         # Store plot widget references (instead of matplotlib figures/axes)
         self.plot_widgets = {}
         self.plot_widgets['status'] = pg.PlotWidget()

@@ -127,22 +127,27 @@ class MainPage(QWidget):
     def _create_top_bar(self):
         # Utwórz pasek górny jako QWidget z poziomym layoutem
         self.top_bar = QWidget(self)
+        self.top_bar.setStyleSheet("background-color: lightgrey;")
         top_bar_layout = QHBoxLayout(self.top_bar)
-        top_bar_layout.setContentsMargins(5, 5, 5, 0)
+        top_bar_layout.setContentsMargins(5, 5, 5, 5)
         top_bar_layout.setSpacing(5)
         
         # Przycisk "pomiary" z zielonym tłem
         self.btn_pomiary = QPushButton("pomiary", self.top_bar)
+        self.btn_pomiary.setFixedSize(100, 40)
         self.btn_pomiary.setStyleSheet("background-color: green; color: white;")
         self.btn_pomiary.clicked.connect(self._on_pomiary_click)
         
         self.btn_nastawy = QPushButton("nastawy", self.top_bar)
+        self.btn_nastawy.setFixedSize(100, 40)
         self.btn_nastawy.clicked.connect(lambda: self.controller.toggle_page("SettingsPage"))
         
         self.btn_historia = QPushButton("historia", self.top_bar)
+        self.btn_historia.setFixedSize(100, 40)
         self.btn_historia.clicked.connect(self._on_historia_click)
         
         self.btn_accuscan = QPushButton("Accuscan", self.top_bar)
+        self.btn_accuscan.setFixedSize(100, 40)
         self.btn_accuscan.clicked.connect(self._on_accuscan_click)
         
         # Dodaj przyciski po lewej stronie
@@ -162,12 +167,15 @@ class MainPage(QWidget):
         control_layout.setSpacing(2)
         
         self.btn_start = QPushButton("Start", self.control_frame)
+        self.btn_start.setFixedSize(100, 40)
         self.btn_start.clicked.connect(self._on_start)
         
         self.btn_stop = QPushButton("Stop", self.control_frame)
+        self.btn_stop.setFixedSize(100, 40)
         self.btn_stop.clicked.connect(self._on_stop)
         
         self.btn_ack = QPushButton("Kwituj", self.control_frame)
+        self.btn_ack.setFixedSize(100,40)
         self.btn_ack.clicked.connect(self._on_ack)
         
         control_layout.addWidget(self.btn_start)
@@ -178,6 +186,7 @@ class MainPage(QWidget):
         
         # Przycisk Exit z czerwonym tłem, ustawiony po prawej stronie
         self.btn_exit = QPushButton("Exit", self.top_bar)
+        self.btn_exit.setFixedSize(100, 40)
         self.btn_exit.setStyleSheet("background-color: red; color: white;")
         self.btn_exit.clicked.connect(self._on_exit_click)
         top_bar_layout.addWidget(self.btn_exit, 0, Qt.AlignRight)
@@ -214,6 +223,10 @@ class MainPage(QWidget):
     def _create_left_panel(self):
         # Utwórz lewy panel jako QFrame o stałej szerokości 400
         self.left_panel = QFrame(self)
+        self.left_panel.setFrameShape(QFrame.Box)         # Sets a box around the frame
+        self.left_panel.setFrameShadow(QFrame.Raised)       # Gives a raised (or Sunken) look
+        self.left_panel.setLineWidth(2)         
+
         self.left_panel.setMinimumWidth(400)
         self.left_panel.setMaximumWidth(400)
         left_layout = QGridLayout(self.left_panel)
@@ -748,6 +761,9 @@ class MainPage(QWidget):
     def _create_middle_panel(self):
         # Utwórz panel środkowy o minimalnej szerokości 1200
         self.middle_panel = QFrame(self)
+        self.middle_panel.setFrameShape(QFrame.Box)         # Sets a box around the frame
+        self.middle_panel.setFrameShadow(QFrame.Raised)       # Gives a raised (or Sunken) look
+        self.middle_panel.setLineWidth(2) 
         self.middle_panel.setMinimumWidth(400)
         self.middle_panel.setMaximumWidth(400)
         middle_layout = QGridLayout(self.middle_panel)
@@ -847,6 +863,9 @@ class MainPage(QWidget):
     def _create_right_panel(self):
         # Utwórz prawy panel jako QFrame i ustaw layout grid
         self.right_panel = QFrame(self)
+        self.right_panel.setFrameShape(QFrame.Box)         # Sets a box around the frame
+        self.right_panel.setFrameShadow(QFrame.Raised)       # Gives a raised (or Sunken) look
+        self.right_panel.setLineWidth(2) 
         self.right_panel.setMinimumWidth(400)
         self.right_panel.setMaximumWidth(800)
         right_layout = QGridLayout(self.right_panel)
