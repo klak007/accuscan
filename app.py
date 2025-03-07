@@ -10,6 +10,7 @@ import multiprocessing as mp
 from multiprocessing import Process, Value, Event, Queue
 # Import modułów
 from plc_helper import read_accuscan_data, connect_plc
+from plc_helper import read_accuscan_data, connect_plc, write_accuscan_out_settings
 from db_helper import init_database, save_measurement_sample, check_database
 from data_processing import FastAcquisitionBuffer
 from flaw_detection import FlawDetector
@@ -302,7 +303,7 @@ class App(QMainWindow):
                         batch_size = 1
                     except queue.Empty:
                         # No data to process, sleep and continue
-                        time.sleep(0.01)
+                        # time.sleep(0.01)
                         continue
                 else:
                     # Get the first item in the batch
@@ -415,11 +416,6 @@ class App(QMainWindow):
             plc_rack: Rack number of the PLC
             plc_slot: Slot number of the PLC
         """
-        # Import needed modules within the process
-        import time
-        from datetime import datetime
-        from plc_helper import read_accuscan_data, connect_plc, write_accuscan_out_settings
-        import queue
         
         print(f"[ACQ Process] Starting acquisition process worker")
         
@@ -440,9 +436,6 @@ class App(QMainWindow):
                     # Set all reset bits
                     zl=True, zn=True, zf=True, zt=False
                 )
-                
-                # Short sleep to let reset complete
-                # time.sleep(0.05)
                 
                 # Clear the reset bits
                 write_accuscan_out_settings(
@@ -550,7 +543,7 @@ class App(QMainWindow):
                         write_accuscan_out_settings(
                             plc_client, db_number=2,
                             # Set all reset bits
-                            zf=True, zt=False#, zl=True, zn=True, 
+                            zf=True, zt=True#, zl=True, zn=True, 
                         )
                         
                         # Immediately clear bits in a second write
@@ -566,12 +559,12 @@ class App(QMainWindow):
                         reset_count += 1
                         
                         # Track high frequency of resets
-                        if now - last_reset_time < 0.05:  # Resets happening very close together
-                            print(f"[ACQ Process] WARNING: Rapid resets detected! This may impact performance.")
+                        # if now - last_reset_time < 0.05:  # Resets happening very close together
+                        #     print(f"[ACQ Process] WARNING: Rapid resets detected! This may impact performance.")
                             
-                            # If we see this is becoming a problem, slow down the acquisition cycle slightly
-                            # to give PLC more time to process
-                            time.sleep(0.01)  # Add a tiny delay to give PLC breathing room
+                        #     # If we see this is becoming a problem, slow down the acquisition cycle slightly
+                        #     # to give PLC more time to process
+                        #     time.sleep(0.01)  # Add a tiny delay to give PLC breathing room
                         
                         last_reset_time = now
                         
@@ -593,50 +586,18 @@ class App(QMainWindow):
                 
                 # Send the data to the main process via the queue with adaptive throttling
                 try:
-                    # Check queue size and implement dynamic throttling
-                    current_size = data_queue.qsize()
-                    if current_size > 0 and cycle_count % 20 == 0:
-                        print(f"[ACQ Process] Queue size: {current_size}")
-                    
-                    # Define throttling thresholds
-                    LOW_THRESHOLD = 20      # Normal operation
-                    WARNING_THRESHOLD = 50  # Begin throttling
-                    HIGH_THRESHOLD = 200    # Aggressive throttling
-                    CRITICAL_THRESHOLD = 500 # Drop samples
-                    
-                    if current_size < LOW_THRESHOLD:
-                        data_queue.put(data, block=False)
-                    elif current_size < HIGH_THRESHOLD:
-                        data_queue.put(data, block=False)
-                        if cycle_count % 5 == 0 and current_size > 0:
-                            print(f"[ACQ Process] WARNING: Queue growing - size: {current_size}")
-                        delay_factor = (current_size - LOW_THRESHOLD) / (HIGH_THRESHOLD - LOW_THRESHOLD)
-                        throttle_delay = 0.005 * delay_factor  # max ~5ms delay
-                        time.sleep(throttle_delay)
-                    elif current_size < CRITICAL_THRESHOLD:
-                        if data.get("lumps", 0) > 0 or data.get("necks", 0) > 0 or cycle_count % 3 == 0:
-                            data_queue.put(data, block=False)
-                        if cycle_count % 2 == 0 and current_size > 0:
-                            print(f"[ACQ Process] HIGH LOAD: Queue size {current_size} - throttling and selective sampling")
-                        # time.sleep(0.010)  # 10ms delay
-                    else:
-                        if data.get("lumps", 0) > 0 or data.get("necks", 0) > 0:
-                            data_queue.put(data, block=False)
-                        print(f"[ACQ Process] CRITICAL: Queue size at {current_size} - dropping samples, adding delay")
-                        # time.sleep(0.050)  # 50ms delay
+                    data_queue.put(data, block=False)
                 except queue.Full:
                     print("[ACQ Process] Data queue is full. Could not enqueue data.")
-                    # time.sleep(0.050)  # Add delay when queue is completely full
-                except Exception as e:
-                    print(f"[ACQ Process] Error sending data to queue: {e}")
+
                 
                 # Periodically log performance info
-                cycle_count += 1
-                if cycle_count >= log_frequency:
-                    cycle_count = 0
-                    total_time = time.perf_counter() - cycle_start
-                    if total_time > 0.031:  # Only print if cycle time exceeded 31ms
-                        print(f"[ACQ Process] Total: {total_time:.4f}s | Read: {read_time:.4f}s | Reset: {reset_time:.4f}s")
+                # cycle_count += 1
+                # if cycle_count >= log_frequency:
+                #     cycle_count = 0
+                #     total_time = time.perf_counter() - cycle_start
+                #     if total_time > 0.001:  # Only print if cycle time exceeded 31ms
+                #         print(f"[ACQ Process] Total: {total_time:.4f}s | Read: {read_time:.4f}s | Reset: {reset_time:.4f}s")
                 
                 # Calculate sleep time to maintain 32ms cycle
                 elapsed = time.perf_counter() - cycle_start
@@ -650,10 +611,10 @@ class App(QMainWindow):
                     
                     if time_since_reset < 0.1 and has_flaws:
                         print(f"[ACQ Process] Cycle time exceeded due to lump/neck reset: {elapsed:.4f}s, Read: {read_time:.4f}s, Reset: {reset_time:.4f}s, Lumps={lumps}, Necks={necks}")
-                    elif elapsed > 0.1:
-                        print(f"[ACQ Process] SEVERE DELAY: Cycle time {elapsed:.4f}s, Read: {read_time:.4f}s, Reset: {reset_time:.4f}s is significantly over budget!")
-                    else:
-                        print(f"[ACQ Process] Cycle time exceeded: {elapsed:.4f}s, Read: {read_time:.4f}s, Reset: {reset_time:.4f}s")
+                    # elif elapsed > 0.1:
+                    #     print(f"[ACQ Process] SEVERE DELAY: Cycle time {elapsed:.4f}s, Read: {read_time:.4f}s, Reset: {reset_time:.4f}s is significantly over budget!")
+                    # else:
+                    #     print(f"[ACQ Process] Cycle time exceeded: {elapsed:.4f}s, Read: {read_time:.4f}s, Reset: {reset_time:.4f}s")
                     
                     # # For severe delays, try sleeping a tiny bit to let system recover
                     # if elapsed > 0.2:
