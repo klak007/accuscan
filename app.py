@@ -442,7 +442,7 @@ class App(QMainWindow):
                 )
                 
                 # Short sleep to let reset complete
-                time.sleep(0.05)
+                # time.sleep(0.05)
                 
                 # Clear the reset bits
                 write_accuscan_out_settings(
@@ -504,7 +504,7 @@ class App(QMainWindow):
                         plc_client, db_number=2,
                         zl=True, zn=True, zf=True, zt=False
                     )
-                    time.sleep(0.05)  # Short delay to ensure reset is processed
+                    # time.sleep(0.05)  # Short delay to ensure reset is processed
                     
                     # Then clear reset bits
                     write_accuscan_out_settings(
@@ -550,7 +550,7 @@ class App(QMainWindow):
                         write_accuscan_out_settings(
                             plc_client, db_number=2,
                             # Set all reset bits
-                            zl=True, zn=True, zf=True, zt=False
+                            zf=True, zt=False#, zl=True, zn=True, 
                         )
                         
                         # Immediately clear bits in a second write
@@ -558,7 +558,7 @@ class App(QMainWindow):
                             write_accuscan_out_settings(
                                 plc_client, db_number=2,
                                 # Clear all reset bits
-                                zl=False, zn=False, zf=False, zt=False
+                                zf=False, zt=False#,zl=False, zn=False, 
                             )
                         
                         # Log reset performance issues
@@ -618,15 +618,15 @@ class App(QMainWindow):
                             data_queue.put(data, block=False)
                         if cycle_count % 2 == 0 and current_size > 0:
                             print(f"[ACQ Process] HIGH LOAD: Queue size {current_size} - throttling and selective sampling")
-                        time.sleep(0.010)  # 10ms delay
+                        # time.sleep(0.010)  # 10ms delay
                     else:
                         if data.get("lumps", 0) > 0 or data.get("necks", 0) > 0:
                             data_queue.put(data, block=False)
                         print(f"[ACQ Process] CRITICAL: Queue size at {current_size} - dropping samples, adding delay")
-                        time.sleep(0.050)  # 50ms delay
+                        # time.sleep(0.050)  # 50ms delay
                 except queue.Full:
                     print("[ACQ Process] Data queue is full. Could not enqueue data.")
-                    time.sleep(0.050)  # Add delay when queue is completely full
+                    # time.sleep(0.050)  # Add delay when queue is completely full
                 except Exception as e:
                     print(f"[ACQ Process] Error sending data to queue: {e}")
                 
