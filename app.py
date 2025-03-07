@@ -383,18 +383,17 @@ class App(QMainWindow):
                 
                 if (now - last_perf_log > 5.0) or (current_queue_size > QUEUE_WARNING_THRESHOLD):
                     elapsed = now - last_perf_log
-                    rate = samples_processed / elapsed if elapsed > 0 else 0
-                    
+                    avg_time = elapsed / samples_processed if samples_processed > 0 else 0
                     # Log more information if queue size is concerning
                     if current_queue_size > QUEUE_WARNING_THRESHOLD:
-                        print(f"[Data Receiver] WARNING - Queue size: {current_queue_size}, " 
-                              f"Processing rate: {rate:.1f} samples/sec, "
-                              f"Batch time: {time.perf_counter() - batch_start:.4f}s for {batch_size} samples")
+                        print(f"[Data Receiver] WARNING - Queue size: {current_queue_size}, "
+                            f"Average processing time: {avg_time:.4f} s/sample, "
+                            f"Batch time: {time.perf_counter() - batch_start:.4f}s for {batch_size} samples")
                     else:
-                        print(f"[Data Receiver] Processing rate: {rate:.1f} samples/sec, Queue size: {current_queue_size}")
+                        print(f"[Data Receiver] Average processing time: {avg_time:.4f} s/sample, Queue size: {current_queue_size}")
                     
                     last_perf_log = now
-                    samples_processed = 0
+                    samples_processed = 0  # Reset sample count after logging
                         
             except Exception as e:
                 print(f"[Data Receiver] Error: {e}")
