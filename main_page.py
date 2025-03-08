@@ -1,23 +1,25 @@
 from datetime import datetime
-import db_helper
-import plc_helper
 import time
+import db_helper
 from db_helper import save_settings, save_settings_history
+import plc_helper
 
 # Import new modules
 from visualization import PlotManager
 from data_processing import WindowProcessor, FastAcquisitionBuffer
 from flaw_detection import FlawDetector
 
+# PyQtGraph imports
 import pyqtgraph as pg
-from PyQt5.QtWidgets import QFrame, QGridLayout, QVBoxLayout
-from PyQt5.QtWidgets import QWidget, QGridLayout, QMessageBox, QSlider
-from PyQt5.QtWidgets import QWidget, QHBoxLayout, QPushButton, QLabel, QSpacerItem, QSizePolicy
-from PyQt5.QtCore import Qt, QTimer
+
+# PyQt5 imports - consolidated
 from PyQt5.QtWidgets import (
-    QFrame, QLabel, QLineEdit, QPushButton, QGridLayout, QHBoxLayout
+    QFrame, QGridLayout, QVBoxLayout, QWidget, QMessageBox, QSlider,
+    QHBoxLayout, QPushButton, QLabel, QSpacerItem, QSizePolicy, QLineEdit
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
+
+# Rest of the file remains unchanged...
 
 class MainPage(QWidget):
     """

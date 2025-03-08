@@ -325,8 +325,9 @@ class SettingsPage(QFrame):
             self.update_db_status()
                     
         except mysql.connector.Error as e:
-            QMessageBox.warning(self, "Błąd połączenia z bazą", 
-                f"Nie można połączyć się z bazą danych: {str(e)}\nAplikacja będzie działać w trybie ograniczonym.")
+            # QMessageBox.warning(self, "Błąd połączenia z bazą", 
+                # f"Nie można połączyć się z bazą danych: {str(e)}\nAplikacja będzie działać w trybie ograniczonym.")
+            print(self,f"Nie można połączyć się z bazą danych: {str(e)}. Aplikacja będzie działać w trybie ograniczonym.")
             self.show_offline_message()
             self.controller.db_connected = False
             self.update_db_status()

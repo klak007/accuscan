@@ -1,6 +1,7 @@
 # app.py
 from PyQt5.QtWidgets import QApplication, QMessageBox, QVBoxLayout, QMainWindow, QWidget, QStackedWidget
 from PyQt5.QtCore import QTimer  # Add this import
+from PyQt5.QtGui import QIcon
 import sys
 from datetime import datetime
 import time
@@ -18,6 +19,7 @@ from flaw_detection import FlawDetector
 from main_page import MainPage
 from settings_page import SettingsPage
 from config import OFFLINE_MODE
+import os
 
 
 # Configuration settings (originally from config.py)
@@ -59,7 +61,13 @@ class App(QMainWindow):
         # Ustawienia okna
         self.setWindowTitle("AccuScan GUI")
         self.setGeometry(0, 0, 1920, 700)
-        
+        # Add logo as window icon
+        logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logo2.png")
+        if os.path.exists(logo_path):
+            self.setWindowIcon(QIcon(logo_path))
+            print(f"[App] Logo loaded from: {logo_path}")
+        else:
+            print(f"[App] Warning: Logo file not found at: {logo_path}")
         
         # -----------------------------------
         # Flagi i parametry sterujące
