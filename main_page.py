@@ -279,7 +279,7 @@ class MainPage(QWidget):
 
         # Rząd row_start: Etykieta "Nazwa receptury:"
         self.label_recipe_name = QLabel("Nazwa receptury:", self.left_panel)
-        left_layout.addWidget(self.label_recipe_name, row_start, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        left_layout.addWidget(self.label_recipe_name, row_start, 0, alignment=Qt.AlignCenter)
 
         # Rząd row_start+1: Pole tekstowe dla nazwy receptury
         self.entry_recipe_name = QLineEdit(self.left_panel)
@@ -288,14 +288,16 @@ class MainPage(QWidget):
 
         # Rząd row_start+2: Etykieta "Średnica docelowa [mm]:"
         self.label_diameter_setpoint = QLabel("Średnica docelowa [mm]:", self.left_panel)
-        left_layout.addWidget(self.label_diameter_setpoint, row_start+2, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        left_layout.addWidget(self.label_diameter_setpoint, row_start+2, 0, alignment=Qt.AlignCenter)
 
         # Rząd row_start+3: Ramka dla przycisków regulujących średnicę i pole wejściowe
         diameter_frame = QFrame(self.left_panel)
         diameter_layout = QHBoxLayout(diameter_frame)
+        diameter_layout.setContentsMargins(0, 0, 0, 0)
         diameter_frame.setLayout(diameter_layout)
-        left_layout.addWidget(diameter_frame, row_start+3, 0, alignment=Qt.AlignLeft)
+        left_layout.addWidget(diameter_frame, row_start+3, 0, alignment=Qt.AlignCenter)
 
+        # Left side buttons
         self.btn_diam_decrease_05 = QPushButton("--", diameter_frame)
         self.btn_diam_decrease_05.setFixedWidth(30)
         self.btn_diam_decrease_05.clicked.connect(lambda: self._adjust_diameter(-0.5))
@@ -306,11 +308,14 @@ class MainPage(QWidget):
         self.btn_diam_decrease_01.clicked.connect(lambda: self._adjust_diameter(-0.1))
         diameter_layout.addWidget(self.btn_diam_decrease_01)
 
+        # Center input field - set expanding size policy with increased minimum width
         self.entry_diameter_setpoint = QLineEdit(diameter_frame)
         self.entry_diameter_setpoint.setPlaceholderText("18.0")
-        self.entry_diameter_setpoint.setFixedWidth(80)
+        self.entry_diameter_setpoint.setMinimumWidth(220)  # Increased from 80 to 120
+        self.entry_diameter_setpoint.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         diameter_layout.addWidget(self.entry_diameter_setpoint)
 
+        # Right side buttons
         self.btn_diam_increase_01 = QPushButton("+", diameter_frame)
         self.btn_diam_increase_01.setFixedWidth(30)
         self.btn_diam_increase_01.clicked.connect(lambda: self._adjust_diameter(0.1))
@@ -323,14 +328,16 @@ class MainPage(QWidget):
 
         # Rząd row_start+4: Etykieta "Gorna granica (roznica od dAvg) [mm]:"
         self.label_tolerance_plus = QLabel("Górna granica tolerancji (różnica od dAvg) [mm]:", self.left_panel)
-        left_layout.addWidget(self.label_tolerance_plus, row_start+4, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        left_layout.addWidget(self.label_tolerance_plus, row_start+4, 0, alignment=Qt.AlignCenter)
 
-        # Rząd row_start+5: Ramka plus
+        # Rząd row_start+5: Ramka plus (górna granica tolerancji)
         plus_frame = QFrame(self.left_panel)
         plus_layout = QHBoxLayout(plus_frame)
+        plus_layout.setContentsMargins(0, 0, 0, 0)
         plus_frame.setLayout(plus_layout)
-        left_layout.addWidget(plus_frame, row_start+5, 0, alignment=Qt.AlignLeft)
+        left_layout.addWidget(plus_frame, row_start+5, 0, alignment=Qt.AlignCenter)
 
+        # Left side buttons
         self.btn_tolerance_plus_dec_05 = QPushButton("--", plus_frame)
         self.btn_tolerance_plus_dec_05.setFixedWidth(30)
         self.btn_tolerance_plus_dec_05.clicked.connect(lambda: self._adjust_tolerance_plus(-0.5))
@@ -341,11 +348,14 @@ class MainPage(QWidget):
         self.btn_tolerance_plus_dec_01.clicked.connect(lambda: self._adjust_tolerance_plus(-0.1))
         plus_layout.addWidget(self.btn_tolerance_plus_dec_01)
 
+        # Center input field - expanding
         self.entry_tolerance_plus = QLineEdit(plus_frame)
         self.entry_tolerance_plus.setPlaceholderText("0.5")
-        self.entry_tolerance_plus.setFixedWidth(80)
+        self.entry_tolerance_plus.setMinimumWidth(220)  # Increased from 80 to 120
+        self.entry_tolerance_plus.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         plus_layout.addWidget(self.entry_tolerance_plus)
 
+        # Right side buttons
         self.btn_tolerance_plus_inc_01 = QPushButton("+", plus_frame)
         self.btn_tolerance_plus_inc_01.setFixedWidth(30)
         self.btn_tolerance_plus_inc_01.clicked.connect(lambda: self._adjust_tolerance_plus(0.1))
@@ -358,14 +368,16 @@ class MainPage(QWidget):
 
         # Rząd row_start+6: Etykieta "Dolna granica  (roznica od dAvg) [mm]:"
         self.label_tolerance_minus = QLabel("Dolna granica tolerancji (różnica od dAvg) [mm]:", self.left_panel)
-        left_layout.addWidget(self.label_tolerance_minus, row_start+6, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        left_layout.addWidget(self.label_tolerance_minus, row_start+6, 0, alignment=Qt.AlignCenter)
 
-        # Rząd row_start+7: Ramka minus
+        # Rząd row_start+7: Ramka minus (dolna granica tolerancji)
         minus_frame = QFrame(self.left_panel)
         minus_layout = QHBoxLayout(minus_frame)
+        minus_layout.setContentsMargins(0, 0, 0, 0)
         minus_frame.setLayout(minus_layout)
-        left_layout.addWidget(minus_frame, row_start+7, 0, alignment=Qt.AlignLeft)
+        left_layout.addWidget(minus_frame, row_start+7, 0, alignment=Qt.AlignCenter)
 
+        # Left side buttons
         self.btn_tolerance_minus_dec_05 = QPushButton("--", minus_frame)
         self.btn_tolerance_minus_dec_05.setFixedWidth(30)
         self.btn_tolerance_minus_dec_05.clicked.connect(lambda: self._adjust_tolerance_minus(-0.5))
@@ -376,11 +388,14 @@ class MainPage(QWidget):
         self.btn_tolerance_minus_dec_01.clicked.connect(lambda: self._adjust_tolerance_minus(-0.1))
         minus_layout.addWidget(self.btn_tolerance_minus_dec_01)
 
+        # Center input field - expanding
         self.entry_tolerance_minus = QLineEdit(minus_frame)
         self.entry_tolerance_minus.setPlaceholderText("0.5")
-        self.entry_tolerance_minus.setFixedWidth(80)
+        self.entry_tolerance_minus.setMinimumWidth(220)  # Increased from 80 to 120
+        self.entry_tolerance_minus.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         minus_layout.addWidget(self.entry_tolerance_minus)
 
+        # Right side buttons
         self.btn_tolerance_minus_inc_01 = QPushButton("+", minus_frame)
         self.btn_tolerance_minus_inc_01.setFixedWidth(30)
         self.btn_tolerance_minus_inc_01.clicked.connect(lambda: self._adjust_tolerance_minus(0.1))
@@ -393,14 +408,16 @@ class MainPage(QWidget):
 
         # Rząd row_start+8: Etykieta "Próg lumps [mm]:"
         self.label_lump_threshold = QLabel("Próg wybrzuszeń [mm]:", self.left_panel)
-        left_layout.addWidget(self.label_lump_threshold, row_start+8, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        left_layout.addWidget(self.label_lump_threshold, row_start+8, 0, alignment=Qt.AlignCenter)
 
         # Rząd row_start+9: Ramka dla ustawień progu lumps
         lumps_threshold_frame = QFrame(self.left_panel)
         lumps_threshold_layout = QHBoxLayout(lumps_threshold_frame)
+        lumps_threshold_layout.setContentsMargins(0, 0, 0, 0)
         lumps_threshold_frame.setLayout(lumps_threshold_layout)
-        left_layout.addWidget(lumps_threshold_frame, row_start+9, 0, alignment=Qt.AlignLeft)
+        left_layout.addWidget(lumps_threshold_frame, row_start+9, 0, alignment=Qt.AlignCenter)
 
+        # Left side buttons
         self.btn_lump_thres_dec_05 = QPushButton("--", lumps_threshold_frame)
         self.btn_lump_thres_dec_05.setFixedWidth(30)
         self.btn_lump_thres_dec_05.clicked.connect(lambda: self._adjust_lump_threshold(-0.5))
@@ -411,11 +428,14 @@ class MainPage(QWidget):
         self.btn_lump_thres_dec_01.clicked.connect(lambda: self._adjust_lump_threshold(-0.1))
         lumps_threshold_layout.addWidget(self.btn_lump_thres_dec_01)
 
+        # Center input field - expanding
         self.entry_lump_threshold = QLineEdit(lumps_threshold_frame)
         self.entry_lump_threshold.setPlaceholderText("0.3")
-        self.entry_lump_threshold.setFixedWidth(80)
+        self.entry_lump_threshold.setMinimumWidth(220)  # Increased from 80 to 120
+        self.entry_lump_threshold.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         lumps_threshold_layout.addWidget(self.entry_lump_threshold)
 
+        # Right side buttons
         self.btn_lump_thres_inc_01 = QPushButton("+", lumps_threshold_frame)
         self.btn_lump_thres_inc_01.setFixedWidth(30)
         self.btn_lump_thres_inc_01.clicked.connect(lambda: self._adjust_lump_threshold(0.1))
@@ -428,14 +448,16 @@ class MainPage(QWidget):
 
         # Rząd row_start+10: Etykieta "Próg necks [mm]:"
         self.label_neck_threshold = QLabel("Próg zagłębienia [mm]:", self.left_panel)
-        left_layout.addWidget(self.label_neck_threshold, row_start+10, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        left_layout.addWidget(self.label_neck_threshold, row_start+10, 0, alignment=Qt.AlignCenter)
 
         # Rząd row_start+11: Ramka dla ustawień progu necks
         necks_threshold_frame = QFrame(self.left_panel)
         necks_threshold_layout = QHBoxLayout(necks_threshold_frame)
+        necks_threshold_layout.setContentsMargins(0, 0, 0, 0)
         necks_threshold_frame.setLayout(necks_threshold_layout)
-        left_layout.addWidget(necks_threshold_frame, row_start+11, 0, alignment=Qt.AlignLeft)
+        left_layout.addWidget(necks_threshold_frame, row_start+11, 0, alignment=Qt.AlignCenter)
 
+        # Left side buttons
         self.btn_neck_thres_dec_05 = QPushButton("--", necks_threshold_frame)
         self.btn_neck_thres_dec_05.setFixedWidth(30)
         self.btn_neck_thres_dec_05.clicked.connect(lambda: self._adjust_neck_threshold(-0.5))
@@ -446,11 +468,14 @@ class MainPage(QWidget):
         self.btn_neck_thres_dec_01.clicked.connect(lambda: self._adjust_neck_threshold(-0.1))
         necks_threshold_layout.addWidget(self.btn_neck_thres_dec_01)
 
+        # Center input field - expanding
         self.entry_neck_threshold = QLineEdit(necks_threshold_frame)
         self.entry_neck_threshold.setPlaceholderText("0.3")
-        self.entry_neck_threshold.setFixedWidth(80)
+        self.entry_neck_threshold.setMinimumWidth(220)  # Increased from 80 to 120
+        self.entry_neck_threshold.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         necks_threshold_layout.addWidget(self.entry_neck_threshold)
 
+        # Right side buttons
         self.btn_neck_thres_inc_01 = QPushButton("+", necks_threshold_frame)
         self.btn_neck_thres_inc_01.setFixedWidth(30)
         self.btn_neck_thres_inc_01.clicked.connect(lambda: self._adjust_neck_threshold(0.1))
@@ -463,63 +488,123 @@ class MainPage(QWidget):
 
         # Rząd row_start+12: Etykieta "Flaw window [m]:"
         self.label_flaw_window = QLabel("Długośc okna defektów [m]:", self.left_panel)
-        left_layout.addWidget(self.label_flaw_window, row_start+12, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        left_layout.addWidget(self.label_flaw_window, row_start+12, 0, alignment=Qt.AlignCenter)
 
-        # Rząd row_start+13: Pole tekstowe dla flaw window
-        self.entry_flaw_window = QLineEdit(self.left_panel)
+        # Rząd row_start+13: Ramka dla flaw window z przyciskami
+        flaw_window_frame = QFrame(self.left_panel)
+        flaw_window_layout = QHBoxLayout(flaw_window_frame)
+        flaw_window_layout.setContentsMargins(0, 0, 0, 0)
+        flaw_window_frame.setLayout(flaw_window_layout)
+        left_layout.addWidget(flaw_window_frame, row_start+13, 0, alignment=Qt.AlignCenter)
+        
+        # Left side buttons
+        self.btn_flaw_window_dec_10 = QPushButton("--", flaw_window_frame)
+        self.btn_flaw_window_dec_10.setFixedWidth(30)
+        self.btn_flaw_window_dec_10.clicked.connect(lambda: self._adjust_flaw_window(-0.1))
+        flaw_window_layout.addWidget(self.btn_flaw_window_dec_10)
+
+        self.btn_flaw_window_dec_05 = QPushButton("-", flaw_window_frame)
+        self.btn_flaw_window_dec_05.setFixedWidth(30)
+        self.btn_flaw_window_dec_05.clicked.connect(lambda: self._adjust_flaw_window(-0.05))
+        flaw_window_layout.addWidget(self.btn_flaw_window_dec_05)
+        
+        # Center input field
+        self.entry_flaw_window = QLineEdit(flaw_window_frame)
         self.entry_flaw_window.setPlaceholderText("0.5")
-        self.entry_flaw_window.setFixedWidth(80)
-        left_layout.addWidget(self.entry_flaw_window, row_start+13, 0)
+        self.entry_flaw_window.setMinimumWidth(220)  # Increased from 80 to 120
+        self.entry_flaw_window.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        flaw_window_layout.addWidget(self.entry_flaw_window)
+        
+        # Right side buttons
+        self.btn_flaw_window_inc_05 = QPushButton("+", flaw_window_frame)
+        self.btn_flaw_window_inc_05.setFixedWidth(30)
+        self.btn_flaw_window_inc_05.clicked.connect(lambda: self._adjust_flaw_window(0.05))
+        flaw_window_layout.addWidget(self.btn_flaw_window_inc_05)
+        
+        self.btn_flaw_window_inc_10 = QPushButton("++", flaw_window_frame)
+        self.btn_flaw_window_inc_10.setFixedWidth(30)
+        self.btn_flaw_window_inc_10.clicked.connect(lambda: self._adjust_flaw_window(0.1))
+        flaw_window_layout.addWidget(self.btn_flaw_window_inc_10)
 
         # Rząd row_start+14: Etykieta "Max lumps in flaw window:"
         self.label_max_lumps = QLabel("Maksymalna liczba wybrzuszeń w oknie defektów:", self.left_panel)
-        left_layout.addWidget(self.label_max_lumps, row_start+14, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        left_layout.addWidget(self.label_max_lumps, row_start+14, 0, alignment=Qt.AlignCenter)
 
         # Rząd row_start+15: Ramka dla max lumps
         max_lumps_frame = QFrame(self.left_panel)
         max_lumps_layout = QHBoxLayout(max_lumps_frame)
+        max_lumps_layout.setContentsMargins(0, 0, 0, 0)
         max_lumps_frame.setLayout(max_lumps_layout)
-        left_layout.addWidget(max_lumps_frame, row_start+15, 0, alignment=Qt.AlignLeft)
+        left_layout.addWidget(max_lumps_frame, row_start+15, 0, alignment=Qt.AlignCenter)
 
+        # Left side buttons
+        self.btn_max_lumps_dec_5 = QPushButton("--", max_lumps_frame)
+        self.btn_max_lumps_dec_5.setFixedWidth(30)
+        self.btn_max_lumps_dec_5.clicked.connect(lambda: self._adjust_max_lumps(-5))
+        max_lumps_layout.addWidget(self.btn_max_lumps_dec_5)
+        
         self.btn_max_lumps_dec = QPushButton("-", max_lumps_frame)
         self.btn_max_lumps_dec.setFixedWidth(30)
         self.btn_max_lumps_dec.clicked.connect(lambda: self._adjust_max_lumps(-1))
         max_lumps_layout.addWidget(self.btn_max_lumps_dec)
 
+        # Center input field - expanding
         self.entry_max_lumps = QLineEdit(max_lumps_frame)
         self.entry_max_lumps.setPlaceholderText("3")
-        self.entry_max_lumps.setFixedWidth(80)
+        self.entry_max_lumps.setMinimumWidth(220)  # Increased from 80 to 120
+        self.entry_max_lumps.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         max_lumps_layout.addWidget(self.entry_max_lumps)
 
+        # Right side buttons
         self.btn_max_lumps_inc = QPushButton("+", max_lumps_frame)
         self.btn_max_lumps_inc.setFixedWidth(30)
         self.btn_max_lumps_inc.clicked.connect(lambda: self._adjust_max_lumps(1))
         max_lumps_layout.addWidget(self.btn_max_lumps_inc)
+        
+        self.btn_max_lumps_inc_5 = QPushButton("++", max_lumps_frame)
+        self.btn_max_lumps_inc_5.setFixedWidth(30)
+        self.btn_max_lumps_inc_5.clicked.connect(lambda: self._adjust_max_lumps(5))
+        max_lumps_layout.addWidget(self.btn_max_lumps_inc_5)
 
         # Rząd row_start+16: Etykieta "Max necks in flaw window:"
         self.label_max_necks = QLabel("Maksymalna liczba zagłębień w oknie defektów:", self.left_panel)
-        left_layout.addWidget(self.label_max_necks, row_start+16, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        left_layout.addWidget(self.label_max_necks, row_start+16, 0, alignment=Qt.AlignCenter)
 
         # Rząd row_start+17: Ramka dla max necks
         max_necks_frame = QFrame(self.left_panel)
         max_necks_layout = QHBoxLayout(max_necks_frame)
+        max_necks_layout.setContentsMargins(0, 0, 0, 0)
         max_necks_frame.setLayout(max_necks_layout)
-        left_layout.addWidget(max_necks_frame, row_start+17, 0, alignment=Qt.AlignLeft)
+        left_layout.addWidget(max_necks_frame, row_start+17, 0, alignment=Qt.AlignCenter)
 
+        # Left side button
+        self.btn_max_necks_dec_5 = QPushButton("--", max_necks_frame)
+        self.btn_max_necks_dec_5.setFixedWidth(30)
+        self.btn_max_necks_dec_5.clicked.connect(lambda: self._adjust_max_necks(-5))
+        max_necks_layout.addWidget(self.btn_max_necks_dec_5)
+        
         self.btn_max_necks_dec = QPushButton("-", max_necks_frame)
         self.btn_max_necks_dec.setFixedWidth(30)
         self.btn_max_necks_dec.clicked.connect(lambda: self._adjust_max_necks(-1))
         max_necks_layout.addWidget(self.btn_max_necks_dec)
 
+        # Center input field - expanding
         self.entry_max_necks = QLineEdit(max_necks_frame)
         self.entry_max_necks.setPlaceholderText("3")
-        self.entry_max_necks.setFixedWidth(80)
+        self.entry_max_necks.setMinimumWidth(220)  # Increased from 80 to 120
+        self.entry_max_necks.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         max_necks_layout.addWidget(self.entry_max_necks)
 
+        # Right side button
         self.btn_max_necks_inc = QPushButton("+", max_necks_frame)
         self.btn_max_necks_inc.setFixedWidth(30)
         self.btn_max_necks_inc.clicked.connect(lambda: self._adjust_max_necks(1))
         max_necks_layout.addWidget(self.btn_max_necks_inc)
+        
+        self.btn_max_necks_inc_5 = QPushButton("++", max_necks_frame)
+        self.btn_max_necks_inc_5.setFixedWidth(30)
+        self.btn_max_necks_inc_5.clicked.connect(lambda: self._adjust_max_necks(5))
+        max_necks_layout.addWidget(self.btn_max_necks_inc_5)
 
     def _adjust_diameter(self, delta: float):
         val_str = self.entry_diameter_setpoint.text() or "0"
@@ -592,6 +677,22 @@ class MainPage(QWidget):
         new_val = max(0, val + delta)  # Ensure the value is not negative
         self.entry_max_necks.clear()
         self.entry_max_necks.setText(f"{new_val}")
+
+    def _adjust_flaw_window(self, delta: float):
+        """Adjust the flaw window size value"""
+        val_str = self.entry_flaw_window.text() or "0.5"
+        try:
+            val = float(val_str)
+        except ValueError:
+            val = 0.5
+        # Ensure the value doesn't go below 0.1
+        new_val = max(0.1, val + delta)  
+        self.entry_flaw_window.clear()
+        self.entry_flaw_window.setText(f"{new_val:.2f}")
+        
+        # Update the flaw detector with the new window size if available
+        if hasattr(self, 'flaw_detector'):
+            self.flaw_detector.update_flaw_window_size(new_val)
 
     def _save_settings(self):
         """
