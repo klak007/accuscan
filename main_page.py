@@ -15,7 +15,7 @@ import pyqtgraph as pg
 # PyQt5 imports - consolidated
 from PyQt5.QtWidgets import (
     QFrame, QGridLayout, QVBoxLayout, QWidget, QMessageBox, QSlider,
-    QHBoxLayout, QPushButton, QLabel, QSpacerItem, QSizePolicy, QLineEdit
+    QHBoxLayout, QPushButton, QLabel, QSpacerItem, QSizePolicy, QLineEdit, QGroupBox
 )
 from PyQt5.QtCore import Qt, QTimer
 
@@ -867,67 +867,103 @@ class MainPage(QWidget):
     # 3. Środkowa kolumna (row=1, col=1) – parametry symulacji
     # ---------------------------------------------------------------------------------
     def _create_middle_panel(self):
-        # Utwórz panel środkowy o minimalnej szerokości 1200
+        # Utwórz panel środkowy
         self.middle_panel = QFrame(self)
         self.middle_panel.setFrameShape(QFrame.Box)
         self.middle_panel.setFrameShadow(QFrame.Raised)
-        self.middle_panel.setLineWidth(2) 
-        # Increase available width to accommodate labels
-        # self.middle_panel.setMinimumWidth(1200)
-        # Remove fixed maximum width to allow expansion
-        self.middle_panel.setMaximumWidth(400)
+        self.middle_panel.setLineWidth(2)
+        # Ustawienia rozmiaru panelu – tutaj możesz dostosować szerokość
+        self.middle_panel.setMinimumWidth(400)
+        self.middle_panel.setMaximumWidth(800)
+        
+        # Layout główny dla panelu środkowego
         middle_layout = QGridLayout(self.middle_panel)
-        # Optionally adjust margins and spacing
         middle_layout.setContentsMargins(10, 10, 10, 10)
         middle_layout.setSpacing(10)
         self.middle_panel.setLayout(middle_layout)
-        middle_layout.setColumnStretch(0, 1)  # Jedna kolumna, rozciągnięta
-
-        # --------------------------
-        # Ramka odczytów (readings_frame)
-        # --------------------------
+        
+        # Ramka główna z układem pionowym na wszystkie grupy
         self.readings_frame = QFrame(self.middle_panel)
         readings_layout = QVBoxLayout(self.readings_frame)
+        readings_layout.setSpacing(15)
         self.readings_frame.setLayout(readings_layout)
         middle_layout.addWidget(self.readings_frame, 0, 0, 1, 1, Qt.AlignTop)
-
-        # Dodaj etykiety odczytów (wszystkie ułożone pionowo)
-        self.label_d1 = QLabel("d1 [mm]: --", self.readings_frame)
-        self.label_d2 = QLabel("d2 [mm]: --", self.readings_frame)
-        self.label_d3 = QLabel("d3 [mm]: --", self.readings_frame)
-        self.label_d4 = QLabel("d4 [mm]: --", self.readings_frame)
-        self.label_davg = QLabel("dAvg [mm]: --", self.readings_frame)
-        self.label_dmin = QLabel("dMin [mm]: --", self.readings_frame)
-        self.label_dmax = QLabel("dMax [mm]: --", self.readings_frame)
-        self.label_dsd = QLabel("dSD [mm]: --", self.readings_frame)
-        self.label_dov = QLabel("dOV [%]: --", self.readings_frame)
-        self.label_xcoord = QLabel("xCoord [m]: --", self.readings_frame)
-        self.label_speed = QLabel("Prędkośc linii [m/min]: --", self.readings_frame)
         
-        for lbl in [self.label_d1, self.label_d2, self.label_d3, self.label_d4,
-                    self.label_davg, self.label_dmin, self.label_dmax, self.label_dsd,
-                    self.label_dov, self.label_xcoord, self.label_speed]:
-            readings_layout.addWidget(lbl)
-
-        # Add a fixed vertical spacer so subsequent indicators do not overlap the top labels
-        readings_layout.addItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Fixed))
-
-        # Wskaźniki: Lump, Neck, Diameter i ich liczniki
+        # --------------------------
+        # Grupa 1: Wymiary pojedynczych pomiarów
+        # --------------------------
+        group_measurements = QGroupBox("Wymiary pojedynczych pomiarów", self.readings_frame)
+        measure_layout = QHBoxLayout()
+        self.label_d1 = QLabel("d1 [mm]: --", group_measurements)
+        self.label_d2 = QLabel("d2 [mm]: --", group_measurements)
+        self.label_d3 = QLabel("d3 [mm]: --", group_measurements)
+        self.label_d4 = QLabel("d4 [mm]: --", group_measurements)
+        measure_layout.addWidget(self.label_d1)
+        measure_layout.addWidget(self.label_d2)
+        measure_layout.addWidget(self.label_d3)
+        measure_layout.addWidget(self.label_d4)
+        group_measurements.setLayout(measure_layout)
+        readings_layout.addWidget(group_measurements)
+        
+        # --------------------------
+        # Grupa 2: Średnie wartości
+        # --------------------------
+        group_avg = QGroupBox("Średnie wartości", self.readings_frame)
+        avg_layout = QHBoxLayout()
+        self.label_davg = QLabel("dAvg [mm]: --", group_avg)
+        self.label_dmin = QLabel("dMin [mm]: --", group_avg)
+        self.label_dmax = QLabel("dMax [mm]: --", group_avg)
+        avg_layout.addWidget(self.label_davg)
+        avg_layout.addWidget(self.label_dmin)
+        avg_layout.addWidget(self.label_dmax)
+        group_avg.setLayout(avg_layout)
+        readings_layout.addWidget(group_avg)
+        
+        # --------------------------
+        # Grupa 3: Statystyki
+        # --------------------------
+        group_stats = QGroupBox("Statystyki", self.readings_frame)
+        stats_layout = QHBoxLayout()
+        self.label_dsd = QLabel("dSD [mm]: --", group_stats)
+        self.label_dov = QLabel("dOV [%]: --", group_stats)
+        stats_layout.addWidget(self.label_dsd)
+        stats_layout.addWidget(self.label_dov)
+        group_stats.setLayout(stats_layout)
+        readings_layout.addWidget(group_stats)
+        
+        # --------------------------
+        # Grupa 4: Pozycja i prędkość
+        # --------------------------
+        group_pos_speed = QGroupBox("Pozycja i prędkość", self.readings_frame)
+        pos_speed_layout = QHBoxLayout()
+        self.label_xcoord = QLabel("xCoord [m]: --", group_pos_speed)
+        self.label_speed = QLabel("Prędkośc linii [m/min]: --", group_pos_speed)
+        pos_speed_layout.addWidget(self.label_xcoord)
+        pos_speed_layout.addWidget(self.label_speed)
+        group_pos_speed.setLayout(pos_speed_layout)
+        readings_layout.addWidget(group_pos_speed)
+        
+        # --------------------------
+        # Dodatkowe wskaźniki (np. wybrzuszenia, zagłębienia, średnica)
+        # --------------------------
+        # Wskaźniki wybrzuszenia
         self.label_lump_indicator = QLabel("Wybrzuszenie: Off", self.readings_frame)
         readings_layout.addWidget(self.label_lump_indicator)
         self.lumps_count_label = QLabel("Liczba wybrzuszeń: 0", self.readings_frame)
         readings_layout.addWidget(self.lumps_count_label)
-
+        
+        # Wskaźniki zagłębienia
         self.label_neck_indicator = QLabel("Zagłębienie: Off", self.readings_frame)
         readings_layout.addWidget(self.label_neck_indicator)
         self.necks_count_label = QLabel("Liczba zagłębień: 0", self.readings_frame)
         readings_layout.addWidget(self.necks_count_label)
-
+        
+        # Wskaźniki średnicy
         self.label_diameter_indicator = QLabel("Średnica: OK", self.readings_frame)
         readings_layout.addWidget(self.label_diameter_indicator)
         self.diameter_deviation_label = QLabel("Odchylenie: 0.00 mm", self.readings_frame)
         readings_layout.addWidget(self.diameter_deviation_label)
-
+        
         # --------------------------
         # Kontrola prędkości produkcji
         # --------------------------
@@ -935,42 +971,42 @@ class MainPage(QWidget):
         speed_control_layout = QVBoxLayout(self.speed_control_frame)
         self.speed_control_frame.setLayout(speed_control_layout)
         readings_layout.addWidget(self.speed_control_frame)
-
+        
         # Etykieta prędkości produkcji
         self.prod_speed_label = QLabel("Prędkośc linii produkcyjnej [m/min]:", self.speed_control_frame)
         speed_control_layout.addWidget(self.prod_speed_label)
-
-        # Ramka dla slidera prędkości
+        
+        # Slider prędkości produkcji
         slider_frame = QFrame(self.speed_control_frame)
         slider_layout = QHBoxLayout(slider_frame)
         slider_frame.setLayout(slider_layout)
         speed_control_layout.addWidget(slider_frame)
-
+        
         self.prod_speed_slider = QSlider(Qt.Horizontal, slider_frame)
         self.prod_speed_slider.setRange(0, 100)
         self.prod_speed_slider.setValue(self.production_speed)
         self.prod_speed_slider.valueChanged.connect(self._on_prod_speed_change)
         slider_layout.addWidget(self.prod_speed_slider)
-
+        
         self.prod_speed_value = QLabel(f"{self.production_speed:.1f}", slider_frame)
         slider_layout.addWidget(self.prod_speed_value)
-
-        # Ramka dla ustawienia fluktuacji prędkości
+        
+        # Ustawienie wahań prędkości linii
         fluct_frame = QFrame(self.speed_control_frame)
         fluct_layout = QHBoxLayout(fluct_frame)
         fluct_frame.setLayout(fluct_layout)
         speed_control_layout.addWidget(fluct_frame)
-
+        
         self.fluct_label = QLabel("Wahania prędkości linii (%):", fluct_frame)
         fluct_layout.addWidget(self.fluct_label)
-
+        
         self.speed_fluct_entry = QLineEdit(fluct_frame)
         self.speed_fluct_entry.setFixedWidth(50)
         self.speed_fluct_entry.setText("2.0")  # Domyślnie 2%
         fluct_layout.addWidget(self.speed_fluct_entry)
-
-        # Po zakończeniu konfiguracji, self.middle_panel powinna zostać dodana do głównego layoutu
-        # (np. przez self.layout.addWidget(self.middle_panel) w konstruktorze)
+        
+        # Po zakończeniu konfiguracji, self.middle_panel powinien zostać dodany do głównego layoutu
+        # np. poprzez self.layout.addWidget(self.middle_panel) w konstruktorze głównego okna.
 
 
     # ---------------------------------------------------------------------------------
