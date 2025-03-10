@@ -18,6 +18,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout, QPushButton, QLabel, QSpacerItem, QSizePolicy, QLineEdit, QGroupBox
 )
 from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QFont
 
 # Rest of the file remains unchanged...
 
@@ -1212,15 +1213,15 @@ class MainPage(QWidget):
         
         # Update labels - this is fast
         label_update_start = time.perf_counter()
-        self.label_d1.setText(f"D1 [mm]: {d1:.2f}")
-        self.label_d2.setText(f"D2 [mm]: {d2:.2f}")
-        self.label_d3.setText(f"D3 [mm]: {d3:.2f}")
-        self.label_d4.setText(f"D4 [mm]: {d4:.2f}")
-        self.label_davg.setText(f"dAvg [mm]: {davg:.2f}")
-        self.label_dmin.setText(f"Dmin [mm]: {dmin:.2f}")
-        self.label_dmax.setText(f"Dmax [mm]: {dmax:.2f}")
-        self.label_dsd.setText(f"dSD [mm]: {dsd:.3f}")
-        self.label_dov.setText(f"dOV [%]: {dov:.2f}")
+        self.label_d1.setText(f"<small>D1 [mm]:</small><br><span style='font-size: 20px;'>{d1:.2f}</span>")
+        self.label_d2.setText(f"<small>D2 [mm]:</small><br><span style='font-size: 20px;'>{d2:.2f}</span>")
+        self.label_d3.setText(f"<small>D3 [mm]:</small><br><span style='font-size: 20px;'>{d3:.2f}</span>")
+        self.label_d4.setText(f"<small>D4 [mm]:</small><br><span style='font-size: 20px;'>{d4:.2f}</span>")
+        self.label_davg.setText(f"<small>dAvg [mm]:</small><br><span style='font-size: 20px;'>{davg:.2f}</span>")
+        self.label_dmin.setText(f"<small>Dmin [mm]:</small><br><span style='font-size: 20px;'>{dmin:.2f}</span>")
+        self.label_dmax.setText(f"<small>Dmax [mm]:</small><br><span style='font-size: 20px;'>{dmax:.2f}</span>")
+        self.label_dsd.setText(f"<small>dSD [mm]:</small><br><span style='font-size: 20px;'>{dsd:.3f}</span>")
+        self.label_dov.setText(f"<small>dOV [%]:</small><br><span style='font-size: 20px;'>{dov:.2f}</span>")
         
         
         
@@ -1239,7 +1240,7 @@ class MainPage(QWidget):
         self.current_x = window_data['current_x']
         
         # Update xCoord label
-        self.label_xcoord.setText(f"Dystans [m]: {self.current_x:.1f}")
+        self.label_xcoord.setText(f"<small>Dystans [m]:</small><br><span style='font-size: 20px;'>{self.current_x:.1f}</span>")
 
         # Process flaw detection - this is fast
         # Update flaw window size from UI
@@ -1369,4 +1370,4 @@ class MainPage(QWidget):
             # Process data through our pipeline
             self.update_readings(data)
         speed = data.get("speed", 0.0)
-        self.label_speed.setText(f"Speed [m/min]: {speed:.2f}")
+        self.label_speed.setText(f"<small>Speed [m/min]:</small><br><span style='font-size: 20px;'>{speed:.2f}</span>")
