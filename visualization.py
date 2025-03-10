@@ -52,57 +52,6 @@ class PlotManager:
         # but here we assume that plot updates occur directly in the UI.
         print("[PlotManager] Initialized for PyQtGraph; using main thread for updates.")
     
-    def process_plot_data(plot_data, fft_buffer_size=64):
-        """
-        Przetwarza surowe dane wykresu i zwraca słownik z przetworzonymi wynikami.
-        
-        Args:
-            plot_data: Słownik zawierający surowe dane, np. 'x_history', 'lumps_history', 'diameter_history', etc.
-            fft_buffer_size: Rozmiar bufora do obliczeń FFT.
-        
-        Returns:
-            processed_data: Słownik z danymi gotowymi do aktualizacji wykresów.
-        """
-        start_time = time.perf_counter()
-        processed_data = {}
-        
-        # Przetwarzanie wykresu statusowego
-        if 'x_history' in plot_data and 'lumps_history' in plot_data and 'necks_history' in plot_data:
-            processed_data['status_plot'] = {
-                'x_vals': plot_data['x_history'],
-                'lumps_vals': plot_data['lumps_history'],
-                'necks_vals': plot_data['necks_history'],
-                'batch_name': plot_data.get('batch_name', 'Unknown'),
-                'current_x': plot_data.get('current_x', 0),
-                'plc_sample_time': plot_data.get('plc_sample_time', 0)
-            }
-        
-        # Przetwarzanie wykresu średnicy
-        if 'diameter_history' in plot_data and 'diameter_x' in plot_data:
-            processed_data['diameter_plot'] = {
-                'x': plot_data['diameter_x'],
-                'y': plot_data['diameter_history'],
-                'current_x': plot_data.get('current_x', 0),
-                'diameter_preset': plot_data.get('diameter_preset', 0),
-                'plc_sample_time': plot_data.get('plc_sample_time', 0)
-            }
-        
-        # Przetwarzanie FFT (najbardziej obciążające obliczeniowo)
-        if 'diameter_history' in plot_data and len(plot_data['diameter_history']) > 0:
-            # Konwersja do numpy array dla analizy FFT
-            data = np.array(plot_data['diameter_history'][-fft_buffer_size:], dtype=np.float32)
-            if data.size > 0:
-                # Obliczenie FFT – zakładamy, że funkcja analyze_window_fft jest dostępna
-                fft_result = analyze_window_fft(data)
-                processed_data['fft_plot'] = {
-                    'fft_data': np.abs(fft_result).tolist(),
-                    'fft_buffer_size': fft_buffer_size
-                }
-        
-        processed_data['processing_time'] = time.perf_counter() - start_time
-        return processed_data
-    
-
 
     def update_status_plot(self, x_history, lumps_history, necks_history, current_x, batch_name, plc_sample_time=0):
         """

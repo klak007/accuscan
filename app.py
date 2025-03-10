@@ -10,7 +10,7 @@ import queue
 import multiprocessing as mp
 from multiprocessing import Process, Value, Event, Queue
 # Import modułów
-from plc_helper import read_plc_data, connect_plc
+
 from plc_helper import read_plc_data, connect_plc, write_plc_data
 from db_helper import init_database, save_measurement_sample, check_database
 from data_processing import FastAcquisitionBuffer
@@ -41,8 +41,7 @@ DB_PARAMS = {
 
 # Set multiprocessing start method to 'spawn' for better compatibility
 if __name__ == "__main__":
-    # Use spawn method for Windows compatibility
-    # This should be set before any other multiprocessing code runs
+    # Use spawn method for Windows compatibility. This should be set before any other multiprocessing code runs
     mp.set_start_method('spawn', force=True)
 
 class App(QMainWindow):
@@ -111,7 +110,6 @@ class App(QMainWindow):
         # Bufor akwizycji
         # -----------------------------------
         self.acquisition_buffer = FastAcquisitionBuffer(max_samples=1024)
-        
         self.flaw_detector = FlawDetector()
         
         # -----------------------------------
@@ -122,11 +120,9 @@ class App(QMainWindow):
         self.layout = QVBoxLayout(central_widget)
         self.stacked_widget = QStackedWidget(central_widget)
         
-        
         # Inicjalizacja stron
         self.main_page = MainPage(parent=central_widget, controller=self)
         self.settings_page = SettingsPage(parent=central_widget, controller=self)
-        
         
         # Na razie dodajemy tylko main_page do layoutu
         self.stacked_widget.addWidget(self.main_page)
@@ -134,18 +130,10 @@ class App(QMainWindow):
         self.layout.addWidget(self.stacked_widget)
         self.settings_page.hide()
         
-        
-        # -----------------------------------
-        # Obsługa zamknięcia okna
-        # (Metoda closeEvent zostanie nadpisana, gdy zajdzie potrzeba)
-        # -----------------------------------
-        
         # Start workerów
         self.start_db_worker()
         
-        
         self.start_acquisition_process()
-        
         
         self.update_timer = QTimer(self)
         print("[App] Timer aktualizacji utworzony.", flush=True)
@@ -161,16 +149,12 @@ class App(QMainWindow):
         self._closing = False   # <-- new flag to prevent recursion
 
     def update_plc_status(self):
-        # Debug print to show the current flag value
-        # print(f"[PLC CONNECT FLAG] update_plc_status: plc_connected_flag = {self.plc_connected_flag.value}")
         if self.plc_connected_flag.value == 1:
             self.main_page.plc_status_label.setText("Połączono z PLC")
             self.main_page.plc_status_label.setStyleSheet("color: green;")
-            # print("[PLC CONNECT FLAG] PLC is connected according to flag")
         else:
             self.main_page.plc_status_label.setText("Rozłączono z PLC")
             self.main_page.plc_status_label.setStyleSheet("color: red;")
-            # print("[PLC CONNECT FLAG] PLC is disconnected according to flag")
 
     def closeEvent(self, event):
         """
@@ -194,13 +178,13 @@ class App(QMainWindow):
             else:
                 self.db_connected = False
                 print("[App] Brak połączenia z bazą. Aplikacja działa w trybie ograniczonym.")
-                # QMessageBox.warning(self, "Brak połączenia z bazą",
-                                    # "Nie można nawiązać połączenia z bazą danych. Aplikacja będzie działać w trybie ograniczonym.")
+                QMessageBox.warning(self, "Brak połączenia z bazą",
+                                    "Nie można nawiązać połączenia z bazą danych. Aplikacja będzie działać w trybie ograniczonym.")
         except Exception as e:
             self.db_connected = False
             print("[App] Błąd przy inicjalizacji połączenia z bazą:", e)
-            # QMessageBox.warning(self, "Błąd połączenia",
-            #                     f"Wystąpił błąd przy łączeniu z bazą danych: {str(e)}\nAplikacja będzie działać w trybie ograniczonym.")
+            QMessageBox.warning(self, "Błąd połączenia",
+                                f"Wystąpił błąd przy łączeniu z bazą danych: {str(e)}\nAplikacja będzie działać w trybie ograniczonym.")
 
 
     def toggle_page(self, page_name):
@@ -310,8 +294,6 @@ class App(QMainWindow):
                         data = self.data_queue.get(timeout=0.1)
                         batch_size = 1
                     except queue.Empty:
-                        # No data to process, sleep and continue
-                        # time.sleep(0.01)
                         continue
                 else:
                     # Get the first item in the batch
@@ -525,7 +507,6 @@ class App(QMainWindow):
                 # READ-RESET CYCLE: Critical to reset counters in the same 32ms cycle
                 plc_start = time.perf_counter()
                 
-                
                 data = read_plc_data(plc_client, db_number=2)
                 read_time = time.perf_counter() - plc_start
                 
@@ -537,14 +518,10 @@ class App(QMainWindow):
                 lumps = data.get("lumps", 0)
                 necks = data.get("necks", 0)
                 has_flaws = (lumps > 0 or necks > 0)
-                
-                # Warning for unusually high values which indicates reset issue
-                if lumps > 100 or necks > 100:
-                    print(f"[ACQ Process] WARNING: Unusually high values detected: lumps={lumps}, necks={necks}")
-                    print("[ACQ Process] Performing emergency reset...")
+                print(f"[ACQ Process] Lumps: {lumps}, Necks: {necks}, Has flaws: {has_flaws}")
                 
                 # Perform reset for ANY flaws or if values are suspiciously high
-                if (has_flaws or lumps > 100 or necks > 100):
+                if (has_flaws):
                     try:
                         # For performance optimization on frequent resets, do reset with separate writes
                         # First set bits to clear counters
@@ -610,6 +587,7 @@ class App(QMainWindow):
                 # Calculate sleep time to maintain 32ms cycle
                 elapsed = time.perf_counter() - cycle_start
                 sleep_time = max(0, 0.032 - elapsed)
+                
                 
                 # Log and handle cycle time issues
                 if elapsed > 0.032:
@@ -851,18 +829,11 @@ if __name__ == "__main__":
     mp.freeze_support()  # Wymagane dla Windows
     print("[App] Uruchamianie aplikacji po freeze ...")
     
-
-    # Inicjalizacja aplikacji PyQt
     app = QApplication(sys.argv)
-    print("[App] Inicjalizacja aplikacji PyQt qapplication")
-    # Opcjonalnie można ustawić styl, np. "Fusion"
     app.setStyle("fusion")
-    # print("[App] Ustawienie stylu aplikacji na Fusion")
 
-    main_window = App()  # App to Twoja klasa dziedzicząca po QMainWindow
-    # print("DEBUG: Created main_window, about to show()")
+    main_window = App() 
     main_window.show()
-    # print("[App] Wyświetlenie głównego okna aplikacji")
 
     sys.exit(app.exec_())
     print("[App] Aplikacja zakończona")
