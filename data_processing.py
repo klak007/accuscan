@@ -77,9 +77,9 @@ class FastAcquisitionBuffer:
                 self.diameters[key].append(data.get(key, 0))
             
             # Store defect indicators
-            self.lumps.append(data.get("lumps", 0))
-            self.necks.append(data.get("necks", 0))
-            
+            self.lumps.append(data.get("lumps_delta", 0))
+            self.necks.append(data.get("necks_delta", 0))
+            # print(f"[Acquisition] lumps: {self.lumps[-1]}, necks: {self.necks[-1]}")
             # Calculate and store average diameter
             values = [data.get(f"D{i}", 0) for i in range(1, 5)]
             avg = sum(values) / 4.0 if all(v != 0 for v in values) else 0

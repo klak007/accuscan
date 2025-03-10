@@ -408,7 +408,12 @@ class App(QMainWindow):
         """
         
         print(f"[ACQ Process] Starting acquisition process worker")
-        
+        # Inicjalizacja zmiennych do akumulacji defektów
+        lumps_prev = 0
+        necks_prev = 0
+        lumps_total = 0
+        necks_total = 0
+        stable_count = 0  # licznik cykli bez przyrostu
         # Connect to the PLC
         plc_client = None
         try:
@@ -512,56 +517,66 @@ class App(QMainWindow):
                 
                 # 2. IMMEDIATELY reset the counters in PLC to avoid cumulative counts
                 # This is critical and must happen in the same cycle as the read
+                
+                
+                # Pobierz bieżące wartości z PLC
+                current_lumps = data.get("lumps", 0)
+                current_necks = data.get("necks", 0)
+
+                # Po obliczeniu delta_lumps oraz delta_necks (jak poprzednio)
+                if current_lumps >= lumps_prev:
+                    delta_lumps = current_lumps - lumps_prev
+                else:
+                    delta_lumps = current_lumps
+
+                if current_necks >= necks_prev:
+                    delta_necks = current_necks - necks_prev
+                else:
+                    delta_necks = current_necks
+
+                # Aktualizacja kumulacji (opcjonalnie, jeśli nadal jej potrzebujesz)
+                lumps_total += delta_lumps
+                necks_total += delta_necks
+
+                # Zapisz zarówno kumulację, jak i sam przyrost
+                data["lumps_software"] = lumps_total      # dotychczasowa wartość kumulowana
+                data["necks_software"] = necks_total
+
+                # Dodaj nowe pola z przyrostem
+                data["lumps_delta"] = delta_lumps
+                data["necks_delta"] = delta_necks
+
+                # Aktualizacja poprzednich wartości
+                lumps_prev = current_lumps
+                necks_prev = current_necks
+
+                # Warunek braku przyrostu – jeśli delta obu (lub jednej) jest równa 0, zwiększamy licznik stabilności
+                if delta_lumps == 0 and delta_necks == 0:
+                    stable_count += 1
+                else:
+                    stable_count = 0
                 reset_start = time.perf_counter()
-                
-                # Get lump and neck values to detect potential issues
-                lumps = data.get("lumps", 0)
-                necks = data.get("necks", 0)
-                has_flaws = (lumps > 0 or necks > 0)
-                print(f"[ACQ Process] Lumps: {lumps}, Necks: {necks}, Has flaws: {has_flaws}")
-                
-                # Perform reset for ANY flaws or if values are suspiciously high
-                if (has_flaws):
+                # Warunki resetu: jeżeli licznik defektów w PLC jest bliski przepełnienia lub defekty przez dłuższy czas nie rosną
+                if current_lumps > 9000 or current_necks > 9000 or stable_count >= 1024:
+                    print("[ACQ Process] Warunki resetu osiągnięte, wykonuję reset PLC")
                     try:
-                        # For performance optimization on frequent resets, do reset with separate writes
-                        # First set bits to clear counters
+                        # Reset – podobnie jak dotychczas, ale wykonujemy tylko gdy trzeba
                         write_plc_data(
                             plc_client, db_number=2,
-                            # Set all reset bits
-                            zf=True, zt=True#, zl=True, zn=True, 
+                            zf=True, zt=True
                         )
-                        
-                        # Immediately clear bits in a second write
-                        if has_flaws:  # Only do second write if we actually had flaws
-                            write_plc_data(
-                                plc_client, db_number=2,
-                                # Clear all reset bits
-                                zf=False, zt=False#,zl=False, zn=False, 
-                            )
-                        
-                        # Log reset performance issues
-                        now = time.time()
-                        reset_count += 1
-                        
-                        # Track high frequency of resets
-                        # if now - last_reset_time < 0.05:  # Resets happening very close together
-                        #     print(f"[ACQ Process] WARNING: Rapid resets detected! This may impact performance.")
-                            
-                        #     # If we see this is becoming a problem, slow down the acquisition cycle slightly
-                        #     # to give PLC more time to process
-                        #     time.sleep(0.01)  # Add a tiny delay to give PLC breathing room
-                        
-                        last_reset_time = now
-                        
-                        # Log reset counts periodically
-                        if now - reset_log_time > 5.0:
-                            if reset_count > 0:
-                                print(f"[ACQ Process] Reset count: {reset_count} in last 5 seconds")
-                            reset_count = 0
-                            reset_log_time = now
+                        write_plc_data(
+                            plc_client, db_number=2,
+                            zf=False, zt=False
+                        )
                     except Exception as e:
                         print(f"[ACQ Process] Reset error: {e}")
-                
+                    
+                    # Po resecie PLC wyzeruj liczniki poprzednich odczytów
+                    lumps_prev = 0
+                    necks_prev = 0
+                    stable_count = 0
+
                 reset_time = time.perf_counter() - reset_start
                 
                 # Add timing information to the data
@@ -577,12 +592,12 @@ class App(QMainWindow):
 
                 
                 # Periodically log performance info
-                # cycle_count += 1
-                # if cycle_count >= log_frequency:
-                #     cycle_count = 0
-                #     total_time = time.perf_counter() - cycle_start
-                #     if total_time > 0.001:  # Only print if cycle time exceeded 31ms
-                #         print(f"[ACQ Process] Total: {total_time:.4f}s | Read: {read_time:.4f}s | Reset: {reset_time:.4f}s")
+                cycle_count += 1
+                if cycle_count >= log_frequency:
+                    cycle_count = 0
+                    total_time = time.perf_counter() - cycle_start
+                    if total_time > 0.001:  # Only print if cycle time exceeded 31ms
+                        print(f"[ACQ Process] Total: {total_time:.4f}s | Read: {read_time:.4f}s | Reset: {reset_time:.4f}s")
                 
                 # Calculate sleep time to maintain 32ms cycle
                 elapsed = time.perf_counter() - cycle_start
@@ -595,8 +610,8 @@ class App(QMainWindow):
                     current_time = time.time()
                     time_since_reset = current_time - last_reset_time
                     
-                    if time_since_reset < 0.1 and has_flaws:
-                        print(f"[ACQ Process] Cycle time exceeded due to lump/neck reset: {elapsed:.4f}s, Read: {read_time:.4f}s, Reset: {reset_time:.4f}s, Lumps={lumps}, Necks={necks}")
+                    if time_since_reset < 0.1:
+                        print(f"[ACQ Process] Cycle time exceeded due to lump/neck reset: {elapsed:.4f}s, Read: {read_time:.4f}s, Reset: {reset_time:.4f}s, Lumps={current_lumps}, Necks={current_necks}")
                     # elif elapsed > 0.1:
                     #     print(f"[ACQ Process] SEVERE DELAY: Cycle time {elapsed:.4f}s, Read: {read_time:.4f}s, Reset: {reset_time:.4f}s is significantly over budget!")
                     # else:
