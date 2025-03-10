@@ -59,7 +59,7 @@ class App(QMainWindow):
         print("[App] Inicjalizacja aplikacji...")
         
         # Ustawienia okna
-        self.setWindowTitle("AccuScan GUI")
+        self.setWindowTitle("AccuScan Controller")
         self.setGeometry(0, 0, 1920, 700)
         # Add logo as window icon
         logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logo2.png")
