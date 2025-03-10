@@ -58,14 +58,12 @@ class FastAcquisitionBuffer:
         self.last_stats_update = 0
         self.stats_cache_ttl = 1.0  # 1 second
 
-    def add_sample(self, data, production_speed=None, speed_fluctuation_percent=0.0):
+    def add_sample(self, data):
         """
         Thread-safe method to add a new sample to the buffer.
         
         Args:
             data: Dictionary containing measurement data
-            production_speed: Base production speed in m/min
-            speed_fluctuation_percent: Random speed fluctuation in percent
             
         Returns:
             Dictionary with basic metrics about the operation
@@ -87,41 +85,29 @@ class FastAcquisitionBuffer:
             avg = sum(values) / 4.0 if all(v != 0 for v in values) else 0
             self.avg_diameters.append(avg)
             
-            # Calculate x-coordinate based on speed
+            # Handle timestamp and dt calculation
             current_time = data.get("timestamp", datetime.now())
             self.timestamps.append(current_time)
-            
             dt = 0
             if self.last_update_time is not None:
                 dt = (current_time - self.last_update_time).total_seconds()
             self.last_update_time = current_time
             
-            # Apply fluctuation to speed if specified
-            if speed_fluctuation_percent > 0:
-                import random
-                fluctuation_factor = 1.0 + random.uniform(-speed_fluctuation_percent/100, speed_fluctuation_percent/100)
-                current_speed = production_speed * fluctuation_factor
-            else:
-                current_speed = production_speed
-                
-            if production_speed is None:
-                production_speed = data.get("speed", 50.0)
-                
-            # Convert from m/min to m/s for calculation
-            speed_mps = production_speed / 60.0
+            # Read speed directly from data; no additional production speed or fluctuation used.
+            speed = data.get("speed", 25.0)
+            speed_mps = speed / 60.0  # Convert m/min to m/s
             self.current_x += dt * speed_mps
             self.x_coords.append(self.current_x)
             
-            # Store complete sample with additional computed values
+            # Store complete sample data
             sample_copy = data.copy()
             sample_copy['xCoord'] = self.current_x
-            sample_copy['speed'] = current_speed
+            sample_copy['speed'] = speed
             sample_copy['avg_diameter'] = avg
             self.samples.append(sample_copy)
             
-            # Invalidate statistics cache
+            # Invalidate the statistics cache
             self.stats_cache = {}
-            
             self.acquisition_time = time.perf_counter() - start_time
             
             return {
@@ -284,17 +270,15 @@ class WindowProcessor(FastAcquisitionBuffer):
     Delegates to FastAcquisitionBuffer.
     """
     
-    def process_sample(self, data, production_speed=50.0, speed_fluctuation_percent=0.0):
+    def process_sample(self, data):
         """
         Process a new data sample, update histories, and calculate x-coordinate.
         
         Args:
             data: Dictionary containing measurement data
-            production_speed: Base production speed in m/min
-            speed_fluctuation_percent: Random speed fluctuation in percent
         
         Returns:
             Dictionary with processed data including window counters
         """
-        self.add_sample(data, production_speed, speed_fluctuation_percent)
+        self.add_sample(data)
         return self.get_window_data()

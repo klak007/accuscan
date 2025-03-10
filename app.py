@@ -10,8 +10,8 @@ import queue
 import multiprocessing as mp
 from multiprocessing import Process, Value, Event, Queue
 # Import modułów
-from plc_helper import read_accuscan_data, connect_plc
-from plc_helper import read_accuscan_data, connect_plc, write_accuscan_out_settings
+from plc_helper import read_plc_data, connect_plc
+from plc_helper import read_plc_data, connect_plc, write_plc_data
 from db_helper import init_database, save_measurement_sample, check_database
 from data_processing import FastAcquisitionBuffer
 from flaw_detection import FlawDetector
@@ -269,7 +269,7 @@ class App(QMainWindow):
         # Cache UI values to reduce UI thread interactions
         batch_cache = "XABC1566"
         product_cache = "18X0600"
-        speed_cache = 50.0
+        
         ui_refresh_counter = 0
         
         # Performance monitoring
@@ -339,14 +339,14 @@ class App(QMainWindow):
                                 else:
                                     product_cache = self.main_page.entry_product.get() if hasattr(self.main_page, 'entry_product') else "18X0600"
                                     
-                                speed_cache = getattr(self.main_page, 'production_speed', 50.0)
+                                
                         except Exception as e:
                             print(f"[Data Receiver] UI access error: {e}")
                 
                 # Minimal processing for each sample
                 data["batch"] = batch_cache
                 data["product"] = product_cache
-                data["speed"] = speed_cache
+                
                 
                 # Add to buffer but skip some unnecessary processing steps for bulk items
                 self.acquisition_buffer.add_sample(data)
@@ -365,7 +365,7 @@ class App(QMainWindow):
                         # Use cached UI values - minimal processing
                         data["batch"] = batch_cache
                         data["product"] = product_cache
-                        data["speed"] = speed_cache
+                        
                         
                         # Add to buffer - minimal processing
                         self.acquisition_buffer.add_sample(data)
@@ -439,14 +439,14 @@ class App(QMainWindow):
             if plc_client and plc_client.get_connected():
                 # First reset that immediately clears all counters
                 print("[ACQ Process] Performing initial PLC reset")
-                write_accuscan_out_settings(
+                write_plc_data(
                     plc_client, db_number=2,
                     # Set all reset bits
                     zl=True, zn=True, zf=True, zt=False
                 )
                 
                 # Clear the reset bits
-                write_accuscan_out_settings(
+                write_plc_data(
                     plc_client, db_number=2,
                     # Clear reset bits
                     zl=False, zn=False, zf=False, zt=False
@@ -501,20 +501,20 @@ class App(QMainWindow):
                 try:
                     print("[ACQ Process] Performing initial reset after measurement start")
                     # First reset with all reset bits set
-                    write_accuscan_out_settings(
+                    write_plc_data(
                         plc_client, db_number=2,
                         zl=True, zn=True, zf=True, zt=False
                     )
                     # time.sleep(0.05)  # Short delay to ensure reset is processed
                     
                     # Then clear reset bits
-                    write_accuscan_out_settings(
+                    write_plc_data(
                         plc_client, db_number=2,
                         zl=False, zn=False, zf=False, zt=False
                     )
                     
                     # Do an initial read and discard to clear any pending data
-                    _ = read_accuscan_data(plc_client, db_number=2)
+                    _ = read_plc_data(plc_client, db_number=2)
                     
                     initial_reset_needed = False
                     print("[ACQ Process] Initial reset completed")
@@ -526,7 +526,7 @@ class App(QMainWindow):
                 plc_start = time.perf_counter()
                 
                 
-                data = read_accuscan_data(plc_client, db_number=2)
+                data = read_plc_data(plc_client, db_number=2)
                 read_time = time.perf_counter() - plc_start
                 
                 # 2. IMMEDIATELY reset the counters in PLC to avoid cumulative counts
@@ -548,7 +548,7 @@ class App(QMainWindow):
                     try:
                         # For performance optimization on frequent resets, do reset with separate writes
                         # First set bits to clear counters
-                        write_accuscan_out_settings(
+                        write_plc_data(
                             plc_client, db_number=2,
                             # Set all reset bits
                             zf=True, zt=True#, zl=True, zn=True, 
@@ -556,7 +556,7 @@ class App(QMainWindow):
                         
                         # Immediately clear bits in a second write
                         if has_flaws:  # Only do second write if we actually had flaws
-                            write_accuscan_out_settings(
+                            write_plc_data(
                                 plc_client, db_number=2,
                                 # Clear all reset bits
                                 zf=False, zt=False#,zl=False, zn=False, 
@@ -647,7 +647,7 @@ class App(QMainWindow):
             if plc_client and plc_client.get_connected():
                 try:
                     # Force a small read to ensure the connection is still valid
-                    _ = read_accuscan_data(plc_client, db_number=2)
+                    _ = read_plc_data(plc_client, db_number=2)
                 except:
                     plc_connected_flag.value = 0
                     plc_client = None
@@ -678,12 +678,12 @@ class App(QMainWindow):
         while self.plc_writer_running:
             try:
                 write_cmd = self.plc_write_queue.get(timeout=0.5)
-                if write_cmd.get("command") == "write_accuscan_out_settings":
-                    from plc_helper import write_accuscan_out_settings
+                if write_cmd.get("command") == "write_plc_settings":
+                    from plc_helper import write_plc_data
                     # Użyj obiektu PLC, który masz – np. self.plc_client,
                     # lub jeśli korzystasz z innego mechanizmu, przekaż odpowiedni obiekt.
                     if hasattr(self, "plc_client") and self.plc_client and self.plc_client.get_connected():
-                        write_accuscan_out_settings(
+                        write_plc_data(
                             self.plc_client,
                             db_number=write_cmd.get("db_number", 2),
                             lump_threshold=write_cmd.get("lump_threshold"),

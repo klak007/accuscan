@@ -158,7 +158,7 @@ def disconnect_plc(client_or_ip):
     else:
         print(f"[PLC Helper] No lock found for {disconnect_key}, can't disconnect safely")
 
-def read_accuscan_data(client: snap7.client.Client, db_number: int = 2) -> dict:
+def read_plc_data(client: snap7.client.Client, db_number: int = 2) -> dict:
     """
     Odczytuje strukturę danych z DB sterownika (np. DB2) i zwraca wyniki
     jako słownik z nazwami kluczowymi (np. 'D1', 'D2', 'lumps').
@@ -168,7 +168,7 @@ def read_accuscan_data(client: snap7.client.Client, db_number: int = 2) -> dict:
     if OFFLINE_MODE or not client:
         return {"D1": 0, "D2": 0, "D3": 0, "D4": 0, "lumps": 0, "necks": 0}
 
-    size = 48  # Rozmiar w bajtach, wymagany do odczytu offsetu 0..47
+    size = 56  # Rozmiar w bajtach, wymagany do odczytu offsetu (bylo 48)
     start = 0
     
     # Try with retries for job pending errors
@@ -186,7 +186,7 @@ def read_accuscan_data(client: snap7.client.Client, db_number: int = 2) -> dict:
                 import time
                 time.sleep(0.01 * (retry_count + 1))  # Exponential backoff
                 retry_count += 1
-                print(f"[PLC Helper] Job pending on read_accuscan_data, retrying {retry_count}/{max_retries}")
+                print(f"[PLC Helper] Job pending on read_plc_data, retrying {retry_count}/{max_retries}")
             else:
                 # Re-raise other exceptions
                 raise
@@ -202,38 +202,48 @@ def read_accuscan_data(client: snap7.client.Client, db_number: int = 2) -> dict:
     d4 = get_real(raw_data, 14)
     lumps_count = get_word(raw_data, 18)
     necks_count = get_word(raw_data, 20)
+    speed = get_real(raw_data, 22)  
+    # print(f"[PLC Helper] Speed: {speed} m/min")
+    status_plc = get_word(raw_data, 26)  
 
     # Przykładowe bity z obszaru 'Out' (offsety i bitmaski wg definicji w DB):
-    zl_zero_lump_alarm = get_bool(raw_data, 22, 0)
-    zn_zero_neck_alarm = get_bool(raw_data, 22, 1)
-    # ...
+    zl_zero_lump_alarm = get_bool(raw_data, 28, 0)
+    zn_zero_neck_alarm = get_bool(raw_data, 28, 1)
+    zf_zero_lump_neck_alarm = get_bool(raw_data, 28, 2)
+    zt_zero_diameter_tolerance_alarm = get_bool(raw_data, 28, 4)
 
-    num_scans_averaging = get_word(raw_data, 24)
-    flaw_preset_diameter = get_real(raw_data, 26)
-    lump_threshold = get_real(raw_data, 30)
-    neck_threshold = get_real(raw_data, 34)
-    flaw_mode_word = get_word(raw_data, 38)
-    upper_tol_preset = get_real(raw_data, 40)
-    under_tol_preset = get_real(raw_data, 44)
+    num_scans_averaging = get_word(raw_data, 30)
+    flaw_preset_diameter = get_real(raw_data, 32)
+    lump_threshold = get_real(raw_data, 36)
+    neck_threshold = get_real(raw_data, 40)
+    flaw_mode_word = get_word(raw_data, 44)
+    upper_tol_preset = get_real(raw_data, 46)
+    under_tol_preset = get_real(raw_data, 50)
+    lamp_control= get_bool(raw_data, 55, 0)
 
     return {
         "status_byte": status_byte,
         "D1": d1, "D2": d2, "D3": d3, "D4": d4,
         "lumps": lumps_count,
         "necks": necks_count,
+        "speed": speed,
+        "status_plc": status_plc,
         "zl_zero_lump_alarm": zl_zero_lump_alarm,
         "zn_zero_neck_alarm": zn_zero_neck_alarm,
-        # ...
+        "zf_zero_lump_neck_alarm": zf_zero_lump_neck_alarm,
+        "zt_zero_diameter_tolerance_alarm": zt_zero_diameter_tolerance_alarm,
+        #...
         "num_scans": num_scans_averaging,
         "flaw_preset_diameter": flaw_preset_diameter,
         "lump_threshold": lump_threshold,
         "neck_threshold": neck_threshold,
         "flaw_mode_word": flaw_mode_word,
         "upper_tolerance": upper_tol_preset,
-        "under_tolerance": under_tol_preset
+        "under_tolerance": under_tol_preset,
+        "lamp_control": lamp_control,
     }
 
-def write_accuscan_out_settings(
+def write_plc_data(
     client: snap7.client.Client,
     db_number: int = 2,
     zl: bool=False, zn: bool=False, zf: bool=False, th: bool=False,
@@ -249,23 +259,21 @@ def write_accuscan_out_settings(
     neck_threshold: float=None,
     flaw_mode: int=16386,
     upper_tol: float=None,
-    under_tol: float=None
+    under_tol: float=None,
+    lamp_control: bool=False
+
 ) -> None:
     """
-    Zapisuje wybrane ustawienia 'Out' w DB2 (np. offset od 22 w górę).
+    Zapisuje wybrane ustawienia 'Out' w DB2 (np. offset od 28 w górę).
     Jeśli użytkownik nie poda wartości dla średnicy lub progów, pozostaną one niezmienione.
     """
-    size = 26  # Zakładany rozmiar (bajty) do zapisu od offsetu 22
-
-    # Try to read existing values with error handling and retry
+    size = 28  # Zakładany rozmiar (bajty) do zapisu od offsetu 28
     retry_count = 0
     max_retries = 3
     read_success = False
     
     while not read_success and retry_count < max_retries:
         try:
-            # Odczyt istniejących wartości z PLC
-            existing_data = client.db_read(db_number, 22, size)
             read_success = True
         except Exception as e:
             if "CLI: Job pending" in str(e):
@@ -277,66 +285,35 @@ def write_accuscan_out_settings(
             else:
                 # Re-raise other exceptions
                 raise
-    
-    # If we still couldn't read, use default values
-    if not read_success:
-        print("[PLC Helper] Couldn't read existing values, using defaults")
-        existing_data = bytearray(size)  # Empty buffer
-        
-    # Pobranie aktualnych wartości, jeśli nie podano nowych
-    # Use safe getters with default values
-    if flaw_preset_diameter is None:
-        try:
-            flaw_preset_diameter = get_real(existing_data, 4)
-        except:
-            flaw_preset_diameter = 18.0  # Safe default
-    if lump_threshold is None:
-        try:
-            lump_threshold = get_real(existing_data, 8)
-        except:
-            lump_threshold = 0.1  # Safe default
-    if neck_threshold is None:
-        try:
-            neck_threshold = get_real(existing_data, 12)
-        except:
-            neck_threshold = 0.1  # Safe default
-    if upper_tol is None:
-        try:
-            upper_tol = get_real(existing_data, 18)
-        except:
-            upper_tol = 0.3  # Safe default
-    if under_tol is None:
-        try:
-            under_tol = get_real(existing_data, 22)
-        except:
-            under_tol = 0.3  # Safe default
 
     # Przygotowanie danych do zapisu
     write_data = bytearray(size)
-
+    # print(f"[PLC Helper] Preparing data for write: {write_data.hex()}")
     # Ustawienie bitów w bajtach 0-1
-    set_bool(write_data, 0, 0, zl)
-    set_bool(write_data, 0, 1, zn)
-    set_bool(write_data, 0, 2, zf)
-    set_bool(write_data, 0, 3, th)
-    set_bool(write_data, 0, 4, zt)
-    set_bool(write_data, 0, 5, et)
-    set_bool(write_data, 0, 6, el)
-    set_bool(write_data, 0, 7, en)
-    set_bool(write_data, 1, 0, eo)
-    set_bool(write_data, 1, 1, zo)
+    set_bool(write_data, 0, 0, zl if zl is not None else False)  # ZL
+    set_bool(write_data, 0, 1, zn if zn is not None else False)  # ZN
+    set_bool(write_data, 0, 2, zf if zf is not None else False)  # ZF
+    set_bool(write_data, 0, 3, th if th is not None else False)  # TH
+    set_bool(write_data, 0, 4, zt if zt is not None else False)  # ZT
+    set_bool(write_data, 0, 5, et if et is not None else True)  # ET
+    set_bool(write_data, 0, 6, el if el is not None else True)  # EL
+    set_bool(write_data, 0, 7, en if en is not None else True)  # EN
+    set_bool(write_data, 1, 0, eo if eo is not None else True)  # EO
+    set_bool(write_data, 1, 1, zo if zo is not None else False)  # ZO
 
     # WORD num_scans
-    set_word(write_data, 2, num_scans)
+    set_word(write_data, 2, num_scans if num_scans is not None else 128)
     # REAL flaw_preset_diameter
-    set_real(write_data, 4, flaw_preset_diameter)
-    set_real(write_data, 8, lump_threshold)
-    set_real(write_data, 12, neck_threshold)
+    set_real(write_data, 4, flaw_preset_diameter if flaw_preset_diameter is not None else 18.0)
+    set_real(write_data, 8, lump_threshold if lump_threshold is not None else 0.1)
+    set_real(write_data, 12, neck_threshold if neck_threshold is not None else 0.1)
     # WORD flaw_mode
-    set_word(write_data, 16, flaw_mode)
+    set_word(write_data, 16, flaw_mode if flaw_mode is not None else 16386)
     # REAL upper_tol, under_tol
-    set_real(write_data, 18, upper_tol)
-    set_real(write_data, 22, under_tol)
+    set_real(write_data, 18, upper_tol if upper_tol is not None else 0.3)
+    set_real(write_data, 22, under_tol if under_tol is not None else 0.3)
+    set_bool(write_data, 27, 0, lamp_control if lamp_control is not None else False)  # Lamp control
+    # print(f"[PLC Helper] Data prepared for write: {write_data.hex()}")    
 
     # Zapis do DB (offset 22 w pamięci PLC) with error handling and retry
     retry_count = 0
@@ -345,7 +322,7 @@ def write_accuscan_out_settings(
     
     while not write_success and retry_count < max_retries:
         try:
-            client.db_write(db_number, 22, write_data)
+            client.db_write(db_number, 28, write_data)
             write_success = True
         except Exception as e:
             if "CLI: Job pending" in str(e):

@@ -14,7 +14,7 @@ import pyqtgraph as pg
 
 # PyQt5 imports - consolidated
 from PyQt5.QtWidgets import (
-    QFrame, QGridLayout, QVBoxLayout, QWidget, QMessageBox, QSlider,
+    QFrame, QGridLayout, QVBoxLayout, QWidget, QMessageBox,
     QHBoxLayout, QPushButton, QLabel, QSpacerItem, QSizePolicy, QLineEdit, QGroupBox
 )
 from PyQt5.QtCore import Qt, QTimer
@@ -62,7 +62,6 @@ class MainPage(QWidget):
         self.x_history = []
         self.MAX_POINTS = 1024  # Increased to 1024 samples
         self.display_range = 10  # ile „metrów” pokazywać na wykresie
-        self.production_speed = 50
         self.last_update_time = None
         self.current_x = 0.0
         self.FFT_BUFFER_SIZE = 64
@@ -754,7 +753,7 @@ class MainPage(QWidget):
 
         # 4. Wysyłanie komendy do PLC asynchronicznie poprzez kolejkę:
         write_cmd = {
-            "command": "write_accuscan_out_settings",
+            "command": "write_plc_settings",
             "db_number": 2,
             "lump_threshold": lump_threshold,
             "neck_threshold": neck_threshold,
@@ -770,11 +769,6 @@ class MainPage(QWidget):
         except Exception as e:
             print(f"[GUI] Błąd przy wysyłaniu komendy do PLC: {e}")
 
-
-
-    def _on_speed_change(self, value: float):
-        self.production_speed = float(value)
-        self.speed_label.setText(f"Speed: {self.production_speed:.1f}")
 
     def _on_entry_focus(self, event=None):
         """Handler for entry field focus - marks UI as busy to reduce processing"""
@@ -842,8 +836,7 @@ class MainPage(QWidget):
                 "entry_flaw_window": "0.5",
                 "entry_max_lumps": "30",
                 "entry_max_necks": "7",
-                "speed_fluct_entry": "2.0"
-            }
+                }
             
             # Update all fields in a single batch to minimize UI processing
             for field_name, value in field_values.items():
@@ -937,9 +930,11 @@ class MainPage(QWidget):
         group_pos_speed = QGroupBox("Pozycja i prędkość", self.readings_frame)
         pos_speed_layout = QHBoxLayout()
         self.label_xcoord = QLabel("xCoord [m]: --", group_pos_speed)
-        self.label_speed = QLabel("Prędkośc linii [m/min]: --", group_pos_speed)
+        
         pos_speed_layout.addWidget(self.label_xcoord)
+        self.label_speed = QLabel("Speed [m/min]: --", group_pos_speed)
         pos_speed_layout.addWidget(self.label_speed)
+        
         group_pos_speed.setLayout(pos_speed_layout)
         readings_layout.addWidget(group_pos_speed)
         
@@ -964,46 +959,8 @@ class MainPage(QWidget):
         self.diameter_deviation_label = QLabel("Odchylenie: 0.00 mm", self.readings_frame)
         readings_layout.addWidget(self.diameter_deviation_label)
         
-        # --------------------------
-        # Kontrola prędkości produkcji
-        # --------------------------
-        self.speed_control_frame = QFrame(self.readings_frame)
-        speed_control_layout = QVBoxLayout(self.speed_control_frame)
-        self.speed_control_frame.setLayout(speed_control_layout)
-        readings_layout.addWidget(self.speed_control_frame)
         
-        # Etykieta prędkości produkcji
-        self.prod_speed_label = QLabel("Prędkośc linii produkcyjnej [m/min]:", self.speed_control_frame)
-        speed_control_layout.addWidget(self.prod_speed_label)
         
-        # Slider prędkości produkcji
-        slider_frame = QFrame(self.speed_control_frame)
-        slider_layout = QHBoxLayout(slider_frame)
-        slider_frame.setLayout(slider_layout)
-        speed_control_layout.addWidget(slider_frame)
-        
-        self.prod_speed_slider = QSlider(Qt.Horizontal, slider_frame)
-        self.prod_speed_slider.setRange(0, 100)
-        self.prod_speed_slider.setValue(self.production_speed)
-        self.prod_speed_slider.valueChanged.connect(self._on_prod_speed_change)
-        slider_layout.addWidget(self.prod_speed_slider)
-        
-        self.prod_speed_value = QLabel(f"{self.production_speed:.1f}", slider_frame)
-        slider_layout.addWidget(self.prod_speed_value)
-        
-        # Ustawienie wahań prędkości linii
-        fluct_frame = QFrame(self.speed_control_frame)
-        fluct_layout = QHBoxLayout(fluct_frame)
-        fluct_frame.setLayout(fluct_layout)
-        speed_control_layout.addWidget(fluct_frame)
-        
-        self.fluct_label = QLabel("Wahania prędkości linii (%):", fluct_frame)
-        fluct_layout.addWidget(self.fluct_label)
-        
-        self.speed_fluct_entry = QLineEdit(fluct_frame)
-        self.speed_fluct_entry.setFixedWidth(50)
-        self.speed_fluct_entry.setText("2.0")  # Domyślnie 2%
-        fluct_layout.addWidget(self.speed_fluct_entry)
         
         # Po zakończeniu konfiguracji, self.middle_panel powinien zostać dodany do głównego layoutu
         # np. poprzez self.layout.addWidget(self.middle_panel) w konstruktorze głównego okna.
@@ -1139,9 +1096,9 @@ class MainPage(QWidget):
     def _clear_reset_bits(self, plc_client):
         """Clear the reset bits after the initial reset"""
         try:
-            from plc_helper import write_accuscan_out_settings
+            from plc_helper import write_plc_data
             print("[GUI] Clearing reset bits")
-            write_accuscan_out_settings(
+            write_plc_data(
                 plc_client, db_number=2,
                 # Clear all reset bits
                 zl=False, zn=False, zf=False, zt=False,
@@ -1208,9 +1165,9 @@ class MainPage(QWidget):
     def _clear_reset_bits_all(self, plc_client):
         """Clear ALL reset bits after Kwituj reset"""
         try:
-            from plc_helper import write_accuscan_out_settings
+            from plc_helper import write_plc_data
             print("[GUI] Clearing ALL reset bits after Kwituj")
-            write_accuscan_out_settings(
+            write_plc_data(
                 plc_client, db_number=2,
                 # Clear all reset bits including zt
                 zl=False, zn=False, zf=False, zt=False,
@@ -1252,7 +1209,7 @@ class MainPage(QWidget):
         davg = sum(diameters) / 4.0
         dsd = (sum((x - davg) ** 2 for x in diameters) / 4.0) ** 0.5
         dov = ((dmax - dmin) / davg * 100) if davg != 0 else 0
-
+        
         # Update labels - this is fast
         label_update_start = time.perf_counter()
         self.label_d1.setText(f"D1 [mm]: {d1:.2f}")
@@ -1265,18 +1222,13 @@ class MainPage(QWidget):
         self.label_dsd.setText(f"dSD [mm]: {dsd:.3f}")
         self.label_dov.setText(f"dOV [%]: {dov:.2f}")
         
-        # Get fluctuation percentage for speed calculation
-        try:
-            fluctuation_percent = float(self.speed_fluct_entry.text() or "0")
-        except ValueError:
-            fluctuation_percent = 0
+        
+        
             
         # Get window data directly from the acquisition buffer
         # This still adds the sample to ensure it's processed
         self.window_processor.process_sample(
-            data, 
-            production_speed=self.production_speed,
-            speed_fluctuation_percent=fluctuation_percent
+            data
         )
         
         # Get the window data directly from controller's acquisition buffer
@@ -1286,21 +1238,8 @@ class MainPage(QWidget):
         # Update current_x from window data
         self.current_x = window_data['current_x']
         
-        # Update xCoord and speed labels
+        # Update xCoord label
         self.label_xcoord.setText(f"Dystans [m]: {self.current_x:.1f}")
-        
-        # Display production speed (potentially with fluctuation)
-        try:
-            if (fluctuation_percent > 0):
-                # Calculate a representative speed value
-                import random
-                fluctuation_factor = 1.0 + random.uniform(-fluctuation_percent/100, fluctuation_percent/100)
-                current_speed = self.production_speed * fluctuation_factor
-                self.label_speed.setText(f"Prędkośc linii [m/min]: {current_speed:.1f} (±{fluctuation_percent}%)")
-            else:
-                self.label_speed.setText(f"Prędkośc linii [m/min]: {self.production_speed:.1f}")
-        except ValueError:
-            self.label_speed.setText(f"Prędkośc linii [m/min]: {self.production_speed:.1f}")
 
         # Process flaw detection - this is fast
         # Update flaw window size from UI
@@ -1416,22 +1355,6 @@ class MainPage(QWidget):
                   f"Plot: {plot_update_time:.4f}s")
 
 
-    # This method is deprecated and replaced by PlotManager.update_all_plots
-    # Kept for reference but no longer used
-    def _update_plot(self):
-        """Update all plots - this is an expensive operation."""
-        pass
-        # Method replaced by PlotManager.update_all_plots
-
-    def _on_speed_change(self, value: float):
-        self.production_speed = float(value)
-        self.speed_value_label.setText(f"Speed: {self.production_speed:.1f}")
-        
-    def _on_prod_speed_change(self, value: float):
-        """Handle production speed slider change"""
-        self.production_speed = value
-        self.prod_speed_value.setText(f"{self.production_speed:.1f}")
-
     def update_data(self):
         # Get latest data directly from the acquisition buffer instead of data_mgr
         data = self.controller.acquisition_buffer.get_latest_data()
@@ -1445,3 +1368,5 @@ class MainPage(QWidget):
                 
             # Process data through our pipeline
             self.update_readings(data)
+        speed = data.get("speed", 0.0)
+        self.label_speed.setText(f"Speed [m/min]: {speed:.2f}")
