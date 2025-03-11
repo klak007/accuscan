@@ -59,8 +59,8 @@ class FlawDetector:
         start_time = time.perf_counter()
         
         # Extract flaw indicators from data
-        lumps = data.get("lumps", 0)
-        necks = data.get("necks", 0)
+        lumps = data.get("lumps_delta", 0)
+        necks = data.get("necks_delta", 0)
         
         # Track total counts
         if lumps > 0:

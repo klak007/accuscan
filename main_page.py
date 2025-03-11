@@ -226,21 +226,28 @@ class MainPage(QWidget):
 
     def show_alarm(self, defect_type, current_count, max_allowed):
         """
-        Przykładowa metoda, która wyświetla alarm dla danego typu defektu.
+        Zawsze wyświetlaj bieżącą liczbę defektów i maksymalną dozwoloną.
+        Jeśli liczba defektów przekracza wartość dopuszczalną, kolor jest czerwony
+        i dodajemy prefiks 'ALARM:'.
         """
-        # Możesz na przykład ustawić kolor etykiety lub wyświetlić komunikat.
-        print(f"ALARM: {defect_type} przekroczone! ({current_count} > {max_allowed})")
-        # Jeśli masz etykietę alarmu w UI, ustaw jej tekst i kolor:
         if defect_type == "Wybrzuszenia":
-            self.label_alarm_lumps.setText(f"ALARM: Wybrzuszenia {current_count}/{max_allowed}")
-            self.label_alarm_lumps.setStyleSheet("color: red;")
+            if current_count > max_allowed:
+                self.label_alarm_lumps.setText(f"ALARM: Wybrzuszenia {current_count}/{max_allowed}")
+                self.label_alarm_lumps.setStyleSheet("color: red;")
+            else:
+                self.label_alarm_lumps.setText(f"Wybrzuszenia {current_count}/{max_allowed}")
+                self.label_alarm_lumps.setStyleSheet("color: black;")
         elif defect_type == "Zagłębienia":
-            self.label_alarm_necks.setText(f"ALARM: Zagłębienia {current_count}/{max_allowed}")
-            self.label_alarm_necks.setStyleSheet("color: red;")
+            if current_count > max_allowed:
+                self.label_alarm_necks.setText(f"ALARM: Zagłębienia {current_count}/{max_allowed}")
+                self.label_alarm_necks.setStyleSheet("color: red;")
+            else:
+                self.label_alarm_necks.setText(f"Zagłębienia {current_count}/{max_allowed}")
+                self.label_alarm_necks.setStyleSheet("color: black;")
 
     def clear_alarm(self, defect_type):
         """
-        Czyści alarmy dla danego typu defektu.
+        Czyści alarmy (lub resetuje licznik na 0/0, w razie potrzeby).
         """
         if defect_type == "Wybrzuszenia":
             self.label_alarm_lumps.setText("Wybrzuszenia OK")

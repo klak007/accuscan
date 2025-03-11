@@ -332,6 +332,12 @@ class App(QMainWindow):
                 
                 # Add to buffer but skip some unnecessary processing steps for bulk items
                 self.acquisition_buffer.add_sample(data)
+                # Wyciągnij xCoord już wyliczony przez add_sample
+                x_coord = self.acquisition_buffer.current_x
+                # print(f"[Data Receiver] Processing data at x={x_coord:.10f} m")
+
+                self.flaw_detector.process_flaws(data, x_coord)
+
                 self.latest_data = data
                 
                 # Note: mp.Queue doesn't have task_done method
@@ -355,7 +361,9 @@ class App(QMainWindow):
                         # Update latest data
                         self.latest_data = data
                         
-                        self.flaw_detector.process_flaws(data, 0)
+                        x_coord = data.get("xCoord", 0.0)
+                        print(f"[Data Receiver] Processing data at x={x_coord:.2f} m")
+                        self.flaw_detector.process_flaws(data, x_coord)  
                         print(f"[Flaws] Lumps = {self.flaw_detector.total_lumps_count}, "
                               f"Necks = {self.flaw_detector.total_necks_count}, "
                               f"Total = {self.flaw_detector.get_total_flaws_count()}")
@@ -557,7 +565,7 @@ class App(QMainWindow):
                     stable_count = 0
                 reset_start = time.perf_counter()
                 # Warunki resetu: jeżeli licznik defektów w PLC jest bliski przepełnienia lub defekty przez dłuższy czas nie rosną
-                if current_lumps > 9000 or current_necks > 9000 or stable_count >= 1024:
+                if current_lumps > 9000 or current_necks > 9000 or stable_count >= 128:
                     print("[ACQ Process] Warunki resetu osiągnięte, wykonuję reset PLC")
                     try:
                         # Reset – podobnie jak dotychczas, ale wykonujemy tylko gdy trzeba
