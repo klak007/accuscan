@@ -224,6 +224,31 @@ class MainPage(QWidget):
         # Exit application
         self.controller.destroy()
 
+    def show_alarm(self, defect_type, current_count, max_allowed):
+        """
+        Przykładowa metoda, która wyświetla alarm dla danego typu defektu.
+        """
+        # Możesz na przykład ustawić kolor etykiety lub wyświetlić komunikat.
+        print(f"ALARM: {defect_type} przekroczone! ({current_count} > {max_allowed})")
+        # Jeśli masz etykietę alarmu w UI, ustaw jej tekst i kolor:
+        if defect_type == "Wybrzuszenia":
+            self.label_alarm_lumps.setText(f"ALARM: Wybrzuszenia {current_count}/{max_allowed}")
+            self.label_alarm_lumps.setStyleSheet("color: red;")
+        elif defect_type == "Zagłębienia":
+            self.label_alarm_necks.setText(f"ALARM: Zagłębienia {current_count}/{max_allowed}")
+            self.label_alarm_necks.setStyleSheet("color: red;")
+
+    def clear_alarm(self, defect_type):
+        """
+        Czyści alarmy dla danego typu defektu.
+        """
+        if defect_type == "Wybrzuszenia":
+            self.label_alarm_lumps.setText("Wybrzuszenia OK")
+            self.label_alarm_lumps.setStyleSheet("color: black;")
+        elif defect_type == "Zagłębienia":
+            self.label_alarm_necks.setText("Zagłębienia OK")
+            self.label_alarm_necks.setStyleSheet("color: black;")
+
 
     # ---------------------------------------------------------------------------------
     # 2. Lewa kolumna (row=1, col=0) – Batch, Product, itp.
@@ -943,17 +968,25 @@ class MainPage(QWidget):
         # Dodatkowe wskaźniki (np. wybrzuszenia, zagłębienia, średnica)
         # --------------------------
         # Wskaźniki wybrzuszenia
-        self.label_lump_indicator = QLabel("Wybrzuszenie: Off", self.readings_frame)
-        readings_layout.addWidget(self.label_lump_indicator)
-        self.lumps_count_label = QLabel("Liczba wybrzuszeń: 0", self.readings_frame)
-        readings_layout.addWidget(self.lumps_count_label)
+        # self.label_lump_indicator = QLabel("Wybrzuszenie: Off", self.readings_frame)
+        # readings_layout.addWidget(self.label_lump_indicator)
+        # self.lumps_count_label = QLabel("Liczba wybrzuszeń: 0", self.readings_frame)
+        # readings_layout.addWidget(self.lumps_count_label)
         
-        # Wskaźniki zagłębienia
-        self.label_neck_indicator = QLabel("Zagłębienie: Off", self.readings_frame)
-        readings_layout.addWidget(self.label_neck_indicator)
-        self.necks_count_label = QLabel("Liczba zagłębień: 0", self.readings_frame)
-        readings_layout.addWidget(self.necks_count_label)
+        # # Wskaźniki zagłębienia
+        # self.label_neck_indicator = QLabel("Zagłębienie: Off", self.readings_frame)
+        # readings_layout.addWidget(self.label_neck_indicator)
+        # self.necks_count_label = QLabel("Liczba zagłębień: 0", self.readings_frame)
+        # readings_layout.addWidget(self.necks_count_label)
         
+        self.label_alarm_lumps = QLabel("Wybrzuszenia OK", self.left_panel) 
+        self.label_alarm_lumps.setFont(QFont("Arial", 12, QFont.Bold))
+        readings_layout.addWidget(self.label_alarm_lumps, alignment=Qt.AlignCenter)
+
+        self.label_alarm_necks = QLabel("Zagłębienia OK", self.left_panel) 
+        self.label_alarm_necks.setFont(QFont("Arial", 12, QFont.Bold)) 
+        readings_layout.addWidget(self.label_alarm_necks, alignment=Qt.AlignCenter)
+
         # Wskaźniki średnicy
         self.label_diameter_indicator = QLabel("Średnica: OK", self.readings_frame)
         readings_layout.addWidget(self.label_diameter_indicator)
@@ -1246,27 +1279,52 @@ class MainPage(QWidget):
         # Update flaw window size from UI
         try:
             flaw_window_size = float(self.entry_flaw_window.text() or "0.5")
-            self.flaw_detector.update_flaw_window_size(flaw_window_size)
+            
         except ValueError:
             pass
+        self.flaw_detector.update_flaw_window_size(flaw_window_size)
+        current_x = data.get("xCoord", 0)
+        self.current_x = current_x  # zapisujemy do pola, żeby mieć spójność
+        flaw_results = self.flaw_detector.process_flaws(data, current_x)
+        # 4. Pobierz progi z UI
+        try:
+            max_lumps = int(self.entry_max_lumps.text() or "3")
+        except ValueError:
+            max_lumps = 3
+        try:
+            max_necks = int(self.entry_max_necks.text() or "3")
+        except ValueError:
+            max_necks = 3
+
+        # 5. Sprawdź, czy przekroczono progi
+        thresholds = self.flaw_detector.check_thresholds(max_lumps, max_necks)
+
+        # 6. Aktualizuj interfejs – na przykład zmień etykietę alarmu
+        if thresholds["lumps_exceeded"]:
+            self.show_alarm("Wybrzuszenia", flaw_results["window_lumps_count"], max_lumps)
+        else:
+            self.clear_alarm("Wybrzuszenia")
             
-        flaw_results = self.flaw_detector.process_flaws(data, self.current_x)
-        
+        if thresholds["necks_exceeded"]:
+            self.show_alarm("Zagłębienia", flaw_results["window_necks_count"], max_necks)
+        else:
+            self.clear_alarm("Zagłębienia")
+
         # Update indicators based on current data
-        lumps = data.get("lumps", 0)
-        necks = data.get("necks", 0)
-        if lumps:
-            self.label_lump_indicator.setText("Wybrzuszenie ON")
-            self.label_lump_indicator.setStyleSheet("color: red;")
-        else:
-            self.label_lump_indicator.setText("Wybrzuszenie OFF")
-            self.label_lump_indicator.setStyleSheet("color: green;")
-        if necks:
-            self.label_neck_indicator.setText("Zagłębienie ON")
-            self.label_neck_indicator.setStyleSheet("color: red;")
-        else:
-            self.label_neck_indicator.setText("Zagłębienie OFF")
-            self.label_neck_indicator.setStyleSheet("color: green;")
+        # lumps = data.get("lumps", 0)
+        # necks = data.get("necks", 0)
+        # if lumps:
+        #     self.label_lump_indicator.setText("Wybrzuszenie ON")
+        #     self.label_lump_indicator.setStyleSheet("color: red;")
+        # else:
+        #     self.label_lump_indicator.setText("Wybrzuszenie OFF")
+        #     self.label_lump_indicator.setStyleSheet("color: green;")
+        # if necks:
+        #     self.label_neck_indicator.setText("Zagłębienie ON")
+        #     self.label_neck_indicator.setStyleSheet("color: red;")
+        # else:
+        #     self.label_neck_indicator.setText("Zagłębienie OFF")
+        #     self.label_neck_indicator.setStyleSheet("color: green;")
         
         label_update_time = time.perf_counter() - label_update_start
 
@@ -1360,14 +1418,9 @@ class MainPage(QWidget):
         # Get latest data directly from the acquisition buffer instead of data_mgr
         data = self.controller.acquisition_buffer.get_latest_data()
         if data:  # If there's data available
-            # Update flaw window size from UI before processing
-            try:
-                flaw_window_size = float(self.entry_flaw_window.text() or "0.5")
-                self.flaw_detector.update_flaw_window_size(flaw_window_size)
-            except ValueError:
-                pass
-                
-            # Process data through our pipeline
+             # Process data through our pipeline
             self.update_readings(data)
         speed = data.get("speed", 0.0)
         self.label_speed.setText(f"<small>Speed [m/min]:</small><br><span style='font-size: 20px;'>{speed:.2f}</span>")
+
+
