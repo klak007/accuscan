@@ -1253,7 +1253,7 @@ class MainPage(QWidget):
         
         # Update labels - this is fast
         label_update_start = time.perf_counter()
-        self.label_d1.setText(f"<small>D1 [mm]:</small><br><span style='font-size: 20px;'>{d1:.2f}</span>")
+        self.label_d1.setText(f"<small>D1 [mm]:</small><br><span style='font-size: 50px;'>{d1:.2f}</span>")
         self.label_d2.setText(f"<small>D2 [mm]:</small><br><span style='font-size: 20px;'>{d2:.2f}</span>")
         self.label_d3.setText(f"<small>D3 [mm]:</small><br><span style='font-size: 20px;'>{d3:.2f}</span>")
         self.label_d4.setText(f"<small>D4 [mm]:</small><br><span style='font-size: 20px;'>{d4:.2f}</span>")

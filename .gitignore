@@ -8,7 +8,7 @@ environment.yml
 
 # Pliki tymczasowe i logi
 wynik.prof
-todo
+
 *.log
 
 # Pliki testowe (opcjonalnie)

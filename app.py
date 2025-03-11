@@ -59,7 +59,7 @@ class App(QMainWindow):
         
         # Ustawienia okna
         self.setWindowTitle("AccuScan Controller")
-        self.setGeometry(0, 0, 1920, 700)
+        self.setGeometry(0, 0, 1920, 1080)
         # Add logo as window icon
         logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logo2.png")
         if os.path.exists(logo_path):
@@ -332,6 +332,10 @@ class App(QMainWindow):
                 
                 # Add to buffer but skip some unnecessary processing steps for bulk items
                 self.acquisition_buffer.add_sample(data)
+                print(f"[Data Receiver] Added sample to buffer: {data}")
+                print(f"[Data Receiver] Buffer statistics: {self.acquisition_buffer.get_statistics()}")
+                
+                
                 # Wyciągnij xCoord już wyliczony przez add_sample
                 x_coord = self.acquisition_buffer.current_x
                 # print(f"[Data Receiver] Processing data at x={x_coord:.10f} m")
@@ -543,7 +547,7 @@ class App(QMainWindow):
                     delta_necks = current_necks
 
                 # Debug: wypis przyrostów
-                print(f"[ACQ Process] Delta: delta_lumps={delta_lumps}, delta_necks={delta_necks}")
+                # print(f"[ACQ Process] Delta: delta_lumps={delta_lumps}, delta_necks={delta_necks}")
 
                 # Aktualizacja sumarycznych liczników defektów (opcjonalnie)
                 lumps_total += delta_lumps
@@ -563,8 +567,8 @@ class App(QMainWindow):
                 necks_prev = current_necks
 
                 # Debug: wypis nowo ustawionych poprzednich wartości
-                print(f"[ACQ Process] Zaktualizowano lumps_prev i necks_prev: "
-                    f"lumps_prev={lumps_prev}, necks_prev={necks_prev}")
+                # print(f"[ACQ Process] Zaktualizowano lumps_prev i necks_prev: "
+                #     f"lumps_prev={lumps_prev}, necks_prev={necks_prev}")
 
                 # Aktualizacja licznika stabilności – jeśli przyrosty są zerowe, zwiększamy licznik cykli bez zmian
                 if delta_lumps == 0 and delta_necks == 0:
@@ -573,7 +577,7 @@ class App(QMainWindow):
                     stable_count = 0
 
                 # Debug: wypis licznika stabilności
-                print(f"[ACQ Process] stable_count={stable_count}")
+                # print(f"[ACQ Process] stable_count={stable_count}")
 
                 reset_start = time.perf_counter()
                 # Warunki resetu: duża wartość w licznikach lub długi brak przyrostu
