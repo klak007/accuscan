@@ -517,24 +517,24 @@ class App(QMainWindow):
                     print(f"[ACQ Process] Error during initial reset: {e}")
                 
             try:
-                # READ-RESET CYCLE: Critical to reset counters in the same 32ms cycle
                 plc_start = time.perf_counter()
-                
                 data = read_plc_data(plc_client, db_number=2)
                 read_time = time.perf_counter() - plc_start
-                
-                # 2. IMMEDIATELY reset the counters in PLC to avoid cumulative counts
-                # This is critical and must happen in the same cycle as the read
-                
-                
+
                 # Pobierz bieżące wartości z PLC
                 current_lumps = data.get("lumps", 0)
                 current_necks = data.get("necks", 0)
 
-                # Po obliczeniu delta_lumps oraz delta_necks (jak poprzednio)
+                # Debug: wypis wartości odczytanych z PLC oraz poprzednich
+                print(f"[ACQ Process] Odczyt z PLC: "
+                    f"current_lumps={current_lumps}, current_necks={current_necks}, "
+                    f"lumps_prev={lumps_prev}, necks_prev={necks_prev}")
+
+                # Oblicz przyrosty (delta) na podstawie poprzednich odczytów
                 if current_lumps >= lumps_prev:
                     delta_lumps = current_lumps - lumps_prev
                 else:
+                    # Jeśli current_lumps jest mniejsze, licznik w PLC został zresetowany lub przepełniony
                     delta_lumps = current_lumps
 
                 if current_necks >= necks_prev:
@@ -542,48 +542,84 @@ class App(QMainWindow):
                 else:
                     delta_necks = current_necks
 
-                # Aktualizacja kumulacji (opcjonalnie, jeśli nadal jej potrzebujesz)
+                # Debug: wypis przyrostów
+                print(f"[ACQ Process] Delta: delta_lumps={delta_lumps}, delta_necks={delta_necks}")
+
+                # Aktualizacja sumarycznych liczników defektów (opcjonalnie)
                 lumps_total += delta_lumps
                 necks_total += delta_necks
 
-                # Zapisz zarówno kumulację, jak i sam przyrost
-                data["lumps_software"] = lumps_total      # dotychczasowa wartość kumulowana
-                data["necks_software"] = necks_total
+                # Debug: wypis sumarycznych liczników
+                print(f"[ACQ Process] Po sumowaniu: lumps_total={lumps_total}, necks_total={necks_total}")
 
-                # Dodaj nowe pola z przyrostem
+                # Zapisz wyniki do danych przekazywanych dalej
+                data["lumps_software"] = lumps_total
+                data["necks_software"] = necks_total
                 data["lumps_delta"] = delta_lumps
                 data["necks_delta"] = delta_necks
 
-                # Aktualizacja poprzednich wartości
+                # Uaktualnij zmienne poprzednich odczytów
                 lumps_prev = current_lumps
                 necks_prev = current_necks
 
-                # Warunek braku przyrostu – jeśli delta obu (lub jednej) jest równa 0, zwiększamy licznik stabilności
+                # Debug: wypis nowo ustawionych poprzednich wartości
+                print(f"[ACQ Process] Zaktualizowano lumps_prev i necks_prev: "
+                    f"lumps_prev={lumps_prev}, necks_prev={necks_prev}")
+
+                # Aktualizacja licznika stabilności – jeśli przyrosty są zerowe, zwiększamy licznik cykli bez zmian
                 if delta_lumps == 0 and delta_necks == 0:
                     stable_count += 1
                 else:
                     stable_count = 0
+
+                # Debug: wypis licznika stabilności
+                print(f"[ACQ Process] stable_count={stable_count}")
+
                 reset_start = time.perf_counter()
-                # Warunki resetu: jeżeli licznik defektów w PLC jest bliski przepełnienia lub defekty przez dłuższy czas nie rosną
+                # Warunki resetu: duża wartość w licznikach lub długi brak przyrostu
                 if current_lumps > 9000 or current_necks > 9000 or stable_count >= 128:
                     print("[ACQ Process] Warunki resetu osiągnięte, wykonuję reset PLC")
-                    try:
-                        # Reset – podobnie jak dotychczas, ale wykonujemy tylko gdy trzeba
-                        write_plc_data(
-                            plc_client, db_number=2,
-                            zf=True, zt=True
-                        )
-                        write_plc_data(
-                            plc_client, db_number=2,
-                            zf=False, zt=False
-                        )
-                    except Exception as e:
-                        print(f"[ACQ Process] Reset error: {e}")
-                    
-                    # Po resecie PLC wyzeruj liczniki poprzednich odczytów
-                    lumps_prev = 0
-                    necks_prev = 0
-                    stable_count = 0
+                    # Maksymalna liczba prób resetu
+                    max_reset_attempts = 1
+                    reset_attempt = 0
+                    reset_successful = False
+
+                    while reset_attempt < max_reset_attempts:
+                        print(f"[ACQ Process] Próba resetu nr {reset_attempt + 1}")
+                        try:
+                            # Wykonaj reset w PLC
+                            write_plc_data(plc_client, db_number=2, zl=True, zn=True, zf=True, zt=False)
+                            write_plc_data(plc_client, db_number=2, zl=False, zn=False, zf=False, zt=False)
+                        except Exception as e:
+                            print(f"[ACQ Process] Reset error: {e}")
+                        
+                        # Daj PLC chwilę na wykonanie resetu – np. 50 ms
+                        time.sleep(0.05)
+                        
+                        # Odczytaj ponownie dane z PLC
+                        data_after_reset = read_plc_data(plc_client, db_number=2)
+                        post_reset_lumps = data_after_reset.get("lumps", 0)
+                        post_reset_necks = data_after_reset.get("necks", 0)
+                        print(f"[ACQ Process] Po resecie: lumps={post_reset_lumps}, necks={post_reset_necks}")
+                        
+                        # Jeśli oba liczniki są zerowe, reset się powiódł
+                        if post_reset_lumps == 0 and post_reset_necks == 0:
+                            reset_successful = True
+                            break
+                        reset_attempt += 1
+
+                    if reset_successful:
+                        print("[ACQ Process] Reset udany po próbie nr", reset_attempt + 1)
+                        # Ustaw zmienne poprzednich odczytów na 0
+                        lumps_prev = 0
+                        necks_prev = 0
+                        stable_count = 0
+                    else:
+                        print("[ACQ Process] Reset nie udany po maksymalnej liczbie prób")
+                        # Jeśli reset nie zadziałał, możesz ustawić zmienne poprzednich odczytów na wartość odczytaną po ostatniej próbie
+                        lumps_prev = post_reset_lumps
+                        necks_prev = post_reset_necks
+                        stable_count = 0
 
                 reset_time = time.perf_counter() - reset_start
                 
