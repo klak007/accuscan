@@ -61,8 +61,10 @@ class FlawDetector:
         # Extract flaw indicators from data
         lumps = data.get("lumps_delta", 0)
         necks = data.get("necks_delta", 0)
+        
         if lumps > 0 or necks > 0:
-            print(f"Processing lumps: {lumps}, necks: {necks} at position: {current_x}")
+            print(f"[FlawDetector] NEW lumps={lumps}, necks={necks} at x={current_x:.2f}")
+        
         # Track total counts
         if lumps > 0:
             self.total_lumps_count += lumps
@@ -72,42 +74,78 @@ class FlawDetector:
         # Track flaws in window
         if lumps > 0:
             self.flaw_lumps_coords.append((current_x, lumps))
-            print(f"Adding lumps: {lumps} at position: {current_x}")
+            # print(f"[FlawDetector]   -> Added lumps={lumps} at x={current_x:.2f}")
             self.flaw_lumps_count += lumps
         
         if necks > 0:
             self.flaw_necks_coords.append((current_x, necks))
-            print(f"Adding necks: {necks} at position: {current_x}")
+            # print(f"[FlawDetector]   -> Added necks={necks} at x={current_x:.2f}")
             self.flaw_necks_count += necks
         
-        # Efficiently remove flaws that are outside the window (too old)
-        # Use a windowing approach that preserves order and is efficient for sequential removal
+        # Określenie progu "początku" okna
         window_start = current_x - self.flaw_window_size
         
-        # Optimize lumps removal
+        # print(f"[FlawDetector] process_flaws called | current_x={current_x:.2f}, window_start={window_start:.2f}, flaw_window_size={self.flaw_window_size:.2f}")
+        
+        # -----------------------------
+        # LUMPS - stan PRZED usuwaniem
+        # -----------------------------
+        # print(f"[FlawDetector] LUMPS BEFORE removal:")
+        # print(f"   coords={self.flaw_lumps_coords}")
+        # print(f"   lumps_count={self.flaw_lumps_count}")
+        
+        # Usuwanie lumps poza oknem
         if self.flaw_lumps_coords:
             if self.flaw_lumps_coords[0][0] < window_start:
-                drop_idx = 0
+                drop_idx = None
                 for i, (x, cnt) in enumerate(self.flaw_lumps_coords):
                     if x >= window_start:
                         drop_idx = i
                         break
+                if drop_idx is None:
+                    drop_idx = len(self.flaw_lumps_coords)
                 if drop_idx > 0:
                     removed = sum(cnt for (_, cnt) in self.flaw_lumps_coords[:drop_idx])
                     self.flaw_lumps_coords = self.flaw_lumps_coords[drop_idx:]
                     self.flaw_lumps_count -= removed
-
+                    # print(f"[FlawDetector]   -> Removed lumps={removed} (older than x={window_start:.2f})")
+        
+        # -----------------------------
+        # LUMPS - stan PO usuwaniu
+        # -----------------------------
+        # print(f"[FlawDetector] LUMPS AFTER removal:")
+        # print(f"   coords={self.flaw_lumps_coords}")
+        # print(f"   lumps_count={self.flaw_lumps_count}")
+        
+        # -----------------------------
+        # NECKS - stan PRZED usuwaniem
+        # -----------------------------
+        # print(f"[FlawDetector] NECKS BEFORE removal:")
+        # print(f"   coords={self.flaw_necks_coords}")
+        # print(f"   necks_count={self.flaw_necks_count}")
+        
+        # Usuwanie necks poza oknem
         if self.flaw_necks_coords:
             if self.flaw_necks_coords[0][0] < window_start:
-                drop_idx = 0
+                drop_idx = None
                 for i, (x, cnt) in enumerate(self.flaw_necks_coords):
                     if x >= window_start:
                         drop_idx = i
                         break
+                if drop_idx is None:
+                    drop_idx = len(self.flaw_necks_coords)
                 if drop_idx > 0:
                     removed = sum(cnt for (_, cnt) in self.flaw_necks_coords[:drop_idx])
                     self.flaw_necks_coords = self.flaw_necks_coords[drop_idx:]
                     self.flaw_necks_count -= removed
+                    # print(f"[FlawDetector]   -> Removed necks={removed} (older than x={window_start:.2f})")
+        
+        # -----------------------------
+        # NECKS - stan PO usuwaniu
+        # -----------------------------
+        # print(f"[FlawDetector] NECKS AFTER removal:")
+        # print(f"   coords={self.flaw_necks_coords}")
+        # print(f"   necks_count={self.flaw_necks_count}")
         
         # Calculate processing time
         self.processing_time = time.perf_counter() - start_time
@@ -120,6 +158,7 @@ class FlawDetector:
             'window_necks_count': self.flaw_necks_count,
             'processing_time': self.processing_time
         }
+
     
     def check_thresholds(self, max_lumps=0, max_necks=0):
         """
