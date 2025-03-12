@@ -332,15 +332,15 @@ class App(QMainWindow):
                 
                 # Add to buffer but skip some unnecessary processing steps for bulk items
                 self.acquisition_buffer.add_sample(data)
-                print(f"[Data Receiver] Added sample to buffer: {data}")
-                print(f"[Data Receiver] Buffer statistics: {self.acquisition_buffer.get_statistics()}")
-                
-                
+                # print(f"[Data Receiver] Added sample to buffer: {data}")
+                # print(f"[Data Receiver] Buffer statistics: {self.acquisition_buffer.get_statistics()}"
                 # Wyciągnij xCoord już wyliczony przez add_sample
                 x_coord = self.acquisition_buffer.current_x
                 # print(f"[Data Receiver] Processing data at x={x_coord:.10f} m")
 
                 self.flaw_detector.process_flaws(data, x_coord)
+                # print flaw window size
+                print(f"[Data Receiver] Flaw window size: {self.flaw_detector.flaw_window_size} m")   
 
                 self.latest_data = data
                 
@@ -530,9 +530,9 @@ class App(QMainWindow):
                 current_necks = data.get("necks", 0)
 
                 # Debug: wypis wartości odczytanych z PLC oraz poprzednich
-                print(f"[ACQ Process] Odczyt z PLC: "
-                    f"current_lumps={current_lumps}, current_necks={current_necks}, "
-                    f"lumps_prev={lumps_prev}, necks_prev={necks_prev}")
+                # print(f"[ACQ Process] Odczyt z PLC: "
+                #     f"current_lumps={current_lumps}, current_necks={current_necks}, "
+                #     f"lumps_prev={lumps_prev}, necks_prev={necks_prev}")
 
                 # Oblicz przyrosty (delta) na podstawie poprzednich odczytów
                 if current_lumps >= lumps_prev:
@@ -554,7 +554,7 @@ class App(QMainWindow):
                 necks_total += delta_necks
 
                 # Debug: wypis sumarycznych liczników
-                print(f"[ACQ Process] Po sumowaniu: lumps_total={lumps_total}, necks_total={necks_total}")
+                # print(f"[ACQ Process] Po sumowaniu: lumps_total={lumps_total}, necks_total={necks_total}")
 
                 # Zapisz wyniki do danych przekazywanych dalej
                 data["lumps_software"] = lumps_total
@@ -584,7 +584,7 @@ class App(QMainWindow):
                 if current_lumps > 9000 or current_necks > 9000 or stable_count >= 128:
                     print("[ACQ Process] Warunki resetu osiągnięte, wykonuję reset PLC")
                     # Maksymalna liczba prób resetu
-                    max_reset_attempts = 1
+                    max_reset_attempts = 3
                     reset_attempt = 0
                     reset_successful = False
 
@@ -672,6 +672,7 @@ class App(QMainWindow):
                     # Normal case - sleep to maintain timing
                     if sleep_time > 0:
                         time.sleep(sleep_time)
+                        # print(f"[ACQ Process] Sleeping for {sleep_time:.4f}s to maintain cycle time")
                 
             except Exception as e:
                 print(f"[ACQ Process] Error during acquisition: {e}")

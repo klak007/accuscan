@@ -61,7 +61,8 @@ class FlawDetector:
         # Extract flaw indicators from data
         lumps = data.get("lumps_delta", 0)
         necks = data.get("necks_delta", 0)
-        
+        if lumps > 0 or necks > 0:
+            print(f"Processing lumps: {lumps}, necks: {necks} at position: {current_x}")
         # Track total counts
         if lumps > 0:
             self.total_lumps_count += lumps
@@ -70,11 +71,13 @@ class FlawDetector:
         
         # Track flaws in window
         if lumps > 0:
-            self.flaw_lumps_coords.append(current_x)
+            self.flaw_lumps_coords.append((current_x, lumps))
+            print(f"Adding lumps: {lumps} at position: {current_x}")
             self.flaw_lumps_count += lumps
         
         if necks > 0:
-            self.flaw_necks_coords.append(current_x)
+            self.flaw_necks_coords.append((current_x, necks))
+            print(f"Adding necks: {necks} at position: {current_x}")
             self.flaw_necks_count += necks
         
         # Efficiently remove flaws that are outside the window (too old)
@@ -83,39 +86,27 @@ class FlawDetector:
         
         # Optimize lumps removal
         if self.flaw_lumps_coords:
-            old_count = len(self.flaw_lumps_coords)
-            # Fast path: check if any need to be removed
-            if self.flaw_lumps_coords[0] < window_start:
-                # Find the index of the first element that's within the window
-                # Binary search would be faster for large arrays, but most windows will be small
+            if self.flaw_lumps_coords[0][0] < window_start:
                 drop_idx = 0
-                for i, x in enumerate(self.flaw_lumps_coords):
+                for i, (x, cnt) in enumerate(self.flaw_lumps_coords):
                     if x >= window_start:
                         drop_idx = i
                         break
-                
-                # Remove all elements before this index
                 if drop_idx > 0:
+                    removed = sum(cnt for (_, cnt) in self.flaw_lumps_coords[:drop_idx])
                     self.flaw_lumps_coords = self.flaw_lumps_coords[drop_idx:]
-                    removed = old_count - len(self.flaw_lumps_coords)
                     self.flaw_lumps_count -= removed
-        
-        # Optimize necks removal
+
         if self.flaw_necks_coords:
-            old_count = len(self.flaw_necks_coords)
-            # Fast path: check if any need to be removed
-            if self.flaw_necks_coords[0] < window_start:
-                # Find the index of the first element that's within the window
+            if self.flaw_necks_coords[0][0] < window_start:
                 drop_idx = 0
-                for i, x in enumerate(self.flaw_necks_coords):
+                for i, (x, cnt) in enumerate(self.flaw_necks_coords):
                     if x >= window_start:
                         drop_idx = i
                         break
-                
-                # Remove all elements before this index
                 if drop_idx > 0:
+                    removed = sum(cnt for (_, cnt) in self.flaw_necks_coords[:drop_idx])
                     self.flaw_necks_coords = self.flaw_necks_coords[drop_idx:]
-                    removed = old_count - len(self.flaw_necks_coords)
                     self.flaw_necks_count -= removed
         
         # Calculate processing time

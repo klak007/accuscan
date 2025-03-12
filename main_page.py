@@ -120,7 +120,7 @@ class MainPage(QWidget):
         self.layout.addWidget(self.right_panel, 1, 2)
         # Initialize new components after right panel is created
         self.window_processor = WindowProcessor(max_samples=self.MAX_POINTS)
-        self.flaw_detector = FlawDetector(flaw_window_size=0.5)
+        # self.flaw_detector = FlawDetector(flaw_window_size=0.5)
 
 
     # ---------------------------------------------------------------------------------
@@ -748,7 +748,7 @@ class MainPage(QWidget):
         
         # Update the flaw detector with the new window size if available
         if hasattr(self, 'flaw_detector'):
-            self.flaw_detector.update_flaw_window_size(new_val)
+            self.controller.flaw_detector.update_flaw_window_size(new_val)
 
     def _save_settings(self):
         """
@@ -890,9 +890,9 @@ class MainPage(QWidget):
                 "entry_tolerance_minus": "0.5",
                 "entry_lump_threshold": "0.1",
                 "entry_neck_threshold": "0.1",
-                "entry_flaw_window": "0.5",
-                "entry_max_lumps": "30",
-                "entry_max_necks": "7",
+                "entry_flaw_window": "2",
+                "entry_max_lumps": "3",
+                "entry_max_necks": "3",
                 }
             
             # Update all fields in a single batch to minimize UI processing
@@ -1316,29 +1316,29 @@ class MainPage(QWidget):
             
         except ValueError:
             pass
-        self.flaw_detector.update_flaw_window_size(flaw_window_size)
+        self.controller.flaw_detector.update_flaw_window_size(flaw_window_size)
         current_x = data.get("xCoord", 0)
         self.current_x = current_x  # zapisujemy do pola, żeby mieć spójność
-        flaw_results = self.flaw_detector.process_flaws(data, current_x)
-        # 4. Pobierz progi z UI
-        try:
-            max_lumps = int(self.entry_max_lumps.text() or "3")
-        except ValueError:
-            max_lumps = 3
-        try:
-            max_necks = int(self.entry_max_necks.text() or "3")
-        except ValueError:
-            max_necks = 3
+        flaw_results = {
+            'lumps_count': self.controller.flaw_detector.total_lumps_count,
+            'necks_count': self.controller.flaw_detector.total_necks_count,
+            'window_lumps_count': self.controller.flaw_detector.flaw_lumps_count,
+            'window_necks_count': self.controller.flaw_detector.flaw_necks_count,
+        }
+        #print window size window lumps and necks count
+        print(f"[MainPage] Window size: {flaw_window_size}, Lumps: {flaw_results['window_lumps_count']}, Necks: {flaw_results['window_necks_count']}")
+        # Następnie wszystko inne pozostaje bez zmian:
+        max_lumps = int(self.entry_max_lumps.text() or "3")
+        max_necks = int(self.entry_max_necks.text() or "3")
 
-        # 5. Sprawdź, czy przekroczono progi
-        thresholds = self.flaw_detector.check_thresholds(max_lumps, max_necks)
+        thresholds = self.controller.flaw_detector.check_thresholds(max_lumps, max_necks)
 
-        # 6. Aktualizuj interfejs – na przykład zmień etykietę alarmu
+        # Wyświetl alarmy tak jak dotychczas:
         if thresholds["lumps_exceeded"]:
             self.show_alarm("Wybrzuszenia", flaw_results["window_lumps_count"], max_lumps)
         else:
             self.clear_alarm("Wybrzuszenia")
-            
+
         if thresholds["necks_exceeded"]:
             self.show_alarm("Zagłębienia", flaw_results["window_necks_count"], max_necks)
         else:
@@ -1444,7 +1444,7 @@ class MainPage(QWidget):
             print(f"[MainPage] Update time: {total_update_time:.4f}s | "
                   f"Labels: {label_update_time:.4f}s | "
                   f"Window: {window_data.get('processing_time', 0):.4f}s | "
-                  f"Flaw: {self.flaw_detector.processing_time:.4f}s | "
+                  f"Flaw: {self.controller.processing_time:.4f}s | "
                   f"Plot: {plot_update_time:.4f}s")
 
 

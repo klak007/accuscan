@@ -18,7 +18,7 @@ _plc_last_used = {}
 _connection_locks = {}  # For thread safety on connection level
 import threading
 
-def connect_plc(ip: str, rack: int = 0, slot: int = 1, delay: int = 2, max_attempts: int = 3) -> snap7.client.Client:
+def connect_plc(ip: str, rack: int = 0, slot: int = 1, delay: int = 2, max_attempts: int = 10) -> snap7.client.Client:
     """
     Łączy się z PLC za pomocą Snap7.
     Tries to establish a connection, waiting 'delay' seconds between attempts.
