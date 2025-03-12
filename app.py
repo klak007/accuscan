@@ -340,7 +340,7 @@ class App(QMainWindow):
 
                 self.flaw_detector.process_flaws(data, x_coord)
                 # print flaw window size
-                print(f"[Data Receiver] Flaw window size: {self.flaw_detector.flaw_window_size} m")   
+                # print(f"[Data Receiver] Flaw window size: {self.flaw_detector.flaw_window_size} m")   
 
                 self.latest_data = data
                 
@@ -361,7 +361,6 @@ class App(QMainWindow):
                         
                         # Add to buffer - minimal processing
                         self.acquisition_buffer.add_sample(data)
-                        
                         # Update latest data
                         self.latest_data = data
                         
