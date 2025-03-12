@@ -1,16 +1,15 @@
-braki łączności
+[x] braki łączności
 
+[x] czyli z każdym cyklem kasować te błędy i działać tylko przyrostowo jeśli chodzi o liczbę defektów. czyli dostane liczbe tych defektów w przeliczeniu na 32 ms.
 
-czyli z każdym cyklem kasować te błędy i działać tylko przyrostowo jeśli chodzi o liczbę defektów. czyli dostane liczbe tych defektów w przeliczeniu na 32 ms.
-
-chcemy też dodać ustawienie które będzie sterować liczbą necków i lumpów na metr 
+[x] chcemy też dodać ustawienie które będzie sterować liczbą necków i lumpów na metr 
 
 rysowanie warunków logicznych czyli 1 gdy jest za dużo lumpw i za duyzo neckow
 sume w oknie trzeba wyliczać i porownywac z tym ustawieniem
 
-cycylic interrupt (albo timer, cykliczne wywołanie) - razem pobieranie danych z accuscana i ich przetwarzanie musi trwać najwyżej 32ms i zaczynać się co 32 ms.
+[x] cycylic interrupt (albo timer, cykliczne wywołanie) - razem pobieranie danych z accuscana i ich przetwarzanie musi trwać najwyżej 32ms i zaczynać się co 32 ms.
 
-w tym cyclic interrupcie: odczyt i zapis do sterownika, ustawienie i zresetowanie odnosnie licznikow nekcow i lumpow. dodawanie samplea. trzeba poinformowac flagą z procesu UI nasz ctyclic interrupt. batch i product w cyclic interrupcie 
+[x] w tym cyclic interrupcie: odczyt i zapis do sterownika, ustawienie i zresetowanie odnosnie licznikow nekcow i lumpow. dodawanie samplea. trzeba poinformowac flagą z procesu UI nasz ctyclic interrupt. batch i product w cyclic interrupcie 
 
 wyzsze a krotsze przyciski
 poprawa d1 d2 d3 d4
@@ -21,7 +20,7 @@ fft
 
 zapisz nastawy do receptury
 
-walidacja pol
+[x] walidacja pol
 
 dodac speed ze sterownika, przesunac adresacje
 dodac tez controlword i statusword - sterowanie lampka (buczkiem)
@@ -34,4 +33,4 @@ limity dla owalności
 
 zrobic get statistics dla flaw window
 
-nei robic +1 tylko +necks i + lumps
+[x] nie robic +1 tylko +necks i + lumps

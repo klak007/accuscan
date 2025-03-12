@@ -1,1 +1,1 @@
-OFFLINE_MODE = False
+OFFLINE_MODE = True

@@ -64,18 +64,18 @@ class FlawDetector:
         
         # Track total counts
         if lumps > 0:
-            self.total_lumps_count += 1
+            self.total_lumps_count += lumps
         if necks > 0:
-            self.total_necks_count += 1
+            self.total_necks_count += necks
         
         # Track flaws in window
         if lumps > 0:
             self.flaw_lumps_coords.append(current_x)
-            self.flaw_lumps_count += 1
+            self.flaw_lumps_count += lumps
         
         if necks > 0:
             self.flaw_necks_coords.append(current_x)
-            self.flaw_necks_count += 1
+            self.flaw_necks_count += necks
         
         # Efficiently remove flaws that are outside the window (too old)
         # Use a windowing approach that preserves order and is efficient for sequential removal

@@ -15,10 +15,10 @@ import pyqtgraph as pg
 # PyQt5 imports - consolidated
 from PyQt5.QtWidgets import (
     QFrame, QGridLayout, QVBoxLayout, QWidget, QMessageBox,
-    QHBoxLayout, QPushButton, QLabel, QSpacerItem, QSizePolicy, QLineEdit, QGroupBox
+    QHBoxLayout, QPushButton, QLabel, QSpacerItem, QSizePolicy, QLineEdit, QGroupBox, QApplication
 )
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QDoubleValidator, QIntValidator
 
 # Rest of the file remains unchanged...
 
@@ -136,26 +136,32 @@ class MainPage(QWidget):
         top_bar_layout = QHBoxLayout(self.top_bar)
         top_bar_layout.setContentsMargins(5, 5, 5, 5)
         top_bar_layout.setSpacing(5)
-        
+        top_bar_font = QFont(QApplication.font())
+        top_bar_font.setPointSize(12)
+        top_bar_font.setBold(False)
         # Pomiary button: fixed size and green background
         self.btn_pomiary = QPushButton("Pomiary", self.top_bar)
-        self.btn_pomiary.setFixedSize(100, 40)
+        self.btn_pomiary.setFont(top_bar_font)
+        self.btn_pomiary.setFixedSize(140, 40)
         # self.btn_pomiary.setStyleSheet("background-color: rgb(67, 160, 71);")
         self.btn_pomiary.clicked.connect(self._on_pomiary_click)
         
         # Nastawy button: fixed size
         self.btn_nastawy = QPushButton("Nastawy", self.top_bar)
-        self.btn_nastawy.setFixedSize(100, 40)
+        self.btn_nastawy.setFont(top_bar_font)
+        self.btn_nastawy.setFixedSize(140, 40)
         self.btn_nastawy.clicked.connect(lambda: self.controller.toggle_page("SettingsPage"))
         
         # Historia button: fixed size
         self.btn_historia = QPushButton("Historia", self.top_bar)
-        self.btn_historia.setFixedSize(100, 40)
+        self.btn_historia.setFont(top_bar_font)
+        self.btn_historia.setFixedSize(140, 40)
         self.btn_historia.clicked.connect(self._on_historia_click)
         
         # Accuscan button: fixed size
         self.btn_accuscan = QPushButton("Accuscan", self.top_bar)
-        self.btn_accuscan.setFixedSize(100, 40)
+        self.btn_accuscan.setFont(top_bar_font)
+        self.btn_accuscan.setFixedSize(140, 40)
         self.btn_accuscan.clicked.connect(self._on_accuscan_click)
         
         # Add left-side buttons
@@ -175,15 +181,18 @@ class MainPage(QWidget):
         control_layout.setSpacing(2)
         
         self.btn_start = QPushButton("Start", self.control_frame)
-        self.btn_start.setFixedSize(100, 40)
+        self.btn_start.setFont(top_bar_font)
+        self.btn_start.setFixedSize(140, 40)
         self.btn_start.clicked.connect(self._on_start)
         
         self.btn_stop = QPushButton("Stop", self.control_frame)
-        self.btn_stop.setFixedSize(100, 40)
+        self.btn_stop.setFont(top_bar_font)
+        self.btn_stop.setFixedSize(140, 40)
         self.btn_stop.clicked.connect(self._on_stop)
         
         self.btn_ack = QPushButton("Kwituj", self.control_frame)
-        self.btn_ack.setFixedSize(100,40)
+        self.btn_ack.setFont(top_bar_font)
+        self.btn_ack.setFixedSize(140,40)
         self.btn_ack.clicked.connect(self._on_ack)
         
         control_layout.addWidget(self.btn_start)
@@ -194,7 +203,8 @@ class MainPage(QWidget):
         
         # Exit button: fixed size and red background
         self.btn_exit = QPushButton("Zamknij", self.top_bar)
-        self.btn_exit.setFixedSize(100, 40)
+        self.btn_exit.setFont(top_bar_font)
+        self.btn_exit.setFixedSize(140, 40)
         self.btn_exit.setStyleSheet("background-color: red;")
         self.btn_exit.clicked.connect(self._on_exit_click)
         top_bar_layout.addWidget(self.btn_exit, 0, Qt.AlignRight)
@@ -296,11 +306,17 @@ class MainPage(QWidget):
 
         # Rząd 4: Przycisk "Przykładowe nastawy"
         self.btn_typowy = QPushButton("Przykładowe nastawy", self.left_panel)
+        self.btn_typowy.setToolTip("Ustawia przykładowe nastawy dla receptury.")
+        # set fixed height
+        self.btn_typowy.setFixedHeight(40)
         self.btn_typowy.clicked.connect(self._on_typowy_click)
         left_layout.addWidget(self.btn_typowy, 4, 0)
 
         # Rząd 5: Przycisk "Zapisz nastawy"
         self.btn_save_settings = QPushButton("Zapisz nastawy", self.left_panel)
+        # set tooltip and height
+        self.btn_save_settings.setToolTip("Zapisuje aktualne nastawy do sterownika i bazy danych.")
+        self.btn_save_settings.setFixedHeight(40)
         self.btn_save_settings.clicked.connect(self._save_settings)
         left_layout.addWidget(self.btn_save_settings, 5, 0)
 
@@ -342,7 +358,8 @@ class MainPage(QWidget):
 
         # Center input field - set expanding size policy with increased minimum width
         self.entry_diameter_setpoint = QLineEdit(diameter_frame)
-        self.entry_diameter_setpoint.setPlaceholderText("18.0")
+        self.entry_diameter_setpoint.setValidator(QDoubleValidator(0.0, 100.0, 3)) # min, max, decimals (3)
+        self.entry_diameter_setpoint.setPlaceholderText("39.745")
         self.entry_diameter_setpoint.setMinimumWidth(220)  # Increased from 80 to 120
         self.entry_diameter_setpoint.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         diameter_layout.addWidget(self.entry_diameter_setpoint)
@@ -382,6 +399,7 @@ class MainPage(QWidget):
 
         # Center input field - expanding
         self.entry_tolerance_plus = QLineEdit(plus_frame)
+        self.entry_tolerance_plus.setValidator(QDoubleValidator(0.0, 100.0, 3)) # min, max, decimals (3)
         self.entry_tolerance_plus.setPlaceholderText("0.5")
         self.entry_tolerance_plus.setMinimumWidth(220)  # Increased from 80 to 120
         self.entry_tolerance_plus.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -422,6 +440,7 @@ class MainPage(QWidget):
 
         # Center input field - expanding
         self.entry_tolerance_minus = QLineEdit(minus_frame)
+        self.entry_tolerance_minus.setValidator(QDoubleValidator(0.0, 100.0, 3)) # min, max, decimals (3)
         self.entry_tolerance_minus.setPlaceholderText("0.5")
         self.entry_tolerance_minus.setMinimumWidth(220)  # Increased from 80 to 120
         self.entry_tolerance_minus.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -462,6 +481,7 @@ class MainPage(QWidget):
 
         # Center input field - expanding
         self.entry_lump_threshold = QLineEdit(lumps_threshold_frame)
+        self.entry_lump_threshold.setValidator(QDoubleValidator(0.0, 100.0, 3)) # min, max, decimals (3)
         self.entry_lump_threshold.setPlaceholderText("0.3")
         self.entry_lump_threshold.setMinimumWidth(220)  # Increased from 80 to 120
         self.entry_lump_threshold.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -502,6 +522,7 @@ class MainPage(QWidget):
 
         # Center input field - expanding
         self.entry_neck_threshold = QLineEdit(necks_threshold_frame)
+        self.entry_neck_threshold.setValidator(QDoubleValidator(0.0, 100.0, 3)) # min, max, decimals (3)
         self.entry_neck_threshold.setPlaceholderText("0.3")
         self.entry_neck_threshold.setMinimumWidth(220)  # Increased from 80 to 120
         self.entry_neck_threshold.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -542,6 +563,7 @@ class MainPage(QWidget):
         
         # Center input field
         self.entry_flaw_window = QLineEdit(flaw_window_frame)
+        self.entry_flaw_window.setValidator(QDoubleValidator(0.0, 100.0, 3)) # min, max, decimals (3)   
         self.entry_flaw_window.setPlaceholderText("0.5")
         self.entry_flaw_window.setMinimumWidth(220)  # Increased from 80 to 120
         self.entry_flaw_window.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -582,6 +604,7 @@ class MainPage(QWidget):
 
         # Center input field - expanding
         self.entry_max_lumps = QLineEdit(max_lumps_frame)
+        self.entry_max_lumps.setValidator(QIntValidator(0, 1000))  # min, max
         self.entry_max_lumps.setPlaceholderText("3")
         self.entry_max_lumps.setMinimumWidth(220)  # Increased from 80 to 120
         self.entry_max_lumps.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -622,6 +645,7 @@ class MainPage(QWidget):
 
         # Center input field - expanding
         self.entry_max_necks = QLineEdit(max_necks_frame)
+        self.entry_max_necks.setValidator(QIntValidator(0, 1000))  # min, max
         self.entry_max_necks.setPlaceholderText("3")
         self.entry_max_necks.setMinimumWidth(220)  # Increased from 80 to 120
         self.entry_max_necks.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -985,13 +1009,16 @@ class MainPage(QWidget):
         # readings_layout.addWidget(self.label_neck_indicator)
         # self.necks_count_label = QLabel("Liczba zagłębień: 0", self.readings_frame)
         # readings_layout.addWidget(self.necks_count_label)
+        default_font = QApplication.font()
+        default_font.setPointSize(20)
+
         
         self.label_alarm_lumps = QLabel("Wybrzuszenia OK", self.left_panel) 
-        self.label_alarm_lumps.setFont(QFont("Arial", 12, QFont.Bold))
+        self.label_alarm_lumps.setFont(default_font)
         readings_layout.addWidget(self.label_alarm_lumps, alignment=Qt.AlignCenter)
 
         self.label_alarm_necks = QLabel("Zagłębienia OK", self.left_panel) 
-        self.label_alarm_necks.setFont(QFont("Arial", 12, QFont.Bold)) 
+        self.label_alarm_necks.setFont(default_font) 
         readings_layout.addWidget(self.label_alarm_necks, alignment=Qt.AlignCenter)
 
         # Wskaźniki średnicy
