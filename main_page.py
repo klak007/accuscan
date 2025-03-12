@@ -1394,7 +1394,7 @@ class MainPage(QWidget):
 
         thresholds = self.controller.flaw_detector.check_thresholds(max_lumps, max_necks)
         #print window lumps and necks count
-        print(f"[MainPage] Window lumps: {flaw_results['window_lumps_count']}, Window necks: {flaw_results['window_necks_count']}")
+        # print(f"[MainPage] Window lumps: {flaw_results['window_lumps_count']}, Window necks: {flaw_results['window_necks_count']}")
         # Wyświetl alarmy tak jak dotychczas:
         if thresholds["lumps_exceeded"]:
             self.show_alarm("Wybrzuszenia", flaw_results["window_lumps_count"], max_lumps)
