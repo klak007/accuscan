@@ -1028,19 +1028,30 @@ class MainPage(QWidget):
         readings_layout.addWidget(self.diameter_deviation_label)
         
         
-        self.group_flaw_diam_stats = QGroupBox("Szczegółowe statystyki flaw window dla średnic", self.readings_frame) 
-        self.group_flaw_diam_stats.setFont(default_font) 
-        flaw_diam_layout = QGridLayout(self.group_flaw_diam_stats)
-        
-        self.label_D1 = QLabel("D1:", self.group_flaw_diam_stats) 
-        self.label_D1_values = QLabel("", self.group_flaw_diam_stats) 
-        flaw_diam_layout.addWidget(self.label_D1, 0, 0) 
-        flaw_diam_layout.addWidget(self.label_D1_values, 0, 1)
+        # --------------------------
+        # Grupa 5: Szczegółowe statystyki dla flaw window dla średnic
+        # --------------------------
+        group_flaw_stats = QGroupBox("Szczegółowe statystyki dla flaw window dla średnic", self.readings_frame)
+        flaw_stats_layout = QGridLayout()
 
-        self.label_D2 = QLabel("D2:", self.group_flaw_diam_stats) 
-        self.label_D2_values = QLabel("", self.group_flaw_diam_stats) 
-        flaw_diam_layout.addWidget(self.label_D2, 1, 0) 
-        flaw_diam_layout.addWidget(self.label_D2_values, 1, 1)
+        # Etykiety dla D1
+        self.label_flaw_d1 = QLabel("D1: mean: --, std: --, min: --, max: --", group_flaw_stats)
+        flaw_stats_layout.addWidget(self.label_flaw_d1, 0, 0)
+
+        # Etykiety dla D2
+        self.label_flaw_d2 = QLabel("D2: mean: --, std: --, min: --, max: --", group_flaw_stats)
+        flaw_stats_layout.addWidget(self.label_flaw_d2, 1, 0)
+
+        # Etykiety dla D3
+        self.label_flaw_d3 = QLabel("D3: mean: --, std: --, min: --, max: --", group_flaw_stats)
+        flaw_stats_layout.addWidget(self.label_flaw_d3, 2, 0)
+
+        # Etykiety dla D4
+        self.label_flaw_d4 = QLabel("D4: mean: --, std: --, min: --, max: --", group_flaw_stats)
+        flaw_stats_layout.addWidget(self.label_flaw_d4, 3, 0)
+
+        group_flaw_stats.setLayout(flaw_stats_layout)
+        readings_layout.addWidget(group_flaw_stats)
         
         # Po zakończeniu konfiguracji, self.middle_panel powinien zostać dodany do głównego layoutu
         # np. poprzez self.layout.addWidget(self.middle_panel) w konstruktorze głównego okna.
@@ -1344,19 +1355,28 @@ class MainPage(QWidget):
         # Wyliczenie statystyk dla ostatnich n próbek
         stats = self.controller.acquisition_buffer.get_statistics(last_n=n)
         if stats:
-            self.label_D1_values.setText(
-                "Mean: {:.2f}, Std: {:.2f}, Min: {:.2f}, Max: {:.2f}".format(
-                    stats.get("D1_mean", 0), stats.get("D1_std", 0), stats.get("D1_min", 0), stats.get("D1_max", 0)
+            labels = [
+                self.label_flaw_d1, 
+                self.label_flaw_d2, 
+                self.label_flaw_d3, 
+                self.label_flaw_d4
+            ]
+            keys = ["D1", "D2", "D3", "D4"]
+
+            for label, key in zip(labels, keys):
+                label.setText(
+                    "{}: mean: {:.2f}, std: {:.2f}, min: {:.2f}, max: {:.2f}".format(
+                        key,
+                        stats.get(f"{key}_mean", 0),
+                        stats.get(f"{key}_std", 0),
+                        stats.get(f"{key}_min", 0),
+                        stats.get(f"{key}_max", 0)
+                    )
                 )
-            )
-            self.label_D2_values.setText(
-                "Mean: {:.2f}, Std: {:.2f}, Min: {:.2f}, Max: {:.2f}".format(
-                    stats.get("D2_mean", 0), stats.get("D2_std", 0), stats.get("D2_min", 0), stats.get("D2_max", 0)
-                )
-            )
+
         
-        print(f"[MainPage] Flaw window size: {flaw_window_size}, Number of samples: {n}")
-        print(f"[MainPage] Statistics: {stats}")
+        # print(f"[MainPage] Flaw window size: {flaw_window_size}, Number of samples: {n}")
+        # print(f"[MainPage] Statistics: {stats}")
         # Przykładowo – aktualizacja widżetu z wynikami statystyk:
         # self.stats_label.setText("Mean D1: {:.2f}".format(stats.get("D1_mean", 0)))
 
