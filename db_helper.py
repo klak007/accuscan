@@ -2,8 +2,7 @@
 import mysql.connector
 from mysql.connector import Error
 from datetime import datetime
-
-OFFLINE_MODE = True
+from config import OFFLINE_MODE
 
 def check_database(db_params: dict) -> bool:
     """
@@ -159,7 +158,7 @@ def save_settings(db_params: dict, settings_data: dict) -> int:
     Zwraca ID rekordu w przypadku powodzenia, None w przeciwnym przypadku.
     """
     if OFFLINE_MODE:
-        return 1
+        return 3
     if not check_database(db_params):
         return None
 

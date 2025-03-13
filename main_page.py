@@ -803,6 +803,7 @@ class MainPage(QWidget):
         # 3. Zapis do bazy
         try:
             settings_id = save_settings(self.controller.db_params, settings_data)
+            print(f"[GUI] Zapisano ustawienia do DB z ID: {settings_id}")
             print("[GUI] Wysłano nowe nastawy do DB.")
         except Exception as e:
             QMessageBox.critical(self, "Błąd", f"Nie udało się zapisać ustawień do DB: {str(e)}")
@@ -1357,24 +1358,14 @@ class MainPage(QWidget):
         # Wyliczenie statystyk dla ostatnich n próbek
         stats = self.controller.acquisition_buffer.get_statistics(last_n=n)
         if stats:
-            labels = [
-                self.label_flaw_d1, 
-                self.label_flaw_d2, 
-                self.label_flaw_d3, 
-                self.label_flaw_d4
-            ]
-            keys = ["D1", "D2", "D3", "D4"]
+            diameters = ["D1", "D2", "D3", "D4"]
+            stats_keys = ["mean", "std", "min", "max"]
 
-            for label, key in zip(labels, keys):
-                label.setText(
-                    "{}: mean: {:.2f}, std: {:.2f}, min: {:.2f}, max: {:.2f}".format(
-                        key,
-                        stats.get(f"{key}_mean", 0),
-                        stats.get(f"{key}_std", 0),
-                        stats.get(f"{key}_min", 0),
-                        stats.get(f"{key}_max", 0)
-                    )
-                )
+            for diameter in diameters:
+                for stat_key in stats_keys:
+                    label_key = f"{diameter}_{stat_key}"
+                    value = stats.get(label_key, 0)
+                    self.flaw_stats_labels[label_key].setText(f"{value:.2f}")
 
         
         # print(f"[MainPage] Flaw window size: {flaw_window_size}, Number of samples: {n}")
