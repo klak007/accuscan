@@ -11,12 +11,12 @@ sume w oknie trzeba wyliczać i porownywac z tym ustawieniem
 
 [x] w tym cyclic interrupcie: odczyt i zapis do sterownika, ustawienie i zresetowanie odnosnie licznikow nekcow i lumpow. dodawanie samplea. trzeba poinformowac flagą z procesu UI nasz ctyclic interrupt. batch i product w cyclic interrupcie 
 
-wyzsze a krotsze przyciski
-poprawa d1 d2 d3 d4
-filtracja po wiekszej liczbie
-dodac batch 
-rozgraniczniue pomiedzy produkcyjnymi nastawami i nieprodukcyjnymi
-fft
+[x]wyzsze a krotsze przyciski
+[x]poprawa d1 d2 d3 d4
+[]filtracja po wiekszej liczbie
+[]dodac batch 
+[]rozgraniczniue pomiedzy produkcyjnymi nastawami i nieprodukcyjnymi
+[x]fft
 
 zapisz nastawy do receptury
 

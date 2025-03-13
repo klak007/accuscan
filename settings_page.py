@@ -2,7 +2,8 @@ import mysql.connector
 from mysql.connector import Error
 from datetime import datetime
 from db_helper import check_database
-from PyQt5.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QMessageBox, QLineEdit, QTableWidgetItem, QDialog
+from PyQt5.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QMessageBox, QLineEdit, QTableWidgetItem, QDialog, QApplication
+from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QPushButton, QLabel, QSpacerItem, QSizePolicy, QTableWidget, QHeaderView
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QDialogButtonBox
@@ -42,6 +43,7 @@ class SettingsPage(QFrame):
         status_layout.addWidget(self.db_status_label)
 
         self.btn_check_db = QPushButton("Sprawdź połączenie", self.status_frame)
+        self.btn_check_db.setFixedSize(200, 40)
         self.btn_check_db.clicked.connect(self.check_db_connection)
         status_layout.addWidget(self.btn_check_db)
 
@@ -95,24 +97,31 @@ class SettingsPage(QFrame):
         top_bar_layout = QHBoxLayout(self.top_bar)
         top_bar_layout.setContentsMargins(5, 5, 5, 5)
         top_bar_layout.setSpacing(5)
+        top_bar_font = QFont(QApplication.font())
+        top_bar_font.setPointSize(12)
+        top_bar_font.setBold(False)
 
         self.btn_pomiary = QPushButton("Pomiary", self.top_bar)
-        self.btn_pomiary.setFixedSize(100, 40)
+        self.btn_pomiary.setFont(top_bar_font)
+        self.btn_pomiary.setFixedSize(140, 40)
         self.btn_pomiary.clicked.connect(self._on_pomiary_click)  # changed handler
         top_bar_layout.addWidget(self.btn_pomiary, 0, Qt.AlignLeft)
 
         self.btn_nastawy = QPushButton("Nastawy", self.top_bar)
-        self.btn_nastawy.setFixedSize(100, 40)
+        self.btn_nastawy.setFont(top_bar_font)
+        self.btn_nastawy.setFixedSize(140, 40)
         self.btn_nastawy.clicked.connect(self._on_nastawy_click)
         top_bar_layout.addWidget(self.btn_nastawy, 0, Qt.AlignLeft)
 
         self.btn_historia = QPushButton("Historia", self.top_bar)
-        self.btn_historia.setFixedSize(100, 40)
+        self.btn_historia.setFont(top_bar_font)
+        self.btn_historia.setFixedSize(140, 40)
         self.btn_historia.clicked.connect(self._on_historia_click)
         top_bar_layout.addWidget(self.btn_historia, 0, Qt.AlignLeft)
 
         self.btn_accuscan = QPushButton("Accuscan", self.top_bar)
-        self.btn_accuscan.setFixedSize(100, 40)
+        self.btn_accuscan.setFont(top_bar_font)
+        self.btn_accuscan.setFixedSize(140, 40)
         self.btn_accuscan.clicked.connect(self._on_accuscan_click)
         top_bar_layout.addWidget(self.btn_accuscan, 0, Qt.AlignLeft)
 
@@ -120,9 +129,10 @@ class SettingsPage(QFrame):
         top_bar_layout.addItem(spacer)
 
         self.btn_exit = QPushButton("Zamknij", self.top_bar)
-        self.btn_exit.setFixedSize(100, 40)
+        self.btn_exit.setFont(top_bar_font)
+        self.btn_exit.setFixedSize(140, 40)
         self.btn_exit.setStyleSheet("background-color: red;")
-        self.btn_exit.clicked.connect(self.close)  # or another exit method
+        self.btn_exit.clicked.connect(self._on_exit_click)
         top_bar_layout.addWidget(self.btn_exit, 0, Qt.AlignRight)
 
         self.plc_status_label = QLabel("PLC Status: Unknown", self.top_bar)
@@ -141,6 +151,13 @@ class SettingsPage(QFrame):
     def _on_accuscan_click(self):
         print("[GUI] Kliknięto przycisk 'Accuscan'.")
 
+    def _on_exit_click(self):
+        if hasattr(self.controller, "run_measurement_flag"):
+            self.controller.run_measurement_flag.value = 0
+        if hasattr(self.controller, "process_running_flag"):
+            self.controller.process_running_flag.value = 0
+        self.controller.destroy()
+
     def _create_filter_panel(self):
         # Utwórz kontener (QFrame) dla panelu filtru w ramach main_frame
         self.filter_frame = QFrame(self.main_frame)
@@ -154,21 +171,24 @@ class SettingsPage(QFrame):
         
         # Pole tekstowe do wpisywania filtru, o stałej szerokości 200 pikseli
         self.filter_entry = QLineEdit(self.filter_frame)
-        self.filter_entry.setFixedWidth(200)
+        self.filter_entry.setFixedSize(1000,40)
         filter_layout.addWidget(self.filter_entry)
         
         # Przycisk "Filtruj" – po kliknięciu wywołuje metodę load_data
         self.btn_filter = QPushButton("Filtruj", self.filter_frame)
+        self.btn_filter.setFixedSize(200,40)
         self.btn_filter.clicked.connect(self.load_data)
         filter_layout.addWidget(self.btn_filter)
         
         # Przycisk "Wszystkie" – wywołuje metodę clear_filter
         self.btn_all = QPushButton("Wszystkie", self.filter_frame)
+        self.btn_all.setFixedSize(200,40)
         self.btn_all.clicked.connect(self.clear_filter)
         filter_layout.addWidget(self.btn_all)
         
         # Przycisk "Załaduj" – wywołuje metodę load_data
         self.btn_reload = QPushButton("Załaduj", self.filter_frame)
+        self.btn_reload.setFixedSize(200,40)
         self.btn_reload.clicked.connect(self.load_data)
         filter_layout.addWidget(self.btn_reload)
         
@@ -232,18 +252,22 @@ class SettingsPage(QFrame):
         self.actions_frame.setLayout(actions_layout)
         
         self.btn_new = QPushButton("Nowa", self.actions_frame)
+        self.btn_new.setFixedHeight(40)
         self.btn_new.clicked.connect(self.new_setting)
         actions_layout.addWidget(self.btn_new)
         
         self.btn_clone = QPushButton("Klonuj", self.actions_frame)
+        self.btn_clone.setFixedHeight(40)
         self.btn_clone.clicked.connect(self.clone_setting)
         actions_layout.addWidget(self.btn_clone)
         
         self.btn_edit = QPushButton("Edytuj", self.actions_frame)
+        self.btn_edit.setFixedHeight(40)
         self.btn_edit.clicked.connect(self.edit_setting)
         actions_layout.addWidget(self.btn_edit)
         
         self.btn_delete = QPushButton("Usuń", self.actions_frame)
+        self.btn_delete.setFixedHeight(40)
         self.btn_delete.clicked.connect(self.delete_setting)
         actions_layout.addWidget(self.btn_delete)
         

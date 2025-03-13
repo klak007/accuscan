@@ -1010,7 +1010,7 @@ class MainPage(QWidget):
         # self.necks_count_label = QLabel("Liczba zagłębień: 0", self.readings_frame)
         # readings_layout.addWidget(self.necks_count_label)
         default_font = QApplication.font()
-        default_font.setPointSize(20)
+        default_font.setPointSize(15)
 
         
         self.label_alarm_lumps = QLabel("Wybrzuszenia OK", self.left_panel) 
@@ -1034,21 +1034,23 @@ class MainPage(QWidget):
         group_flaw_stats = QGroupBox("Szczegółowe statystyki dla flaw window dla średnic", self.readings_frame)
         flaw_stats_layout = QGridLayout()
 
-        # Etykiety dla D1
-        self.label_flaw_d1 = QLabel("D1: mean: --, std: --, min: --, max: --", group_flaw_stats)
-        flaw_stats_layout.addWidget(self.label_flaw_d1, 0, 0)
+        # Nagłówki kolumn
+        headers = ["Średnica", "Średnia", "Odchylenie std.", "Min", "Max"]
+        for idx, header in enumerate(headers):
+            flaw_stats_layout.addWidget(QLabel(f"<b>{header}</b>"), 0, idx)
 
-        # Etykiety dla D2
-        self.label_flaw_d2 = QLabel("D2: mean: --, std: --, min: --, max: --", group_flaw_stats)
-        flaw_stats_layout.addWidget(self.label_flaw_d2, 1, 0)
+        # Dane dla średnic (inicjalizacja)
+        diameters = ["D1", "D2", "D3", "D4"]
+        self.flaw_stats_labels = {}
 
-        # Etykiety dla D3
-        self.label_flaw_d3 = QLabel("D3: mean: --, std: --, min: --, max: --", group_flaw_stats)
-        flaw_stats_layout.addWidget(self.label_flaw_d3, 2, 0)
+        for row, diameter in enumerate(diameters, start=1):
+            flaw_stats_layout.addWidget(QLabel(f"{diameter}"), row, 0)
 
-        # Etykiety dla D4
-        self.label_flaw_d4 = QLabel("D4: mean: --, std: --, min: --, max: --", group_flaw_stats)
-        flaw_stats_layout.addWidget(self.label_flaw_d4, 3, 0)
+            # Tworzenie i dodawanie etykiet dla poszczególnych wartości
+            for col, stat in enumerate(["mean", "std", "min", "max"], start=1):
+                label = QLabel("--")
+                flaw_stats_layout.addWidget(label, row, col)
+                self.flaw_stats_labels[f"{diameter}_{stat}"] = label
 
         group_flaw_stats.setLayout(flaw_stats_layout)
         readings_layout.addWidget(group_flaw_stats)
@@ -1304,14 +1306,14 @@ class MainPage(QWidget):
         # Update labels - this is fast
         label_update_start = time.perf_counter()
         self.label_d1.setText(f"<small>D1 [mm]:</small><br><span style='font-size: 50px;'>{d1:.2f}</span>")
-        self.label_d2.setText(f"<small>D2 [mm]:</small><br><span style='font-size: 20px;'>{d2:.2f}</span>")
-        self.label_d3.setText(f"<small>D3 [mm]:</small><br><span style='font-size: 20px;'>{d3:.2f}</span>")
-        self.label_d4.setText(f"<small>D4 [mm]:</small><br><span style='font-size: 20px;'>{d4:.2f}</span>")
-        self.label_davg.setText(f"<small>dAvg [mm]:</small><br><span style='font-size: 20px;'>{davg:.2f}</span>")
-        self.label_dmin.setText(f"<small>Dmin [mm]:</small><br><span style='font-size: 20px;'>{dmin:.2f}</span>")
-        self.label_dmax.setText(f"<small>Dmax [mm]:</small><br><span style='font-size: 20px;'>{dmax:.2f}</span>")
-        self.label_dsd.setText(f"<small>dSD [mm]:</small><br><span style='font-size: 20px;'>{dsd:.3f}</span>")
-        self.label_dov.setText(f"<small>dOV [%]:</small><br><span style='font-size: 20px;'>{dov:.2f}</span>")
+        self.label_d2.setText(f"<small>D2 [mm]:</small><br><span style='font-size: 50px;'>{d2:.2f}</span>")
+        self.label_d3.setText(f"<small>D3 [mm]:</small><br><span style='font-size: 50px;'>{d3:.2f}</span>")
+        self.label_d4.setText(f"<small>D4 [mm]:</small><br><span style='font-size: 50px;'>{d4:.2f}</span>")
+        self.label_davg.setText(f"<small>dAvg [mm]:</small><br><span style='font-size: 50px;'>{davg:.2f}</span>")
+        self.label_dmin.setText(f"<small>Dmin [mm]:</small><br><span style='font-size: 50px;'>{dmin:.2f}</span>")
+        self.label_dmax.setText(f"<small>Dmax [mm]:</small><br><span style='font-size: 50px;'>{dmax:.2f}</span>")
+        self.label_dsd.setText(f"<small>dSD [mm]:</small><br><span style='font-size: 50px;'>{dsd:.3f}</span>")
+        self.label_dov.setText(f"<small>dOV [%]:</small><br><span style='font-size: 50px;'>{dov:.2f}</span>")
         
         
         
