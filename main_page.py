@@ -65,7 +65,7 @@ class MainPage(QWidget):
         self.display_range = 10  # ile „metrów” pokazywać na wykresie
         self.last_update_time = None
         self.current_x = 0.0
-        self.FFT_BUFFER_SIZE = 64
+        self.FFT_BUFFER_SIZE = 512
         self.diameter_history = []  # Values
         self.diameter_x = []        # X-coordinates for diameter values
         self.last_plot_update = None  # new attribute for plot update frequency
@@ -1489,6 +1489,27 @@ class MainPage(QWidget):
                     plot_data['current_x'],
                     plot_data['diameter_preset'],
                     plot_data['plc_sample_time']
+                )
+                # import numpy as np
+                # fs = 256
+                # t = np.linspace(0, 1, fs, endpoint=False)
+                # signal = (
+                #     np.sin(2 * np.pi * 5 * t) +
+                #     0.5 * np.sin(2 * np.pi * 30 * t) +
+                #     0.2 * np.sin(2 * np.pi * 50 * t)
+                # )
+                # self.plot_manager.update_fft_plot(
+                #     signal,
+                #     256  # lub inna wartość fft_buffer_size
+                # )
+                # self.plot_manager.update_fft_plot(
+                #     plot_data['diameter_history'],
+                #     plot_data.get('fft_buffer_size', 0)
+                # )
+                modulated_history = self.plot_manager.apply_pulsation(plot_data['diameter_history'], sample_rate=100, modulation_frequency=10, modulation_depth=0.5)
+                self.plot_manager.update_fft_plot(
+                    modulated_history,
+                    plot_data.get('fft_buffer_size', 512)
                 )
                 
             else:

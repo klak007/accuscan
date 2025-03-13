@@ -53,6 +53,26 @@ class PlotManager:
         print("[PlotManager] Initialized for PyQtGraph; using main thread for updates.")
     
 
+    def apply_pulsation(self, diameter_history, sample_rate=100, modulation_frequency=1, modulation_depth=0.05):
+        """
+        Modyfikuje dane diameter_history, mnożąc je przez współczynnik pulsacji.
+        
+        Args:
+            diameter_history: Lista oryginalnych próbek średnicy.
+            sample_rate: Częstotliwość próbkowania (ilość próbek na sekundę).
+            modulation_frequency: Częstotliwość pulsacji (Hz).
+            modulation_depth: Głębokość modulacji (np. 0.05 to 5% zmiany).
+        
+        Returns:
+            Nowa lista próbek po nałożeniu modulacji.
+        """
+        modulated = []
+        for i, d in enumerate(diameter_history):
+            t = i / sample_rate
+            mod_factor = 1 + modulation_depth * np.sin(2 * np.pi * modulation_frequency * t)
+            modulated.append(d * mod_factor)
+        return modulated
+
     def update_status_plot(self, x_history, lumps_history, necks_history, current_x, batch_name, plc_sample_time=0):
         """
         Aktualizuje wykres statusu (lumps/necks względem współrzędnych X) przy użyciu PyQtGraph.
@@ -140,7 +160,7 @@ class PlotManager:
                 plot_widget.setTitle(f"Uśredniona średnica na dystansie - {sample_count} samples, {meters_covered:.1f}m")
             
             
-    def update_fft_plot(self, diameter_history, fft_buffer_size=64):
+    def update_fft_plot(self, diameter_history, fft_buffer_size=256):
         """
         Aktualizuje wykres analizy FFT średnicy przy użyciu PyQtGraph.
         
@@ -160,10 +180,13 @@ class PlotManager:
             if len(diameter_array) > 0:
                 # Obliczenie FFT – zakładamy, że funkcja analyze_window_fft jest dostępna
                 diameter_fft = analyze_window_fft(diameter_array)
-                
+                # print(f"[PlotManager] FFT calculated for {len(diameter_array)} samples")
+                # print(f"[update_fft_plot] length={len(diameter_history)} last_5={diameter_history[-5:]}")
+                # print(f"[PlotManager] FFT array ({len(diameter_fft)}): {diameter_fft}")
+
                 plot_widget.setTitle("Diameter FFT Analysis")
                 # Rysujemy wykres FFT; domyślnie oś X to indeksy próbek
-                plot_widget.plot(np.abs(diameter_fft), pen='g', name="FFT")
+                plot_widget.plot(np.abs(diameter_fft), pen='m', name="FFT")
                 plot_widget.setLabel('bottom', "Frequency")
                 plot_widget.setLabel('left', "Magnitude")
 
@@ -218,13 +241,14 @@ class PlotManager:
                         plc_sample_time
                     )
                     status_time = time.perf_counter() - start
-
+                # print throttle level and update count
+                print(f"[PlotManager] Throttle Level: {self.throttle_level}, Update Count: {self.plot_update_count}")
                 # Aktualizacja wykresu FFT – tylko przy najniższym poziomie throttle
                 if 'fft' in self.plot_widgets and self.throttle_level == 1:
                     start = time.perf_counter()
                     self.update_fft_plot(
                         data_dict['diameter_history'],
-                        data_dict.get('fft_buffer_size', 64)
+                        data_dict.get('fft_buffer_size', 256)
                     )
                     fft_time = time.perf_counter() - start
 
