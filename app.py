@@ -651,13 +651,14 @@ class App(QMainWindow):
                 if cycle_count >= log_frequency:
                     cycle_count = 0
                     total_time = time.perf_counter() - cycle_start
-                    if total_time > 0.001:  # Only print if cycle time exceeded 31ms
+                    #print once every 100 cycles
+                    if cycle_count % 100 == 0:
                         print(f"[ACQ Process] Total: {total_time:.4f}s | Read: {read_time:.4f}s | Reset: {reset_time:.4f}s")
                 
                 # Calculate sleep time to maintain 32ms cycle
                 elapsed = time.perf_counter() - cycle_start
                 # print(f"[ACQ Process] Elapsed time: {elapsed:.4f}s")
-                sleep_time = 0.002 # max(0, 0.014 - elapsed)
+                sleep_time = 0.001 # max(0, 0.014 - elapsed)
                 
                 
                 # Log and handle cycle time issues

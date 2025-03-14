@@ -45,3 +45,5 @@ na koncu jesli gate jest empty to kasujemy początek bufora
 prog zadzialania fft (kiedy mamy pulsowanie a kiedy nie) - pozbycie sie normalizacji
 
 os x - w metrach (niewazne za bardzo)
+
+dodac gdzie siega okno na wykresach diameter i defekty

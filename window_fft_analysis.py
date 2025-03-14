@@ -71,6 +71,6 @@ def analyze_window_fft(data_array, cache_ttl=5):
     
     # Zamiast cache – zawsze licz od nowa
     result = np.abs(np.fft.rfft(data_array))
-    if np.max(result) > 0:
-        result /= np.max(result)
+    # if np.max(result) > 0:
+    #     result /= np.max(result)
     return result

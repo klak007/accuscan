@@ -11,6 +11,8 @@ from multiprocessing import Process, Queue, Event, Value, cpu_count
 from window_fft_analysis import analyze_window_fft
 import psutil
 import copy
+import numpy as np
+from scipy.signal import find_peaks
 
 
 class PlotManager:
@@ -72,6 +74,8 @@ class PlotManager:
             mod_factor = 1 + modulation_depth * np.sin(2 * np.pi * modulation_frequency * t)
             modulated.append(d * mod_factor)
         return modulated
+    
+
 
     def update_status_plot(self, x_history, lumps_history, necks_history, current_x, batch_name, plc_sample_time=0):
         """
@@ -159,39 +163,74 @@ class PlotManager:
                 meters_covered = x_max - x_min
                 plot_widget.setTitle(f"Uśredniona średnica na dystansie - {sample_count} samples, {meters_covered:.1f}m")
             
-            
+
+
+    def detect_peaks(self, freqs, amplitudes, threshold=500.0):
+        """
+        Wyszukuje lokalne maksima (piki) w wektorze amplitudes,
+        zwraca listę indeksów tych pików, które przekraczają zadany próg.
+        """
+        # find_peaks zwraca indeksy próbek, w których znajdują się piki
+        # można też przekazać parametry typu 'distance', 'prominence', itp.
+        peak_indices, properties = find_peaks(amplitudes, prominence=100, distance=5)
+
+        # Filtrujemy tylko te piki, które są powyżej progu amplitudy
+        peak_indices_above_thresh = [i for i in peak_indices if amplitudes[i] > threshold]
+        return peak_indices_above_thresh
+
     def update_fft_plot(self, diameter_history, fft_buffer_size=256):
         if 'fft' not in self.plot_widgets:
             return
+
+        import numpy as np
+        import pyqtgraph as pg
+        from PyQt5.QtCore import Qt
 
         plot_widget = self.plot_widgets['fft']
         plot_widget.clear()
 
         if len(diameter_history) > 0:
-            # 1) Określamy częstotliwość próbkowania (Hz)
-            sample_rate = 74  # 1 / 0.032 sek
-
-            # 2) Bierzemy ostatnie fft_buffer_size próbek
+            sample_rate = 74  # Przykładowa częstotliwość próbkowania (Hz)
             diameter_array = np.array(diameter_history[-fft_buffer_size:], dtype=np.float32)
+
+            # Odjęcie składowej stałej (DC)
             diameter_mean = np.mean(diameter_array)
             diameter_array -= diameter_mean
+
             if len(diameter_array) > 1:
-                # 3) Obliczamy widmo (moduł FFT), korzystamy z istniejącej funkcji
-                diameter_fft = analyze_window_fft(diameter_array)
-                # UWAGA: analyze_window_fft zwraca już wartości modułu widma
-
-                # 4) Generujemy oś częstotliwości w Hz:
-                #    np.fft.rfftfreq(liczba_próbek, okres_próbkowania)
-                #    Okres_próbkowania = 1 / sample_rate
+                # Obliczamy widmo (bez normalizacji)
+                diameter_fft = np.abs(np.fft.rfft(diameter_array))
+                # Generujemy oś częstotliwości (Hz)
                 freqs = np.fft.rfftfreq(len(diameter_array), d=1.0 / sample_rate)
-
-                # 5) Rysujemy wykres FFT z osią X w Hz i amplitudą na osi Y
+                
+                # Ustalamy próg amplitudy
+                threshold = 500.0
+                
+                # Wykrywanie lokalnych pików za pomocą metody instancyjnej detect_peaks (z self)
+                peak_idxs = self.detect_peaks(freqs, diameter_fft, threshold)
+                
+                # Rysujemy wykres FFT
                 plot_widget.setTitle("Diameter FFT Analysis")
                 plot_widget.plot(freqs, diameter_fft, pen='m', name="FFT")
-
-                # 6) Podpisujemy osie
                 plot_widget.setLabel('bottom', "Frequency [Hz]")
                 plot_widget.setLabel('left', "Magnitude")
+                
+                # Dodajemy poziomą linię progu (threshold) - czerwona linia
+                threshold_line = pg.InfiniteLine(pos=threshold, angle=0, pen='r')
+                plot_widget.addItem(threshold_line)
+                
+                # Dla każdego wykrytego piku dodajemy pionową, przerywaną linię (niebieską)
+                for idx in peak_idxs:
+                    vertical_line = pg.InfiniteLine(
+                        pos=freqs[idx],
+                        angle=90,
+                        pen=pg.mkPen(color='b', style=Qt.DashLine)
+                    )
+                    plot_widget.addItem(vertical_line)
+                    # print(f"[FFT] Lokalny pik o amplitudzie={diameter_fft[idx]:.2f} przy f={freqs[idx]:.2f} Hz")
+
+
+
 
     
 
