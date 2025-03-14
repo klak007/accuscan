@@ -11,7 +11,7 @@ _fft_cache = {}
 _fft_cache_max_size = 50
 _last_fft_calc = 0  # timestamp
 
-def analyze_window_fft(data_array, cache_ttl=5):
+def analyze_window_fft_with_cache(data_array, cache_ttl=5):
     """
     Analyze data with FFT, with caching for performance optimization.
     
@@ -46,8 +46,8 @@ def analyze_window_fft(data_array, cache_ttl=5):
         result = np.abs(np.fft.rfft(data_array))
         
         # Scale to expected range
-        if len(result) > 0:
-            result = result / np.max(result) if np.max(result) > 0 else result
+        # if len(result) > 0:
+        #     result = result / np.max(result) if np.max(result) > 0 else result
     
     # Store in cache
     _fft_cache[data_hash] = {'result': result, 'time': now}
@@ -61,4 +61,16 @@ def analyze_window_fft(data_array, cache_ttl=5):
             del _fft_cache[key]
     
     _last_fft_calc = now
+    return result
+
+def analyze_window_fft(data_array, cache_ttl=5):
+    import numpy as np
+    
+    if len(data_array) <= 1:
+        return np.zeros(32, dtype=np.float32)
+    
+    # Zamiast cache – zawsze licz od nowa
+    result = np.abs(np.fft.rfft(data_array))
+    if np.max(result) > 0:
+        result /= np.max(result)
     return result

@@ -1495,15 +1495,15 @@ class MainPage(QWidget):
                 #     signal,
                 #     256  # lub inna wartość fft_buffer_size
                 # )
-                # self.plot_manager.update_fft_plot(
-                #     plot_data['diameter_history'],
-                #     plot_data.get('fft_buffer_size', 0)
-                # )
-                modulated_history = self.plot_manager.apply_pulsation(plot_data['diameter_history'], sample_rate=100, modulation_frequency=10, modulation_depth=0.5)
                 self.plot_manager.update_fft_plot(
-                    modulated_history,
-                    plot_data.get('fft_buffer_size', 512)
+                    plot_data['diameter_history'],
+                    plot_data.get('fft_buffer_size', 0)
                 )
+                # modulated_history = self.plot_manager.apply_pulsation(plot_data['diameter_history'], sample_rate=100, modulation_frequency=10, modulation_depth=0.5)
+                # self.plot_manager.update_fft_plot(
+                #     modulated_history,
+                #     plot_data.get('fft_buffer_size', 512)
+                # )
                 
             else:
                 # Normal case - update through PlotManager process 

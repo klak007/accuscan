@@ -161,33 +161,36 @@ class PlotManager:
             
             
     def update_fft_plot(self, diameter_history, fft_buffer_size=256):
-        """
-        Aktualizuje wykres analizy FFT średnicy przy użyciu PyQtGraph.
-        
-        Args:
-            diameter_history: Lista wartości średnicy
-            fft_buffer_size: Liczba próbek używanych do obliczenia FFT
-        """
         if 'fft' not in self.plot_widgets:
             return
+
         plot_widget = self.plot_widgets['fft']
         plot_widget.clear()
-        
-        if len(diameter_history) > 0:
-            # Konwersja do numpy array do analizy FFT
-            diameter_array = np.array(diameter_history[-fft_buffer_size:], dtype=np.float32)
-            
-            if len(diameter_array) > 0:
-                # Obliczenie FFT – zakładamy, że funkcja analyze_window_fft jest dostępna
-                diameter_fft = analyze_window_fft(diameter_array)
-                # print(f"[PlotManager] FFT calculated for {len(diameter_array)} samples")
-                # print(f"[update_fft_plot] length={len(diameter_history)} last_5={diameter_history[-5:]}")
-                # print(f"[PlotManager] FFT array ({len(diameter_fft)}): {diameter_fft}")
 
+        if len(diameter_history) > 0:
+            # 1) Określamy częstotliwość próbkowania (Hz)
+            sample_rate = 74  # 1 / 0.032 sek
+
+            # 2) Bierzemy ostatnie fft_buffer_size próbek
+            diameter_array = np.array(diameter_history[-fft_buffer_size:], dtype=np.float32)
+            diameter_mean = np.mean(diameter_array)
+            diameter_array -= diameter_mean
+            if len(diameter_array) > 1:
+                # 3) Obliczamy widmo (moduł FFT), korzystamy z istniejącej funkcji
+                diameter_fft = analyze_window_fft(diameter_array)
+                # UWAGA: analyze_window_fft zwraca już wartości modułu widma
+
+                # 4) Generujemy oś częstotliwości w Hz:
+                #    np.fft.rfftfreq(liczba_próbek, okres_próbkowania)
+                #    Okres_próbkowania = 1 / sample_rate
+                freqs = np.fft.rfftfreq(len(diameter_array), d=1.0 / sample_rate)
+
+                # 5) Rysujemy wykres FFT z osią X w Hz i amplitudą na osi Y
                 plot_widget.setTitle("Diameter FFT Analysis")
-                # Rysujemy wykres FFT; domyślnie oś X to indeksy próbek
-                plot_widget.plot(np.abs(diameter_fft), pen='m', name="FFT")
-                plot_widget.setLabel('bottom', "Frequency")
+                plot_widget.plot(freqs, diameter_fft, pen='m', name="FFT")
+
+                # 6) Podpisujemy osie
+                plot_widget.setLabel('bottom', "Frequency [Hz]")
                 plot_widget.setLabel('left', "Magnitude")
 
     

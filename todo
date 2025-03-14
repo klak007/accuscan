@@ -34,3 +34,14 @@ limity dla owalności
 [x]zrobic get statistics dla flaw window
 
 [x] nie robic +1 tylko +necks i + lumps
+
+
+znieczulić na wejscie rury i na wyjście rury, dodac na poczatku 64 probki (od strony wejsciowej bufora)
+jak gate jest empty to nic do tablicy nie wchodzi 
+jak gate nie jest empty to zaczynamy liczenie i 64 pierwsze probki są na straty
+
+na koncu jesli gate jest empty to kasujemy początek bufora
+
+prog zadzialania fft (kiedy mamy pulsowanie a kiedy nie) - pozbycie sie normalizacji
+
+os x - w metrach (niewazne za bardzo)

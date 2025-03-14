@@ -17,6 +17,7 @@ from data_processing import FastAcquisitionBuffer
 from flaw_detection import FlawDetector
 # Import stron
 from main_page import MainPage
+from alarm_handling import AlarmHandler
 from settings_page import SettingsPage
 from config import OFFLINE_MODE
 import os
@@ -140,6 +141,13 @@ class App(QMainWindow):
         self.update_timer.timeout.connect(self.update_plc_status)
         print("[App] Metoda update_plc_status przypisana do timera.", flush=True)
         self.update_timer.start(1000)  # check every 1 second
+
+        self.alarm_handler = AlarmHandler(
+            db_params=self.db_params,
+            id_register_settings=1,  # lub pobrany z konfiguracji/ustawień
+            product_nr=self.main_page.entry_product.text(),
+            batch_nr=self.main_page.entry_batch.text()
+        )
 
         self.start_update_loop()
         
@@ -648,7 +656,8 @@ class App(QMainWindow):
                 
                 # Calculate sleep time to maintain 32ms cycle
                 elapsed = time.perf_counter() - cycle_start
-                sleep_time = max(0, 0.032 - elapsed)
+                # print(f"[ACQ Process] Elapsed time: {elapsed:.4f}s")
+                sleep_time = 0.002 # max(0, 0.014 - elapsed)
                 
                 
                 # Log and handle cycle time issues
