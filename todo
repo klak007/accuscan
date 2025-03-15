@@ -27,6 +27,9 @@ dodac tez controlword i statusword - sterowanie lampka (buczkiem)
 
 event jest wtedy kiedy oba sa przekroczone (wtedy kiedy oba sa źle to jest błąd - kiedy jeden to nie jest błąd),
  w tym samym momencie trzeba zapalić lampke. Przycisk kwituj kwituje lampke.
+ ~stan poprzedni * stan aktualny = wygeneruj wejscie bledu
+ stan poprzedni * ~stan aktualny = wygeneruj zejście błedu 
+
 
 limity dla odchylenia standardowego
 limity dla owalności
@@ -47,3 +50,19 @@ prog zadzialania fft (kiedy mamy pulsowanie a kiedy nie) - pozbycie sie normaliz
 os x - w metrach (niewazne za bardzo)
 
 dodac gdzie siega okno na wykresach diameter i defekty
+
+zaladuj to nie jest zaladuj tylko odswiez, a zaladuj oznacza zaladowanie to aktualnych nastaw
+
+jak poza zakresem to tez blad do bazy danych. jak cos bedzie poza zakresem tolerancji to ma sie swiecic na czerwono
+
+jak przekroczymy threshold to tez taki blad
+
+a wszystkie bledy skladaja sie na common fault
+
+kwitowanie powinno trwać n cykli
+
+sprawdzić tab order 
+
+sprawdzic f1 f2 f3 na przyciski na gorze
+
+zrobienie ikonki i automatycznego otwierania
