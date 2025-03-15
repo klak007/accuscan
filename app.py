@@ -589,14 +589,14 @@ class App(QMainWindow):
                 reset_start = time.perf_counter()
                 # Warunki resetu: duża wartość w licznikach lub długi brak przyrostu
                 if current_lumps > 9000 or current_necks > 9000 or stable_count >= 128:
-                    print("[ACQ Process] Warunki resetu osiągnięte, wykonuję reset PLC")
+                    # print("[ACQ Process] Warunki resetu osiągnięte, wykonuję reset PLC")
                     # Maksymalna liczba prób resetu
                     max_reset_attempts = 3
                     reset_attempt = 0
                     reset_successful = False
 
                     while reset_attempt < max_reset_attempts:
-                        print(f"[ACQ Process] Próba resetu nr {reset_attempt + 1}")
+                        # print(f"[ACQ Process] Próba resetu nr {reset_attempt + 1}")
                         try:
                             # Wykonaj reset w PLC
                             write_plc_data(plc_client, db_number=2, zl=True, zn=True, zf=True, zt=False)
@@ -611,7 +611,7 @@ class App(QMainWindow):
                         data_after_reset = read_plc_data(plc_client, db_number=2)
                         post_reset_lumps = data_after_reset.get("lumps", 0)
                         post_reset_necks = data_after_reset.get("necks", 0)
-                        print(f"[ACQ Process] Po resecie: lumps={post_reset_lumps}, necks={post_reset_necks}")
+                        # print(f"[ACQ Process] Po resecie: lumps={post_reset_lumps}, necks={post_reset_necks}")
                         
                         # Jeśli oba liczniki są zerowe, reset się powiódł
                         if post_reset_lumps == 0 and post_reset_necks == 0:
@@ -620,7 +620,7 @@ class App(QMainWindow):
                         reset_attempt += 1
 
                     if reset_successful:
-                        print("[ACQ Process] Reset udany po próbie nr", reset_attempt + 1)
+                        # print("[ACQ Process] Reset udany po próbie nr", reset_attempt + 1)
                         # Ustaw zmienne poprzednich odczytów na 0
                         lumps_prev = 0
                         necks_prev = 0
@@ -652,8 +652,8 @@ class App(QMainWindow):
                     cycle_count = 0
                     total_time = time.perf_counter() - cycle_start
                     #print once every 100 cycles
-                    if cycle_count % 100 == 0:
-                        print(f"[ACQ Process] Total: {total_time:.4f}s | Read: {read_time:.4f}s | Reset: {reset_time:.4f}s")
+                    # if cycle_count % 100 == 0:
+                    #     print(f"[ACQ Process] Total: {total_time:.4f}s | Read: {read_time:.4f}s | Reset: {reset_time:.4f}s")
                 
                 # Calculate sleep time to maintain 32ms cycle
                 elapsed = time.perf_counter() - cycle_start

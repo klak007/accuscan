@@ -62,8 +62,8 @@ class FlawDetector:
         lumps = data.get("lumps_delta", 0)
         necks = data.get("necks_delta", 0)
         
-        if lumps > 0 or necks > 0:
-            print(f"[FlawDetector] NEW lumps={lumps}, necks={necks} at x={current_x:.2f}")
+        # if lumps > 0 or necks > 0:
+        #     print(f"[FlawDetector] NEW lumps={lumps}, necks={necks} at x={current_x:.2f}")
         
         # Track total counts
         if lumps > 0:
