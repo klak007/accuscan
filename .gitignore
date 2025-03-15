@@ -3,9 +3,6 @@
 .conda/
 __pycache__/
 
-# Pliki zależności (jeśli używasz tylko requirements.txt)
-environment.yml
-
 # Pliki tymczasowe i logi
 wynik.prof
 
