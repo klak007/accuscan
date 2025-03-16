@@ -9,11 +9,8 @@ import numpy as np
 import multiprocessing as mp
 from multiprocessing import Process, Queue, Event, Value, cpu_count
 from window_fft_analysis import analyze_window_fft
-import psutil
-import copy
-import numpy as np
 from scipy.signal import find_peaks
-
+from PyQt5.QtCore import Qt
 
 class PlotManager:
     """
@@ -181,10 +178,6 @@ class PlotManager:
     def update_fft_plot(self, diameter_history, fft_buffer_size=256):
         if 'fft' not in self.plot_widgets:
             return
-
-        import numpy as np
-        import pyqtgraph as pg
-        from PyQt5.QtCore import Qt
 
         plot_widget = self.plot_widgets['fft']
         plot_widget.clear()

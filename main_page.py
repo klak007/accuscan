@@ -996,23 +996,8 @@ class MainPage(QWidget):
         group_pos_speed.setLayout(pos_speed_layout)
         readings_layout.addWidget(group_pos_speed)
         
-        # --------------------------
-        # Dodatkowe wskaźniki (np. wybrzuszenia, zagłębienia, średnica)
-        # --------------------------
-        # Wskaźniki wybrzuszenia
-        # self.label_lump_indicator = QLabel("Wybrzuszenie: Off", self.readings_frame)
-        # readings_layout.addWidget(self.label_lump_indicator)
-        # self.lumps_count_label = QLabel("Liczba wybrzuszeń: 0", self.readings_frame)
-        # readings_layout.addWidget(self.lumps_count_label)
-        
-        # # Wskaźniki zagłębienia
-        # self.label_neck_indicator = QLabel("Zagłębienie: Off", self.readings_frame)
-        # readings_layout.addWidget(self.label_neck_indicator)
-        # self.necks_count_label = QLabel("Liczba zagłębień: 0", self.readings_frame)
-        # readings_layout.addWidget(self.necks_count_label)
         default_font = QApplication.font()
         default_font.setPointSize(15)
-
         
         self.label_alarm_lumps = QLabel("Wybrzuszenia OK", self.left_panel) 
         self.label_alarm_lumps.setFont(default_font)

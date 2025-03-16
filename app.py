@@ -3,11 +3,13 @@ from PyQt5.QtWidgets import QApplication, QMessageBox, QVBoxLayout, QMainWindow,
 from PyQt5.QtCore import QTimer  # Add this import
 from PyQt5.QtGui import QIcon
 import sys
+import os
 from datetime import datetime
 import time
 import threading
 import queue
 import multiprocessing as mp
+import pyqtgraph as pg
 from multiprocessing import Process, Value, Event, Queue
 # Import modułów
 
@@ -20,10 +22,10 @@ from main_page import MainPage
 from alarm_handling import AlarmHandler
 from settings_page import SettingsPage
 from config import OFFLINE_MODE
-import os
 
 
-# Configuration settings (originally from config.py)
+
+
 # PLC connection parameters
 PLC_IP = "192.168.50.90"  # Przykładowy adres sterownika
 PLC_RACK = 0              # Zwykle 0 przy S7-1200
@@ -51,38 +53,32 @@ class App(QMainWindow):
     teraz po QMainWindow (PyQt5).
     """
     def __init__(self):
-        # Inicjalizacja aplikacji    
         super().__init__()
-        #Inicjalizacja flagi PLC
-        from multiprocessing import Value
-        self.plc_connected_flag = Value('i', 0)
+        self.plc_connected_flag = Value('i', 0)         #Inicjalizacja flagi PLC
         print("[App] Inicjalizacja aplikacji...")
         
-        # Ustawienia okna
+
         self.setWindowTitle("AccuScan Controller")
         self.setGeometry(0, 0, 1920, 1080)
-        # Add logo as window icon
         logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logo2.png")
         if os.path.exists(logo_path):
             self.setWindowIcon(QIcon(logo_path))
-            print(f"[App] Logo loaded from: {logo_path}")
         else:
             print(f"[App] Warning: Logo file not found at: {logo_path}")
         
-        # -----------------------------------
+        
         # Flagi i parametry sterujące
-        # -----------------------------------
         self.run_measurement = False
         self.current_page = "MainPage"
         self.db_connected = False
         self.log_counter = 0
         self.log_frequency = 10
         self.last_log_time = time.time()
+        self.last_plc_retry = 0
+        self._closing = False   
+
         
-        
-        # -----------------------------------
         # Kolejki, wątki/procesy
-        # -----------------------------------
         self.acquisition_thread_running = False
         self.acquisition_thread = None
         self.db_queue = queue.Queue(maxsize=100)
@@ -101,21 +97,15 @@ class App(QMainWindow):
         # Używamy mp.Queue dla między-procesowego przesyłu danych
         self.data_queue = mp.Queue(maxsize=250)
         
-        
-        # -----------------------------------
-        # Parametry bazy danych
-        # -----------------------------------
+        # Parametry bazy danycH
         self.db_params = DB_PARAMS
         self.init_database_connection()
-        # -----------------------------------
+
         # Bufor akwizycji
-        # -----------------------------------
         self.acquisition_buffer = FastAcquisitionBuffer(max_samples=1024)
         self.flaw_detector = FlawDetector()
         
-        # -----------------------------------
         # Kontener na strony (MainPage, SettingsPage)
-        # -----------------------------------
         central_widget = QWidget(self)
         self.setCentralWidget(central_widget)
         self.layout = QVBoxLayout(central_widget)
@@ -125,7 +115,6 @@ class App(QMainWindow):
         self.main_page = MainPage(parent=central_widget, controller=self)
         self.settings_page = SettingsPage(parent=central_widget, controller=self)
         
-        # Na razie dodajemy tylko main_page do layoutu
         self.stacked_widget.addWidget(self.main_page)
         self.stacked_widget.addWidget(self.settings_page)
         self.layout.addWidget(self.stacked_widget)
@@ -133,7 +122,6 @@ class App(QMainWindow):
         
         # Start workerów
         self.start_db_worker()
-        
         self.start_acquisition_process()
         
         self.update_timer = QTimer(self)
@@ -150,11 +138,6 @@ class App(QMainWindow):
         )
 
         self.start_update_loop()
-        
-        
-        self.last_plc_retry = 0
-        
-        self._closing = False   # <-- new flag to prevent recursion
 
     def update_plc_status(self):
         if self.plc_connected_flag.value == 1:
@@ -165,10 +148,6 @@ class App(QMainWindow):
             self.main_page.plc_status_label.setStyleSheet("color: red;")
 
     def closeEvent(self, event):
-        """
-        Zamiast self.protocol("WM_DELETE_WINDOW", self._on_closing),
-        w PyQt robimy override closeEvent().
-        """
         self._on_closing()
         event.accept()  # lub event.ignore(), zależnie od Twojej logiki
     
@@ -229,7 +208,6 @@ class App(QMainWindow):
             args=(
                 self.process_running_flag,
                 self.run_measurement_flag,
-                
                 self.data_queue,
                 PLC_IP,
                 PLC_RACK,
@@ -242,11 +220,9 @@ class App(QMainWindow):
         # Set a flag to force an initial reset of the PLC counters when we start measuring
         self.initial_reset_needed = True
         
-        # Start the acquisition process
+        # Start the acquisition process and a thread to receive data from the acquisition process
         self.acquisition_process.start()
         print(f"[App] Data acquisition process started with PID: {self.acquisition_process.pid}")
-        
-        # Also start a thread to receive data from the acquisition process
         self.start_data_receiver_thread()
     
     def start_data_receiver_thread(self):
@@ -258,12 +234,9 @@ class App(QMainWindow):
         
     def _data_receiver_worker(self):
         """Worker thread that receives data from the acquisition process and updates the buffer"""
-        # Cache UI values to reduce UI thread interactions
+        ui_refresh_counter = 0
         batch_cache = "XABC1566"
         product_cache = "18X0600"
-        
-        ui_refresh_counter = 0
-        
         # Performance monitoring
         last_perf_log = time.time()
         samples_processed = 0
@@ -277,7 +250,7 @@ class App(QMainWindow):
             try:
                 # Check if we need to handle queue overflow situation
                 current_queue_size = self.data_queue.qsize()
-                if current_queue_size > 0:
+                if current_queue_size > 10:
                     print(f"[Data Receiver] Current queue size: {current_queue_size}")
                 
                 # Critical overflow - need to drop samples to catch up
@@ -287,9 +260,8 @@ class App(QMainWindow):
                     samples_to_drop = current_queue_size - QUEUE_WARNING_THRESHOLD
                     for _ in range(samples_to_drop):
                         try:
-                            # Get and discard samples - multiprocessing Queue doesn't have task_done
+                            # Get and discard samples, mp.Queue doesn't have task_done method 
                             _ = self.data_queue.get_nowait()
-                            # Note: mp.Queue doesn't have task_done method
                         except queue.Empty:
                             break
                     print(f"[Data Receiver] Dropped {samples_to_drop} samples, new queue size: {self.data_queue.qsize()}")
@@ -299,19 +271,19 @@ class App(QMainWindow):
                 if batch_size == 0:
                     # No data available, try to get at least one sample with timeout
                     try:
-                        data = self.data_queue.get(timeout=0.1)
+                        data = self.data_queue.get(timeout=0.01)
                         batch_size = 1
                     except queue.Empty:
                         continue
                 else:
                     # Get the first item in the batch
-                    data = self.data_queue.get(timeout=0.1)
+                    data = self.data_queue.get(timeout=0.01)
                 
                 batch_start = time.perf_counter()
                 
                 # Only refresh UI values occasionally to reduce overhead
                 ui_refresh_counter += 1
-                if ui_refresh_counter >= 20:  # Reduced frequency of UI updates from 10 to 20 cycles
+                if ui_refresh_counter >= 10:  # Reduced frequency of UI updates from 10 to 20 cycles
                     ui_refresh_counter = 0
                     # Update cached values from UI using the safer methods if available
                     if hasattr(self, 'main_page'):
@@ -898,15 +870,13 @@ class App(QMainWindow):
             return None
 
 if __name__ == "__main__":
-    import multiprocessing as mp
-    mp.freeze_support()  # Wymagane dla Windows
-    print("[App] Uruchamianie aplikacji po freeze ...")
+    mp.freeze_support()  
+    print("[App] Uruchamianie aplikacji")
     
     app = QApplication(sys.argv)
     app.setStyle("fusion")
-
     main_window = App() 
-    main_window.show()
+    main_window.showFullScreen()
 
     sys.exit(app.exec_())
     print("[App] Aplikacja zakończona")

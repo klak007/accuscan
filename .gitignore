@@ -13,3 +13,5 @@ test_plc_write.py
 main.py
 git_help.txt
 test_db_connection.py
+fft_with_cache.py
+schema.md
