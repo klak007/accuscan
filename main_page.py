@@ -99,6 +99,7 @@ class MainPage(QWidget):
             }, 
             min_update_interval=0.2  # Reduce interval for more responsive updates
         )
+        self.fft_threshold_value = 1000.0
         print("[MainPage] Plot manager initialized for PyQtGraph")
 
         # Tworzenie poszczególnych części interfejsu
@@ -662,6 +663,54 @@ class MainPage(QWidget):
         self.btn_max_necks_inc_5.clicked.connect(lambda: self._adjust_max_necks(5))
         max_necks_layout.addWidget(self.btn_max_necks_inc_5)
 
+        # Rząd row_start+18: Etykieta "Pulsation threshold"
+        self.label_pulsation_threshold = QLabel("Próg pulsacji:", self.left_panel)
+        left_layout.addWidget(self.label_pulsation_threshold, row_start+18, 0, alignment=Qt.AlignCenter)
+
+        # Rząd row_start+19: Ramka dla pulsation threshold
+        pulsation_frame = QFrame(self.left_panel)
+        pulsation_layout = QHBoxLayout(pulsation_frame)
+        pulsation_layout.setContentsMargins(0, 0, 0, 0)
+        pulsation_frame.setLayout(pulsation_layout)
+        left_layout.addWidget(pulsation_frame, row_start+19, 0, alignment=Qt.AlignCenter)
+
+        # Left buttons
+        self.btn_pulsation_dec = QPushButton("-", pulsation_frame)
+        self.btn_pulsation_dec.setFixedWidth(30)
+        self.btn_pulsation_dec.clicked.connect(lambda: self._adjust_pulsation_threshold(-50))
+        pulsation_layout.addWidget(self.btn_pulsation_dec)
+
+        # Center input
+        self.entry_pulsation_threshold = QLineEdit(pulsation_frame)
+        self.entry_pulsation_threshold.setValidator(QDoubleValidator(0.0, 10000.0, 1))
+        self.entry_pulsation_threshold.setPlaceholderText("500.0")
+        self.entry_pulsation_threshold.setText("500.0")
+        self.entry_pulsation_threshold.setMinimumWidth(220)
+        self.entry_pulsation_threshold.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        pulsation_layout.addWidget(self.entry_pulsation_threshold)
+
+        # Right buttons
+        self.btn_pulsation_inc = QPushButton("+", pulsation_frame)
+        self.btn_pulsation_inc.setFixedWidth(30)
+        self.btn_pulsation_inc.clicked.connect(lambda: self._adjust_pulsation_threshold(50))
+        pulsation_layout.addWidget(self.btn_pulsation_inc)
+
+    def _adjust_pulsation_threshold(self, delta: float):
+        val_str = self.entry_pulsation_threshold.text() or "0"
+        try:
+            val = float(val_str)
+        except ValueError:
+            val = 0.0
+        new_val = max(0.0, val + delta)
+        self.entry_pulsation_threshold.setText(f"{new_val:.1f}")
+        # Wywołaj metodę, która ustawia próg w PlotManager:
+        self._adjust_fft_threshold(new_val)
+
+    def _adjust_fft_threshold(self, new_value: float):
+        self.fft_threshold_value = new_value
+        self.plot_manager.fft_threshold = new_value
+        print(f"[GUI] FFT threshold set to: {new_value:.1f}")
+
     def _adjust_diameter(self, delta: float):
         val_str = self.entry_diameter_setpoint.text() or "0"
         try:
@@ -765,6 +814,8 @@ class MainPage(QWidget):
         flaw_window_str = self.entry_flaw_window.text() or "2.0"
         max_lumps_str = self.entry_max_lumps.text() or "3"
         max_necks_str = self.entry_max_necks.text() or "3"
+        pulsation_str = self.entry_pulsation_threshold.text() or "550.0"
+
 
         # Konwersje na float lub int
         try:
@@ -776,6 +827,7 @@ class MainPage(QWidget):
             flaw_window = float(flaw_window_str)
             max_lumps = int(max_lumps_str)
             max_necks = int(max_necks_str)
+            pulsation_threshold = float(pulsation_str)
         except ValueError:
             QMessageBox.critical(self, "Błąd", "Błędne dane wejściowe.")
             return
@@ -798,6 +850,7 @@ class MainPage(QWidget):
             "diameter_histeresis": 0.0,
             "lump_histeresis": 0.0,
             "neck_histeresis": 0.0,
+            "pulsation_threshold": pulsation_threshold
         }
 
         # 3. Zapis do bazy

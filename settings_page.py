@@ -221,6 +221,7 @@ class SettingsPage(QFrame):
             "flaw_window",
             "max_lumps_in_flaw_window",
             "max_necks_in_flaw_window",
+            "pulsation_threshold",
             "created_at"
         ]
         
@@ -298,7 +299,7 @@ class SettingsPage(QFrame):
                     SELECT `Id Settings` AS id_settings, `Recipe name`, `Product nr`, `Preset Diameter`, 
                         `Diameter Over tolerance`, `Diameter Under tolerance`, `Lump threshold`, 
                         `Neck threshold`, `Flaw Window`, `Max lumps in flaw window`, 
-                        `Max necks in flaw window`, `created_at` 
+                        `Max necks in flaw window`, `Pulsation_threshold`, `created_at` 
                     FROM settings 
                     ORDER BY id_settings DESC
                 """
@@ -319,6 +320,7 @@ class SettingsPage(QFrame):
                 flaw_window = row.get("Flaw Window") or 0
                 max_lumps_in_flaw_window = row.get("Max lumps in flaw window") or 3
                 max_necks_in_flaw_window = row.get("Max necks in flaw window") or 3
+                pulsation_threshold = row.get("Pulsation_threshold") or 0
                 created_at = row.get("created_at")
                 if created_at:
                     created_at = created_at.strftime("%Y-%m-%d %H:%M:%S")
@@ -333,7 +335,7 @@ class SettingsPage(QFrame):
                     str(id_val), recipe_name, product_nr, str(preset_diameter),
                     str(diameter_over_tol), str(diameter_under_tol), str(lump_threshold),
                     str(neck_threshold), str(flaw_window), str(max_lumps_in_flaw_window),
-                    str(max_necks_in_flaw_window), created_at
+                    str(max_necks_in_flaw_window), str(pulsation_threshold),created_at
                 ]
                 
                 for col, value in enumerate(values):

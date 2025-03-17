@@ -373,10 +373,12 @@ class App(QMainWindow):
                             f"Average processing time: {avg_time:.4f} s/sample, "
                             f"Batch time: {time.perf_counter() - batch_start:.4f}s for {batch_size} samples")
                     else:
-                        print(f"[Data Receiver] Average processing time: {avg_time:.4f} s/sample, Queue size: {current_queue_size}")
+                        #print once every 1000 cycles
+                        if samples_processed % 1000 == 0:
+                            print(f"[Data Receiver] Average processing time: {avg_time:.4f} s/sample, Queue size: {current_queue_size}")
                     
                     self.processing_time = avg_time
-                    print(f"[Data Receiver] Processing time: {self.processing_time:.4f} s/sample")
+                    # print(f"[Data Receiver] Processing time: {self.processing_time:.4f} s/sample")
                     last_perf_log = now
                     samples_processed = 0  # Reset sample count after logging
                         
