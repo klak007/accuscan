@@ -407,6 +407,22 @@ class SettingsPage(QFrame):
 
         QMessageBox.information(self, "Załadowano", "Ustawienia zostały załadowane do aktualnych nastaw.")
 
+         # Dodatkowo, wysyłamy te ustawienia do PLC
+        try:
+            write_cmd = {
+                "command": "write_plc_settings",
+                "db_number": 2,
+                "lump_threshold": float(lump_threshold) if lump_threshold else 0.0,
+                "neck_threshold": float(neck_threshold) if neck_threshold else 0.0,
+                "flaw_preset_diameter": float(preset_diameter) if preset_diameter else 0.0,
+                "upper_tol": float(diameter_over_tol) if diameter_over_tol else 0.0,
+                "under_tol": float(diameter_under_tol) if diameter_under_tol else 0.0
+            }
+            self.controller.plc_write_queue.put_nowait(write_cmd)
+            print("[GUI] Ustawienia zostały wysłane do PLC po załadowaniu do aktualnych nastaw.")
+        except Exception as e:
+            print(f"[GUI] Błąd przy wysyłaniu ustawień do PLC: {e}")
+
 
     def open_edit_modal(self, values=None, clone=False):
         # Tworzymy i wyświetlamy nasz dialog

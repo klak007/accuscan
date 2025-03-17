@@ -72,7 +72,7 @@ sprawdzic f1 f2 f3 na przyciski na gorze
 
 [x] utworzono baze danych w mysql workbench
 
-zmienic sposob ladowania czyli na main page mamy przycisk zapisz ktory zapisuje nastawy do bazy danych. 
+[x]zmienic sposob ladowania czyli na main page mamy przycisk zapisz ktory zapisuje nastawy do bazy danych. 
 na ekranie nastaw mamy przycisk ktory laduje do aktualnych nastaw i laduje do PLC
-i ne ekranie main page mamy podzielony lewy panel na dwa mniejsze - jeden z nastawami do PLC i jeden z nastawami softwareowymi
-na ekranie main page potrzebny jest tez przycisk laduj do plc
+[x]i ne ekranie main page mamy podzielony lewy panel na dwa mniejsze - jeden z nastawami do PLC i jeden z nastawami softwareowymi
+[x]na ekranie main page potrzebny jest tez przycisk laduj do plc
