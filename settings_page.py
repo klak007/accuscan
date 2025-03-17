@@ -271,6 +271,11 @@ class SettingsPage(QFrame):
         self.btn_delete.setFixedHeight(40)
         self.btn_delete.clicked.connect(self.delete_setting)
         actions_layout.addWidget(self.btn_delete)
+
+        self.btn_load_current = QPushButton("Załaduj do aktualnych nastaw", self.actions_frame)
+        self.btn_load_current.setFixedHeight(40)
+        self.btn_load_current.clicked.connect(self.load_current_settings)
+        actions_layout.addWidget(self.btn_load_current)
         
         # Dodaj actions_frame do main_frame – przykładowo w wierszu 2, kolumna 0
         self.main_frame.layout().addWidget(self.actions_frame, 2, 0)
@@ -359,6 +364,49 @@ class SettingsPage(QFrame):
             self.update_db_status()
         except Exception as e:
             QMessageBox.warning(self, "Błąd", f"Wystąpił nieoczekiwany błąd: {str(e)}")
+
+    def load_current_settings(self):
+        """Kopiowanie ustawień z wybranej receptury do głównych nastaw na stronie głównej."""
+
+        selected_items = self.table.selectedItems()
+        if not selected_items:
+            QMessageBox.warning(self, "Brak wybranej receptury", "Proszę wybrać recepturę z listy.")
+            return
+
+        # Ponieważ tryb selekcji to pojedynczy wiersz, pobieramy numer pierwszego zaznaczonego wiersza
+        row = selected_items[0].row()
+
+        # Zakładając, że kolumny są w tej kolejności:
+        # 0: id, 1: recipe_name, 2: product_nr, 3: preset_diameter,
+        # 4: diameter_over_tol, 5: diameter_under_tol, 6: lump_threshold, 7: neck_threshold, ...
+        recipe_name = self.table.item(row, 1).text() if self.table.item(row, 1) else ""
+        product_nr = self.table.item(row, 2).text() if self.table.item(row, 2) else ""
+        preset_diameter = self.table.item(row, 3).text() if self.table.item(row, 3) else ""
+        diameter_over_tol = self.table.item(row, 4).text() if self.table.item(row, 4) else ""
+        diameter_under_tol = self.table.item(row, 5).text() if self.table.item(row, 5) else ""
+        lump_threshold = self.table.item(row, 6).text() if self.table.item(row, 6) else ""
+        neck_threshold = self.table.item(row, 7).text() if self.table.item(row, 7) else ""
+        flaw_window = self.table.item(row, 8).text() if self.table.item(row, 8) else ""
+        max_lumps_in_flaw_window = self.table.item(row, 9).text() if self.table.item(row, 9) else ""
+        max_necks_in_flaw_window = self.table.item(row, 10).text() if self.table.item(row, 10) else ""
+        pulsation_threshold = self.table.item(row, 11).text() if self.table.item(row, 11) else ""
+
+        # Teraz ustawiamy te wartości w lewym panelu strony głównej
+        main_page = self.controller.main_page
+        main_page.entry_recipe_name.setText(recipe_name)
+        main_page.entry_product.setText(product_nr)
+        main_page.entry_diameter_setpoint.setText(preset_diameter)
+        main_page.entry_tolerance_plus.setText(diameter_over_tol)
+        main_page.entry_tolerance_minus.setText(diameter_under_tol)
+        main_page.entry_lump_threshold.setText(lump_threshold)
+        main_page.entry_neck_threshold.setText(neck_threshold)
+        main_page.entry_flaw_window.setText(flaw_window)
+        main_page.entry_max_lumps.setText(max_lumps_in_flaw_window)
+        main_page.entry_max_necks.setText(max_necks_in_flaw_window)
+        main_page.entry_pulsation_threshold.setText(pulsation_threshold)
+
+        QMessageBox.information(self, "Załadowano", "Ustawienia zostały załadowane do aktualnych nastaw.")
+
 
     def open_edit_modal(self, values=None, clone=False):
         # Tworzymy i wyświetlamy nasz dialog
