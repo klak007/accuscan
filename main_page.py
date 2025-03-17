@@ -15,10 +15,10 @@ import pyqtgraph as pg
 # PyQt5 imports - consolidated
 from PyQt5.QtWidgets import (
     QFrame, QGridLayout, QVBoxLayout, QWidget, QMessageBox,
-    QHBoxLayout, QPushButton, QLabel, QSpacerItem, QSizePolicy, QLineEdit, QGroupBox, QApplication, QPlainTextEdit
+    QHBoxLayout, QPushButton, QLabel, QSpacerItem, QSizePolicy, QLineEdit, QGroupBox, QApplication, QPlainTextEdit, QShortcut
 )
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QFont, QDoubleValidator, QIntValidator
+from PyQt5.QtGui import QFont, QDoubleValidator, QIntValidator, QKeySequence
 
 import sys
 
@@ -140,30 +140,43 @@ class MainPage(QWidget):
         top_bar_font = QFont(QApplication.font())
         top_bar_font.setPointSize(12)
         top_bar_font.setBold(False)
+
         # Pomiary button: fixed size and green background
-        self.btn_pomiary = QPushButton("Pomiary", self.top_bar)
+        self.btn_pomiary = QPushButton("Pomiary (F2)", self.top_bar)
         self.btn_pomiary.setFont(top_bar_font)
         self.btn_pomiary.setFixedSize(140, 40)
-        # self.btn_pomiary.setStyleSheet("background-color: rgb(67, 160, 71);")
         self.btn_pomiary.clicked.connect(self._on_pomiary_click)
-        
+
+        shortcut_pomiary = QShortcut(QKeySequence('F2'), self)
+        shortcut_pomiary.activated.connect(self.btn_pomiary.click)
+
         # Nastawy button: fixed size
-        self.btn_nastawy = QPushButton("Nastawy", self.top_bar)
+        self.btn_nastawy = QPushButton("Nastawy (F3)", self.top_bar)
         self.btn_nastawy.setFont(top_bar_font)
         self.btn_nastawy.setFixedSize(140, 40)
         self.btn_nastawy.clicked.connect(lambda: self.controller.toggle_page("SettingsPage"))
-        
+
+        shortcut_nastawy = QShortcut(QKeySequence('F3'), self)
+        shortcut_nastawy.activated.connect(self.btn_nastawy.click)
+
         # Historia button: fixed size
-        self.btn_historia = QPushButton("Historia", self.top_bar)
+        self.btn_historia = QPushButton("Historia (F4)", self.top_bar)
         self.btn_historia.setFont(top_bar_font)
         self.btn_historia.setFixedSize(140, 40)
         self.btn_historia.clicked.connect(self._on_historia_click)
-        
+
+        shortcut_historia = QShortcut(QKeySequence('F4'), self)
+        shortcut_historia.activated.connect(self.btn_historia.click)
+
         # Accuscan button: fixed size
-        self.btn_accuscan = QPushButton("Accuscan", self.top_bar)
+        self.btn_accuscan = QPushButton("Accuscan (F5)", self.top_bar)
         self.btn_accuscan.setFont(top_bar_font)
         self.btn_accuscan.setFixedSize(140, 40)
         self.btn_accuscan.clicked.connect(self._on_accuscan_click)
+
+        shortcut_accuscan = QShortcut(QKeySequence('F5'), self)
+        shortcut_accuscan.activated.connect(self.btn_accuscan.click)
+
         
         # Add left-side buttons
         top_bar_layout.addWidget(self.btn_pomiary, 0, Qt.AlignLeft)
@@ -322,6 +335,7 @@ class MainPage(QWidget):
         self.btn_save_settings_to_db.setToolTip("Zapisuje aktualne nastawy do bazy danych.")
         self.btn_save_settings_to_db.setFixedHeight(40)
         self.btn_save_settings_to_db.clicked.connect(self._save_settings_to_db)
+        self.btn_save_settings_to_db.setAutoDefault(True)
         upper_layout.addWidget(self.btn_save_settings_to_db, 5, 0)
 
         # Wiersz 6: Etykieta "Nazwa receptury:"
@@ -511,6 +525,7 @@ class MainPage(QWidget):
         self.btn_save_plc = QPushButton("Zapisz do PLC", self.lower_frame)
         self.btn_save_plc.setToolTip("Wysyła ustawienia do sterownika PLC.")
         self.btn_save_plc.setFixedSize(360, 40)
+        self.btn_save_plc.setAutoDefault(True)
         self.btn_save_plc.clicked.connect(self._save_settings_to_plc)
         lower_layout.addWidget(self.btn_save_plc, 1, 0, alignment=Qt.AlignCenter)
 
@@ -703,6 +718,23 @@ class MainPage(QWidget):
         self.btn_neck_thres_inc_05.setFixedWidth(30)
         self.btn_neck_thres_inc_05.clicked.connect(lambda: self._adjust_neck_threshold(0.5))
         necks_threshold_layout.addWidget(self.btn_neck_thres_inc_05)
+
+        # Ustawiamy kolejność przechodzenia klawiszem Tab
+        self.setTabOrder(self.entry_batch, self.entry_product)
+        self.setTabOrder(self.entry_product, self.entry_recipe_name)
+        self.setTabOrder(self.entry_recipe_name, self.entry_flaw_window)
+        self.setTabOrder(self.entry_flaw_window, self.entry_max_lumps)
+        self.setTabOrder(self.entry_max_lumps, self.entry_max_necks)
+        self.setTabOrder(self.entry_max_necks, self.entry_pulsation_threshold)
+        self.setTabOrder(self.entry_pulsation_threshold, self.entry_diameter_setpoint)
+        self.setTabOrder(self.entry_diameter_setpoint, self.entry_tolerance_plus)
+        self.setTabOrder(self.entry_tolerance_plus, self.entry_tolerance_minus)
+        self.setTabOrder(self.entry_tolerance_minus, self.entry_lump_threshold)
+        self.setTabOrder(self.entry_lump_threshold, self.entry_neck_threshold)
+        self.setTabOrder(self.entry_neck_threshold, self.btn_save_settings_to_db)
+        self.setTabOrder(self.btn_save_settings_to_db, self.btn_save_plc)
+        self.setTabOrder(self.btn_save_plc, self.entry_batch)
+
 
 
 

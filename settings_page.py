@@ -2,8 +2,8 @@ import mysql.connector
 from mysql.connector import Error
 from datetime import datetime
 from db_helper import check_database
-from PyQt5.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QMessageBox, QLineEdit, QTableWidgetItem, QDialog, QApplication
-from PyQt5.QtGui import QFont
+from PyQt5.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QMessageBox, QLineEdit, QTableWidgetItem, QDialog, QApplication, QShortcut
+from PyQt5.QtGui import QFont, QKeySequence
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QPushButton, QLabel, QSpacerItem, QSizePolicy, QTableWidget, QHeaderView
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QDialogButtonBox
@@ -101,29 +101,45 @@ class SettingsPage(QFrame):
         top_bar_font.setPointSize(12)
         top_bar_font.setBold(False)
 
-        self.btn_pomiary = QPushButton("Pomiary", self.top_bar)
+        # Pomiary - F2
+        self.btn_pomiary = QPushButton("Pomiary (F2)", self.top_bar)
         self.btn_pomiary.setFont(top_bar_font)
         self.btn_pomiary.setFixedSize(140, 40)
-        self.btn_pomiary.clicked.connect(self._on_pomiary_click)  # changed handler
+        self.btn_pomiary.clicked.connect(self._on_pomiary_click)
         top_bar_layout.addWidget(self.btn_pomiary, 0, Qt.AlignLeft)
 
-        self.btn_nastawy = QPushButton("Nastawy", self.top_bar)
+        shortcut_pomiary = QShortcut(QKeySequence('F2'), self)
+        shortcut_pomiary.activated.connect(self.btn_pomiary.click)
+
+        # Nastawy - F1
+        self.btn_nastawy = QPushButton("Nastawy (F3)", self.top_bar)
         self.btn_nastawy.setFont(top_bar_font)
         self.btn_nastawy.setFixedSize(140, 40)
         self.btn_nastawy.clicked.connect(self._on_nastawy_click)
         top_bar_layout.addWidget(self.btn_nastawy, 0, Qt.AlignLeft)
 
-        self.btn_historia = QPushButton("Historia", self.top_bar)
+        shortcut_nastawy = QShortcut(QKeySequence('F3'), self)
+        shortcut_nastawy.activated.connect(self.btn_nastawy.click)
+
+        # Historia - F3
+        self.btn_historia = QPushButton("Historia (F4)", self.top_bar)
         self.btn_historia.setFont(top_bar_font)
         self.btn_historia.setFixedSize(140, 40)
         self.btn_historia.clicked.connect(self._on_historia_click)
         top_bar_layout.addWidget(self.btn_historia, 0, Qt.AlignLeft)
 
-        self.btn_accuscan = QPushButton("Accuscan", self.top_bar)
+        shortcut_historia = QShortcut(QKeySequence('F4'), self)
+        shortcut_historia.activated.connect(self.btn_historia.click)
+
+        # Accuscan - F4
+        self.btn_accuscan = QPushButton("Accuscan (F5)", self.top_bar)
         self.btn_accuscan.setFont(top_bar_font)
         self.btn_accuscan.setFixedSize(140, 40)
         self.btn_accuscan.clicked.connect(self._on_accuscan_click)
         top_bar_layout.addWidget(self.btn_accuscan, 0, Qt.AlignLeft)
+
+        shortcut_accuscan = QShortcut(QKeySequence('F5'), self)
+        shortcut_accuscan.activated.connect(self.btn_accuscan.click)
 
         spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
         top_bar_layout.addItem(spacer)
