@@ -76,6 +76,7 @@ class App(QMainWindow):
         self.last_log_time = time.time()
         self.last_plc_retry = 0
         self._closing = False   
+        self.processing_time = 0.0  # Czas przetwarzania danych
 
         
         # Kolejki, wątki/procesy
@@ -374,6 +375,8 @@ class App(QMainWindow):
                     else:
                         print(f"[Data Receiver] Average processing time: {avg_time:.4f} s/sample, Queue size: {current_queue_size}")
                     
+                    self.processing_time = avg_time
+                    print(f"[Data Receiver] Processing time: {self.processing_time:.4f} s/sample")
                     last_perf_log = now
                     samples_processed = 0  # Reset sample count after logging
                         
@@ -845,6 +848,10 @@ class App(QMainWindow):
             current_page = self.get_current_page()
             ui_start = time.perf_counter()
             if hasattr(current_page, 'update_data'):
+                # Budujemy słownik danych przekazywanych do wykresów
+                data_dict = getattr(self, "latest_data", {}).copy()
+                # Dodajemy processing_time obliczony w _data_receiver_worker
+                data_dict["processing_time"] = self.processing_time
                 current_page.update_data()
             ui_time = time.perf_counter() - ui_start
             
@@ -872,7 +879,7 @@ class App(QMainWindow):
 if __name__ == "__main__":
     mp.freeze_support()  
     print("[App] Uruchamianie aplikacji")
-    
+
     app = QApplication(sys.argv)
     app.setStyle("fusion")
     main_window = App() 

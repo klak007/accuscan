@@ -175,7 +175,7 @@ class PlotManager:
         peak_indices_above_thresh = [i for i in peak_indices if amplitudes[i] > threshold]
         return peak_indices_above_thresh
 
-    def update_fft_plot(self, diameter_history, fft_buffer_size=256):
+    def update_fft_plot(self, diameter_history, fft_buffer_size=256, processing_time=0):
         if 'fft' not in self.plot_widgets:
             return
 
@@ -183,47 +183,37 @@ class PlotManager:
         plot_widget.clear()
 
         if len(diameter_history) > 0:
-            sample_rate = 74  # Przykładowa częstotliwość próbkowania (Hz)
+            # Ustal dynamiczny sample rate na podstawie processing_time, używając 74 Hz jako domyślnej wartości
+            sample_rate = 1 / processing_time if processing_time > 0 else 83.123
+                
             diameter_array = np.array(diameter_history[-fft_buffer_size:], dtype=np.float32)
-
-            # Odjęcie składowej stałej (DC)
             diameter_mean = np.mean(diameter_array)
             diameter_array -= diameter_mean
 
             if len(diameter_array) > 1:
-                # Obliczamy widmo (bez normalizacji)
                 diameter_fft = np.abs(np.fft.rfft(diameter_array))
-                # Generujemy oś częstotliwości (Hz)
                 freqs = np.fft.rfftfreq(len(diameter_array), d=1.0 / sample_rate)
-                
-                # Ustalamy próg amplitudy
                 threshold = 500.0
-                
-                # Wykrywanie lokalnych pików za pomocą metody instancyjnej detect_peaks (z self)
                 peak_idxs = self.detect_peaks(freqs, diameter_fft, threshold)
                 
-                # Rysujemy wykres FFT
-                plot_widget.setTitle("Diameter FFT Analysis")
+                # Uaktualnij tytuł wykresu, dodając sample rate i processing time
+                title_text = f"Diameter FFT Analysis (Sample rate: {sample_rate:.2f} Hz, Proc time: {processing_time:.4f} s)"
+                plot_widget.setTitle(title_text)
+                
                 plot_widget.plot(freqs, diameter_fft, pen='m', name="FFT")
                 plot_widget.setLabel('bottom', "Frequency [Hz]")
                 plot_widget.setLabel('left', "Magnitude")
                 
-                # Dodajemy poziomą linię progu (threshold) - czerwona linia
                 threshold_line = pg.InfiniteLine(pos=threshold, angle=0, pen='r')
                 plot_widget.addItem(threshold_line)
                 
-                # Dla każdego wykrytego piku dodajemy pionową, przerywaną linię (niebieską)
                 for idx in peak_idxs:
                     vertical_line = pg.InfiniteLine(
                         pos=freqs[idx],
                         angle=90,
-                        pen=pg.mkPen(color='b', style=Qt.DashLine)
+                        pen=pg.mkPen(color='b', style=pg.QtCore.Qt.DashLine)
                     )
                     plot_widget.addItem(vertical_line)
-                    # print(f"[FFT] Lokalny pik o amplitudzie={diameter_fft[idx]:.2f} przy f={freqs[idx]:.2f} Hz")
-
-
-
 
     
 
@@ -283,7 +273,8 @@ class PlotManager:
                     start = time.perf_counter()
                     self.update_fft_plot(
                         data_dict['diameter_history'],
-                        data_dict.get('fft_buffer_size', 256)
+                        data_dict.get('fft_buffer_size', 256),
+                        data_dict.get('processing_time', 83)
                     )
                     fft_time = time.perf_counter() - start
 

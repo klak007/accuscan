@@ -186,8 +186,8 @@ class SettingsPage(QFrame):
         self.btn_all.clicked.connect(self.clear_filter)
         filter_layout.addWidget(self.btn_all)
         
-        # Przycisk "Załaduj" – wywołuje metodę load_data
-        self.btn_reload = QPushButton("Załaduj", self.filter_frame)
+        # Przycisk "Odśwież" – wywołuje metodę load_data
+        self.btn_reload = QPushButton("Odśwież", self.filter_frame)
         self.btn_reload.setFixedSize(200,40)
         self.btn_reload.clicked.connect(self.load_data)
         filter_layout.addWidget(self.btn_reload)

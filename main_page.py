@@ -8,19 +8,19 @@ import plc_helper
 from visualization import PlotManager
 from data_processing import WindowProcessor, FastAcquisitionBuffer
 from flaw_detection import FlawDetector
-
+from stream_redirector import EmittingStream
 # PyQtGraph imports
 import pyqtgraph as pg
 
 # PyQt5 imports - consolidated
 from PyQt5.QtWidgets import (
     QFrame, QGridLayout, QVBoxLayout, QWidget, QMessageBox,
-    QHBoxLayout, QPushButton, QLabel, QSpacerItem, QSizePolicy, QLineEdit, QGroupBox, QApplication
+    QHBoxLayout, QPushButton, QLabel, QSpacerItem, QSizePolicy, QLineEdit, QGroupBox, QApplication, QPlainTextEdit
 )
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont, QDoubleValidator, QIntValidator
 
-# Rest of the file remains unchanged...
+import sys
 
 class MainPage(QWidget):
     """
@@ -1041,8 +1041,18 @@ class MainPage(QWidget):
         group_flaw_stats.setLayout(flaw_stats_layout)
         readings_layout.addWidget(group_flaw_stats)
         
-        # Po zakończeniu konfiguracji, self.middle_panel powinien zostać dodany do głównego layoutu
-        # np. poprzez self.layout.addWidget(self.middle_panel) w konstruktorze głównego okna.
+        # Create the terminal output field (using QPlainTextEdit)
+        self.terminal_output = QPlainTextEdit(self.middle_panel)
+        self.terminal_output.setReadOnly(True)
+        self.terminal_output.setFixedHeight(150)  # Adjust height as needed
+
+        # Add the terminal_output widget to the layout, e.g. in a new row:
+        middle_layout.addWidget(self.terminal_output, 1, 0)
+
+        # Set up the emitting stream to capture print output
+        self.emitting_stream = EmittingStream()
+        self.emitting_stream.textWritten.connect(self.terminal_output.insertPlainText)
+        sys.stdout = self.emitting_stream  # Redirect standard output to the terminal widget
 
 
     # ---------------------------------------------------------------------------------
@@ -1439,7 +1449,8 @@ class MainPage(QWidget):
             'diameter_preset': diameter_preset,
             'fft_buffer_size': self.FFT_BUFFER_SIZE,
             'timestamp': time.time(),  # Add timestamp for debugging
-            'update_id': id(self) % 10000  # Add unique update ID for tracking updates
+            'update_id': id(self) % 10000,  # Add unique update ID for tracking updates
+            'processing_time': self.controller.processing_time,
         }
         
         # Add debug log if we have data but no visible updates
@@ -1468,21 +1479,10 @@ class MainPage(QWidget):
                     plot_data['diameter_preset'],
                     plot_data['plc_sample_time']
                 )
-                # import numpy as np
-                # fs = 256
-                # t = np.linspace(0, 1, fs, endpoint=False)
-                # signal = (
-                #     np.sin(2 * np.pi * 5 * t) +
-                #     0.5 * np.sin(2 * np.pi * 30 * t) +
-                #     0.2 * np.sin(2 * np.pi * 50 * t)
-                # )
-                # self.plot_manager.update_fft_plot(
-                #     signal,
-                #     256  # lub inna wartość fft_buffer_size
-                # )
                 self.plot_manager.update_fft_plot(
                     plot_data['diameter_history'],
-                    plot_data.get('fft_buffer_size', 0)
+                    plot_data.get('fft_buffer_size', 0),
+                    plot_data.get('processing_time', 0)
                 )
                 # modulated_history = self.plot_manager.apply_pulsation(plot_data['diameter_history'], sample_rate=100, modulation_frequency=10, modulation_depth=0.5)
                 # self.plot_manager.update_fft_plot(
