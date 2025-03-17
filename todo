@@ -22,7 +22,7 @@ zapisz nastawy do receptury
 
 [x] walidacja pol
 
-dodac speed ze sterownika, przesunac adresacje
+[x] dodac speed ze sterownika, przesunac adresacje
 dodac tez controlword i statusword - sterowanie lampka (buczkiem)
 
 event jest wtedy kiedy oba sa przekroczone (wtedy kiedy oba sa źle to jest błąd - kiedy jeden to nie jest błąd),
@@ -65,9 +65,9 @@ sprawdzić tab order
 
 sprawdzic f1 f2 f3 na przyciski na gorze
 
-[x ]zrobienie ikonki i 
-    automatycznego otwierania
+[x]zrobienie ikonki i 
+[x]    automatycznego otwierania
 
-obliczać czestotliwosc probkowania od processing time
+[x]obliczać czestotliwosc probkowania od processing time
 
 [x] utworzono baze danych w mysql workbench

@@ -193,8 +193,8 @@ class PlotManager:
             if len(diameter_array) > 1:
                 diameter_fft = np.abs(np.fft.rfft(diameter_array))
                 freqs = np.fft.rfftfreq(len(diameter_array), d=1.0 / sample_rate)
-                threshold = 500.0
-                peak_idxs = self.detect_peaks(freqs, diameter_fft, threshold)
+                fft_pulsation_threshold = 500.0
+                peak_idxs = self.detect_peaks(freqs, diameter_fft, fft_pulsation_threshold)
                 
                 # Uaktualnij tytuł wykresu, dodając sample rate i processing time
                 title_text = f"Diameter FFT Analysis (Sample rate: {sample_rate:.2f} Hz, Proc time: {processing_time:.4f} s)"
@@ -204,7 +204,7 @@ class PlotManager:
                 plot_widget.setLabel('bottom', "Frequency [Hz]")
                 plot_widget.setLabel('left', "Magnitude")
                 
-                threshold_line = pg.InfiniteLine(pos=threshold, angle=0, pen='r')
+                threshold_line = pg.InfiniteLine(pos=fft_pulsation_threshold, angle=0, pen='r')
                 plot_widget.addItem(threshold_line)
                 
                 for idx in peak_idxs:
