@@ -21,6 +21,7 @@ from alarm_manager import AlarmManager
 # Import stron
 from main_page import MainPage
 from settings_page import SettingsPage
+from history_page import HistoryPage
 from config import OFFLINE_MODE
 
 
@@ -116,11 +117,14 @@ class App(QMainWindow):
         # Inicjalizacja stron
         self.main_page = MainPage(parent=central_widget, controller=self)
         self.settings_page = SettingsPage(parent=central_widget, controller=self)
+        self.history_page = HistoryPage(parent=central_widget, controller=self)
         
         self.stacked_widget.addWidget(self.main_page)
         self.stacked_widget.addWidget(self.settings_page)
+        self.stacked_widget.addWidget(self.history_page)
         self.layout.addWidget(self.stacked_widget)
         self.settings_page.hide()
+        self.history_page.hide()
         
         # Start workerów
         self.start_db_worker()
@@ -182,6 +186,14 @@ class App(QMainWindow):
                 return
             self.stacked_widget.setCurrentWidget(self.settings_page)
             self.current_page = "SettingsPage"
+        elif page_name == "HistoryPage":
+            # Sprawdź połączenie z bazą przed przejściem do historii
+            if not self.db_connected and not check_database(self.db_params):
+                QMessageBox.warning(self, "Brak dostępu do bazy danych", 
+                                    "Dostęp do historii jest ograniczony bez połączenia z bazą danych.")
+                return
+            self.stacked_widget.setCurrentWidget(self.history_page)
+            self.current_page = "HistoryPage"
     
     def start_acquisition_process(self):
         """Start dedicated process for high-speed data acquisition from PLC"""
@@ -852,6 +864,8 @@ class App(QMainWindow):
             return self.main_page
         elif self.current_page == "SettingsPage":
             return self.settings_page
+        elif self.current_page == "HistoryPage":
+            return self.history_page
         else:
             return None
 

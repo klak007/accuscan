@@ -145,7 +145,7 @@ class MainPage(QWidget):
         self.btn_pomiary = QPushButton("Pomiary (F2)", self.top_bar)
         self.btn_pomiary.setFont(top_bar_font)
         self.btn_pomiary.setFixedSize(140, 40)
-        self.btn_pomiary.clicked.connect(self._on_pomiary_click)
+        
 
         shortcut_pomiary = QShortcut(QKeySequence('F2'), self)
         shortcut_pomiary.activated.connect(self.btn_pomiary.click)
@@ -163,7 +163,7 @@ class MainPage(QWidget):
         self.btn_historia = QPushButton("Historia (F4)", self.top_bar)
         self.btn_historia.setFont(top_bar_font)
         self.btn_historia.setFixedSize(140, 40)
-        self.btn_historia.clicked.connect(self._on_historia_click)
+        self.btn_historia.clicked.connect(lambda: self.controller.toggle_page("HistoryPage"))
 
         shortcut_historia = QShortcut(QKeySequence('F4'), self)
         shortcut_historia.activated.connect(self.btn_historia.click)
@@ -227,14 +227,6 @@ class MainPage(QWidget):
         self.plc_status_label = QLabel("PLC Status: Unknown", self.top_bar)
         top_bar_layout.addWidget(self.plc_status_label, 0, Qt.AlignRight)
 
-    def _on_pomiary_click(self):
-        print("[GUI] Kliknięto przycisk 'pomiary'.")
-
-    def _on_nastawy_click(self):
-        self.controller.show_settings_page()
-
-    def _on_historia_click(self):
-        print("[GUI] Kliknięto przycisk 'historia'.")
 
     def _on_accuscan_click(self):
         print("[GUI] Kliknięto przycisk 'Accuscan'.")

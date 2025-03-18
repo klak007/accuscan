@@ -111,17 +111,16 @@ class SettingsPage(QFrame):
         shortcut_pomiary = QShortcut(QKeySequence('F2'), self)
         shortcut_pomiary.activated.connect(self.btn_pomiary.click)
 
-        # Nastawy - F1
+        # Nastawy - F3
         self.btn_nastawy = QPushButton("Nastawy (F3)", self.top_bar)
         self.btn_nastawy.setFont(top_bar_font)
         self.btn_nastawy.setFixedSize(140, 40)
-        self.btn_nastawy.clicked.connect(self._on_nastawy_click)
         top_bar_layout.addWidget(self.btn_nastawy, 0, Qt.AlignLeft)
 
         shortcut_nastawy = QShortcut(QKeySequence('F3'), self)
         shortcut_nastawy.activated.connect(self.btn_nastawy.click)
 
-        # Historia - F3
+        # Historia - F4
         self.btn_historia = QPushButton("Historia (F4)", self.top_bar)
         self.btn_historia.setFont(top_bar_font)
         self.btn_historia.setFixedSize(140, 40)
@@ -131,7 +130,7 @@ class SettingsPage(QFrame):
         shortcut_historia = QShortcut(QKeySequence('F4'), self)
         shortcut_historia.activated.connect(self.btn_historia.click)
 
-        # Accuscan - F4
+        # Accuscan - F5
         self.btn_accuscan = QPushButton("Accuscan (F5)", self.top_bar)
         self.btn_accuscan.setFont(top_bar_font)
         self.btn_accuscan.setFixedSize(140, 40)
@@ -155,14 +154,10 @@ class SettingsPage(QFrame):
         top_bar_layout.addWidget(self.plc_status_label, 0, Qt.AlignRight)
 
     def _on_pomiary_click(self):
-        print("[GUI] Kliknięto przycisk 'pomiary'.")
         self.controller.toggle_page("MainPage")
 
-    def _on_nastawy_click(self):
-        print("[GUI] Kliknięto przycisk 'nastawy'.")
-
     def _on_historia_click(self):
-        print("[GUI] Kliknięto przycisk 'historia'.")
+        self.controller.toggle_page("HistoryPage")
 
     def _on_accuscan_click(self):
         print("[GUI] Kliknięto przycisk 'Accuscan'.")
