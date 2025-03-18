@@ -226,19 +226,19 @@ class SettingsPage(QFrame):
         
         # Definicja kolumn – przykładowo
         columns = [
-            "id",
-            "recipe_name",
-            "product_nr",
-            "preset_diameter",
-            "diameter_over_tol",
-            "diameter_under_tol",
-            "lump_threshold",
-            "neck_threshold",
-            "flaw_window",
-            "max_lumps_in_flaw_window",
-            "max_necks_in_flaw_window",
-            "pulsation_threshold",
-            "created_at"
+            "ID",
+            "Nazwa receptury",
+            "Nr produktu",
+            "Docelowa\nśrednica",
+            "Tolerancja średnicy\npowyżej",
+            "Tolerancja średnicy\nponiżej",
+            "Próg\nwybrzuszeń",
+            "Próg\nwgłębień",
+            "Długość okna\ndefektów",
+            "Maksymalna liczba wybrzuszeń\nw oknie defektów",
+            "Maksymalna liczba wgłębień\nw oknie defektów",
+            "Próg\n pulsacji",
+            "Data i godzina\nutworzenia"
         ]
         
         # Utwórz QTableWidget z odpowiednią liczbą kolumn
@@ -247,11 +247,24 @@ class SettingsPage(QFrame):
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
         
-        # Opcjonalnie: ustawienie centralnego wyrównania i szerokości kolumn
         header = self.table.horizontalHeader()
-        for i in range(len(columns)):
+        header.setDefaultAlignment(Qt.AlignCenter)
+        for i, col in enumerate(columns):
             header.setSectionResizeMode(i, QHeaderView.Interactive)
-            self.table.setColumnWidth(i, 100)
+            if col == "Nazwa receptury":
+                self.table.setColumnWidth(i, 200)  # szersza kolumna
+            elif col == "ID":
+                self.table.setColumnWidth(i, 30)
+            elif col == "Nr produktu":
+                self.table.setColumnWidth(i, 180)  # szersza kolumna
+            elif col == "Data i godzina\nutworzenia":
+                self.table.setColumnWidth(i, 50)   # węższa kolumna
+            elif col in ["Próg\nwybrzuszeń", "Próg\nwgłębień", "Próg\n pulsacji", "Długość okna\ndefektów", "Docelowa\nśrednica"]:
+                self.table.setColumnWidth(i, 90)
+            elif col in ["Maksymalna liczba wybrzuszeń\nw oknie defektów", "Maksymalna liczba wgłębień\nw oknie defektów"]:
+                self.table.setColumnWidth(i, 200)
+            else:
+                self.table.setColumnWidth(i, 140)  # domyślna szerokość
         header.setStretchLastSection(True)
         
         table_layout.addWidget(self.table, 0, 0)
