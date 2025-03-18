@@ -51,8 +51,6 @@ event jest wtedy kiedy oba sa przekroczone (wtedy kiedy oba sa źle to jest bł�
  stan poprzedni * ~stan aktualny = wygeneruj zejście błedu 
 
 Wiec odpowiedni alarm (event) generujemy gdy:
-- jest za duzo wglebien (neckow) w oknie
-- jest za duzo wybrzuszen (lumpow) w oknie
 - jest za duzo wglebien i wybrzuszen w oknie
 - jest przekroczony któryś diameter (d1, d2, d3, d4) poza zakresem tolerancji.
 - jest wykryta pulsacja czyli jest cos powyzej progu pulsacji

@@ -9,12 +9,11 @@ import time
 import threading
 import queue
 import multiprocessing as mp
-import pyqtgraph as pg
 from multiprocessing import Process, Value, Event, Queue
 # Import modułów
 
 from plc_helper import read_plc_data, connect_plc, write_plc_data
-from db_helper import init_database, save_measurement_sample, check_database
+from db_helper import init_database, check_database
 from data_processing import FastAcquisitionBuffer
 from flaw_detection import FlawDetector
 # Import stron
@@ -305,24 +304,10 @@ class App(QMainWindow):
                 
                 # Add to buffer but skip some unnecessary processing steps for bulk items
                 self.acquisition_buffer.add_sample(data)
-                # print(f"[Data Receiver] Added sample to buffer: {data}")
-                # print(f"[Data Receiver] Buffer statistics: {self.acquisition_buffer.get_statistics()}"
-                # Wyciągnij xCoord już wyliczony przez add_sample
                 x_coord = self.acquisition_buffer.current_x
-                # print(f"[Data Receiver] Processing data at x={x_coord:.10f} m")
-
                 self.flaw_detector.process_flaws(data, x_coord)
-                # print flaw window size
-                # print(f"[Data Receiver] Flaw window size: {self.flaw_detector.flaw_window_size} m")   
-
                 self.latest_data = data
-                
-                # Note: mp.Queue doesn't have task_done method
                 samples_processed += 1
-                
-                # Database saving removed - no longer saving measurement samples
-                
-                # Then process remaining items in the batch - more efficiently
                 for _ in range(batch_size - 1):
                     try:
                         data = self.data_queue.get_nowait()
@@ -390,9 +375,6 @@ class App(QMainWindow):
             run_measurement: Shared Value flag indicating if measurements should be taken
             
             data_queue: Multiprocessing Queue for sending data back to main process
-            plc_ip: IP address of the PLC
-            plc_rack: Rack number of the PLC
-            plc_slot: Slot number of the PLC
         """
         
         print(f"[ACQ Process] Starting acquisition process worker")

@@ -3,7 +3,6 @@ Data processing module for AccuScan application.
 Handles window calculations and processing of measurement data with multithreading support.
 """
 
-import numpy as np
 import time
 import threading
 from collections import deque
@@ -193,69 +192,6 @@ class FastAcquisitionBuffer:
                 'current_x': self.current_x,
                 'acquisition_time': self.acquisition_time
             }
-            
-            # Fill gaps in diameter data if requested
-            # if interpolate_gaps and len(self.x_coords) > 2:
-            #     try:
-            #         # Import here to avoid initial overhead
-            #         import numpy as np
-                    
-            #         # Convert to numpy arrays for vectorized operations
-            #         x_arr = np.array(self.x_coords)
-            #         diameter_arr = np.array(self.avg_diameters)
-                    
-            #         # Check for discontinuities in x-coordinates
-            #         # A discontinuity is when the distance between points is much larger than average
-            #         diffs = np.diff(x_arr)
-            #         mean_diff = np.mean(diffs)
-            #         std_diff = np.std(diffs)
-            #         threshold = mean_diff + 2 * std_diff  # 2 standard deviations above mean
-                    
-            #         # Find gaps larger than threshold
-            #         gap_indices = np.where(diffs > threshold)[0]
-                    
-            #         if len(gap_indices) > 0:
-            #             # Create a new x-axis with more points to fill gaps
-            #             new_x = list(x_arr)
-            #             new_diameters = list(diameter_arr)
-                        
-            #             # Insert interpolated points at each gap
-            #             added_points = 0
-            #             for idx in gap_indices:
-            #                 # Adjust index for points we've already added
-            #                 adj_idx = idx + added_points
-                            
-            #                 # Calculate how many points to insert in this gap
-            #                 gap_size = diffs[idx]
-            #                 num_points = int(gap_size / mean_diff) - 1
-                            
-            #                 if num_points > 0 and num_points < 30:  # Avoid filling huge gaps
-            #                     # Calculate interpolated x values
-            #                     start_x = new_x[adj_idx]
-            #                     end_x = new_x[adj_idx + 1]
-            #                     step = (end_x - start_x) / (num_points + 1)
-                                
-            #                     # Calculate interpolated diameter values
-            #                     start_diam = new_diameters[adj_idx]
-            #                     end_diam = new_diameters[adj_idx + 1]
-            #                     diam_step = (end_diam - start_diam) / (num_points + 1)
-                                
-            #                     # Insert interpolated points
-            #                     for i in range(1, num_points + 1):
-            #                         insert_idx = adj_idx + i
-            #                         new_x.insert(insert_idx, start_x + i * step)
-            #                         new_diameters.insert(insert_idx, start_diam + i * diam_step)
-                                    
-            #                     added_points += num_points
-                        
-            #             # Update window data with interpolated values
-            #             if added_points > 0:
-            #                 print(f"[Interpolation] Added {added_points} points to fill {len(gap_indices)} gaps")
-            #                 window_data['diameter_history'] = new_diameters
-            #                 window_data['diameter_x'] = new_x
-                
-            #     except Exception as e:
-            #         print(f"[Interpolation] Error: {e}")
             
             self.processing_time = time.perf_counter() - start_time
             window_data['processing_time'] = self.processing_time
