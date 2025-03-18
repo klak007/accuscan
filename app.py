@@ -16,6 +16,8 @@ from plc_helper import read_plc_data, connect_plc, write_plc_data
 from db_helper import init_database, check_database
 from data_processing import FastAcquisitionBuffer
 from flaw_detection import FlawDetector
+from alarm_manager import AlarmManager
+
 # Import stron
 from main_page import MainPage
 from settings_page import SettingsPage
@@ -103,6 +105,7 @@ class App(QMainWindow):
         # Bufor akwizycji
         self.acquisition_buffer = FastAcquisitionBuffer(max_samples=1024)
         self.flaw_detector = FlawDetector()
+        self.alarm_manager = AlarmManager(db_params=self.db_params, plc_client=self.plc_client)
         
         # Kontener na strony (MainPage, SettingsPage)
         central_widget = QWidget(self)

@@ -1389,6 +1389,51 @@ class MainPage(QWidget):
         except Exception as e:
             print(f"[GUI] Error clearing reset bits: {e}")
 
+    def _check_and_update_defects_alarm(self, lumps_in_window: int, necks_in_window: int, d1: float, d2: float, d3: float, d4: float, current_x: float):
+        """
+        Metoda pomocnicza – pobiera limity z pól tekstowych,
+        buduje measurement_data i wywołuje update_alarm() w alarm_manager.
+        Dodatkowo drukuje (print) informację o wejściu/wyjściu z alarmu.
+        """
+        from datetime import datetime
+
+        # 1) Pobieramy limity z UI
+        max_lumps_str = self.entry_max_lumps.text()
+        max_necks_str = self.entry_max_necks.text()
+        max_lumps = int(max_lumps_str) if max_lumps_str.isdigit() else 5
+        max_necks = int(max_necks_str) if max_necks_str.isdigit() else 5
+
+        # 2) Budujemy measurement_data
+        measurement_data = {
+            "timestamp": datetime.now(),
+            "xCoord": current_x,  
+            "product": self.entry_product.text(),
+            "batch": self.entry_batch.text(),
+            "statusword": 0,
+            "D1": d1,
+            "D2": d2,
+            "D3": d3,
+            "D4": d4,
+            "lumps": lumps_in_window,
+            "necks": necks_in_window,
+        }
+
+        # 3) Wywołujemy alarm_manager.update_alarm i odbieramy info o zmianie stanu
+        change_status = self.controller.alarm_manager.update_alarm(
+            lumps_in_window=lumps_in_window,
+            necks_in_window=necks_in_window,
+            max_lumps=max_lumps,
+            max_necks=max_necks,
+            measurement_data=measurement_data
+        )
+
+        # # 4) Jeśli była zmiana stanu, drukujemy (print) komunikat:
+        # if change_status == "entered":
+        #     print(">>> [AlarmManager] Alarm defektów WŁĄCZONY (wejście w alarm).")
+        # elif change_status == "exited":
+        #     print(">>> [AlarmManager] Alarm defektów WYŁĄCZONY (zejście z alarmu).")
+        # # "no_change" nie drukujemy
+
     # ---------------------------------------------------------------------------------
     # 5. Metoda update_readings – aktualizacja etykiet i wykresu
     # ---------------------------------------------------------------------------------
@@ -1482,27 +1527,19 @@ class MainPage(QWidget):
                     self.flaw_stats_labels[label_key].setText(f"{value:.2f}")
 
         
-        # print(f"[MainPage] Flaw window size: {flaw_window_size}, Number of samples: {n}")
-        # print(f"[MainPage] Statistics: {stats}")
-        # Przykładowo – aktualizacja widżetu z wynikami statystyk:
-        # self.stats_label.setText("Mean D1: {:.2f}".format(stats.get("D1_mean", 0)))
-
+        
         flaw_results = {
             'lumps_count': self.controller.flaw_detector.total_lumps_count,
             'necks_count': self.controller.flaw_detector.total_necks_count,
             'window_lumps_count': self.controller.flaw_detector.flaw_lumps_count,
             'window_necks_count': self.controller.flaw_detector.flaw_necks_count,
         }
-        #print window size window lumps and necks count
-        # print(f"[MainPage] Window size: {flaw_window_size}, Lumps: {flaw_results['window_lumps_count']}, Necks: {flaw_results['window_necks_count']}")
-        # Następnie wszystko inne pozostaje bez zmian:
+        
         max_lumps = int(self.entry_max_lumps.text() or "3")
         max_necks = int(self.entry_max_necks.text() or "3")
 
         thresholds = self.controller.flaw_detector.check_thresholds(max_lumps, max_necks)
-        #print window lumps and necks count
-        # print(f"[MainPage] Window lumps: {flaw_results['window_lumps_count']}, Window necks: {flaw_results['window_necks_count']}")
-        # Wyświetl alarmy tak jak dotychczas:
+        # Wyświetlanie alarmów:
         if thresholds["lumps_exceeded"]:
             self.show_alarm("Wybrzuszenia", flaw_results["window_lumps_count"], max_lumps)
         else:
@@ -1513,25 +1550,10 @@ class MainPage(QWidget):
         else:
             self.clear_alarm("Zagłębienia")
 
-        # Update indicators based on current data
-        # lumps = data.get("lumps", 0)
-        # necks = data.get("necks", 0)
-        # if lumps:
-        #     self.label_lump_indicator.setText("Wybrzuszenie ON")
-        #     self.label_lump_indicator.setStyleSheet("color: red;")
-        # else:
-        #     self.label_lump_indicator.setText("Wybrzuszenie OFF")
-        #     self.label_lump_indicator.setStyleSheet("color: green;")
-        # if necks:
-        #     self.label_neck_indicator.setText("Zagłębienie ON")
-        #     self.label_neck_indicator.setStyleSheet("color: red;")
-        # else:
-        #     self.label_neck_indicator.setText("Zagłębienie OFF")
-        #     self.label_neck_indicator.setStyleSheet("color: green;")
         
-        label_update_time = time.perf_counter() - label_update_start
+        
 
-        # Check diameter tolerance - this is fast
+        # Check diameter tolerance 
         diameter_preset = float(self.entry_diameter_setpoint.text() or 0.0)
         tolerance_plus = float(self.entry_tolerance_plus.text() or 0.5)
         tolerance_minus = float(self.entry_tolerance_minus.text() or 0.5)
@@ -1549,9 +1571,11 @@ class MainPage(QWidget):
             self.label_diameter_indicator.setText("Diameter: OK")
             self.label_diameter_indicator.setStyleSheet("color: green;")
 
-        # Prepare plot data and update plots - this is the slower part
-        plot_update_start = time.perf_counter()
-        
+        lumps_in_window = self.controller.flaw_detector.flaw_lumps_count
+        necks_in_window = self.controller.flaw_detector.flaw_necks_count
+
+        self._check_and_update_defects_alarm(lumps_in_window, necks_in_window, d1, d2, d3, d4, current_x)
+
         # Set the plot_dirty flag on the PlotManager
         self.plot_manager.plot_dirty = True
         
@@ -1616,16 +1640,9 @@ class MainPage(QWidget):
             # Optionally clear or skip plot updates when measurement is stopped.
             pass
 
-        plot_update_time = time.perf_counter() - plot_update_start
         
-        # Performance logging (only for slow updates)
-        total_update_time = time.perf_counter() - update_start
-        if total_update_time > 0.1:  # >100ms is considered slow
-            print(f"[MainPage] Update time: {total_update_time:.4f}s | "
-                  f"Labels: {label_update_time:.4f}s | "
-                  f"Window: {window_data.get('processing_time', 0):.4f}s | "
-                  f"Flaw: {self.controller.processing_time:.4f}s | "
-                  f"Plot: {plot_update_time:.4f}s")
+    
+
 
 
     def update_data(self):

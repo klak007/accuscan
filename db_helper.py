@@ -100,7 +100,8 @@ def save_event(db_params: dict, event_data: dict) -> bool:
     """
     Zapisuje zdarzenie do tabeli event:
       Id register settings, Date time, X-coordinate, Product nr, Batch nr, 
-      Alarm Statusword, D1..D4, lumps number of, necks number of
+      Alarm Statusword, D1..D4, lumps number of, necks number of, alarm_type,
+      event_type, comment
     Zwraca True jeśli zapis się powiódł, False w przeciwnym przypadku.
     """
     if OFFLINE_MODE:
@@ -119,9 +120,10 @@ def save_event(db_params: dict, event_data: dict) -> bool:
             `Product nr`, `Batch nr`,
             `Alarm Statusword`,
             D1, D2, D3, D4,
-            `lumps number of`, `necks number of`
+            `lumps number of`, `necks number of`,
+            alarm_type, event_type, comment
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         cursor.execute(
             sql,
@@ -138,6 +140,9 @@ def save_event(db_params: dict, event_data: dict) -> bool:
                 event_data.get("D4", 0.0),
                 event_data.get("lumps", 0),
                 event_data.get("necks", 0),
+                event_data.get("alarm_type", None),
+                event_data.get("event_type", None),
+                event_data.get("comment", None),
             )
         )
         connection.commit()

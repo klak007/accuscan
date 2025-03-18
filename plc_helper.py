@@ -260,7 +260,8 @@ def write_plc_data(
     flaw_mode: int=16386,
     upper_tol: float=None,
     under_tol: float=None,
-    lamp_control: bool=False
+    lamp_on: bool=False,
+    lamp_off: bool=False
 
 ) -> None:
     """
@@ -312,7 +313,8 @@ def write_plc_data(
     # REAL upper_tol, under_tol
     set_real(write_data, 18, upper_tol if upper_tol is not None else 0.3)
     set_real(write_data, 22, under_tol if under_tol is not None else 0.3)
-    set_bool(write_data, 27, 0, lamp_control if lamp_control is not None else False)  # Lamp control
+    set_bool(write_data, 27, 0, lamp_on if lamp_on else False)
+    set_bool(write_data, 27, 1, lamp_off if lamp_off else False)
     # print(f"[PLC Helper] Data prepared for write: {write_data.hex()}")    
 
     # Zapis do DB (offset 22 w pamięci PLC) with error handling and retry
