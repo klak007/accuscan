@@ -4,69 +4,34 @@
 
 [x] chcemy też dodać ustawienie które będzie sterować liczbą necków i lumpów na metr 
 
-rysowanie warunków logicznych czyli 1 gdy jest za dużo lumpw i za duyzo neckow
-sume w oknie trzeba wyliczać i porownywac z tym ustawieniem
-
 [x] cycylic interrupt (albo timer, cykliczne wywołanie) - razem pobieranie danych z accuscana i ich przetwarzanie musi trwać najwyżej 32ms i zaczynać się co 32 ms.
 
 [x] w tym cyclic interrupcie: odczyt i zapis do sterownika, ustawienie i zresetowanie odnosnie licznikow nekcow i lumpow. dodawanie samplea. trzeba poinformowac flagą z procesu UI nasz ctyclic interrupt. batch i product w cyclic interrupcie 
 
 [x]wyzsze a krotsze przyciski
 [x]poprawa d1 d2 d3 d4
-filtracja po wiekszej liczbie
-dodac batch 
-rozgraniczniue pomiedzy produkcyjnymi nastawami i nieprodukcyjnymi
+
 [x]fft
 
-zapisz nastawy do receptury
+[x]zapisz nastawy do receptury
 
 [x] walidacja pol
 
 [x] dodac speed ze sterownika, przesunac adresacje
-dodac tez controlword i statusword - sterowanie lampka (buczkiem)
-
-event jest wtedy kiedy oba sa przekroczone (wtedy kiedy oba sa źle to jest błąd - kiedy jeden to nie jest błąd),
- w tym samym momencie trzeba zapalić lampke. Przycisk kwituj kwituje lampke.
- ~stan poprzedni * stan aktualny = wygeneruj wejscie bledu
- stan poprzedni * ~stan aktualny = wygeneruj zejście błedu 
-
-
-limity dla odchylenia standardowego
-limity dla owalności
 
 [x]zrobic get statistics dla flaw window
 
 [x] nie robic +1 tylko +necks i + lumps
 
-
-znieczulić na wejscie rury i na wyjście rury, dodac na poczatku 64 probki (od strony wejsciowej bufora)
-jak gate jest empty to nic do tablicy nie wchodzi 
-jak gate nie jest empty to zaczynamy liczenie i 64 pierwsze probki są na straty
-
-na koncu jesli gate jest empty to kasujemy początek bufora
-
 [x] prog zadzialania fft (kiedy mamy pulsowanie a kiedy nie) - pozbycie sie normalizacji
 
-os x - w metrach (niewazne za bardzo)
-
-dodac gdzie siega okno na wykresach diameter i defekty
-
-zaladuj to nie jest zaladuj tylko odswiez, a zaladuj oznacza zaladowanie to aktualnych nastaw
-
-jak poza zakresem to tez blad do bazy danych. jak cos bedzie poza zakresem tolerancji to ma sie swiecic na czerwono
-
-jak przekroczymy threshold to tez taki blad
-
-a wszystkie bledy skladaja sie na common fault
-
-kwitowanie powinno trwać n cykli
+[x] zaladuj to nie jest zaladuj tylko odswiez, a zaladuj oznacza zaladowanie to aktualnych nastaw
 
 [x]sprawdzić tab order 
 
 [x] sprawdzic f1 f2 f3 na przyciski na gorze
 
-[x]zrobienie ikonki i 
-[x]    automatycznego otwierania
+[x]zrobienie ikonki i automatycznego otwierania
 
 [x]obliczać czestotliwosc probkowania od processing time
 
@@ -76,3 +41,42 @@ kwitowanie powinno trwać n cykli
 na ekranie nastaw mamy przycisk ktory laduje do aktualnych nastaw i laduje do PLC
 [x]i ne ekranie main page mamy podzielony lewy panel na dwa mniejsze - jeden z nastawami do PLC i jeden z nastawami softwareowymi
 [x]na ekranie main page potrzebny jest tez przycisk laduj do plc
+
+
+(((Obsługa alarmów)))
+
+event jest wtedy kiedy oba sa przekroczone (wtedy kiedy oba sa źle to jest błąd - kiedy jeden to nie jest błąd),
+ w tym samym momencie trzeba zapalić lampke. Przycisk kwituj kwituje lampke.
+ ~stan poprzedni * stan aktualny = wygeneruj wejscie bledu
+ stan poprzedni * ~stan aktualny = wygeneruj zejście błedu 
+
+Wiec odpowiedni alarm (event) generujemy gdy:
+- jest za duzo wglebien (neckow) w oknie
+- jest za duzo wybrzuszen (lumpow) w oknie
+- jest za duzo wglebien i wybrzuszen w oknie
+- jest przekroczony któryś diameter (d1, d2, d3, d4) poza zakresem tolerancji.
+- jest wykryta pulsacja czyli jest cos powyzej progu pulsacji
+Należy dodać też nastawy dla owalności i odchylenia standardowego i wtedy dodać też alarmy dla nich (czyli limity dla owalnosci i odchylenia standardowego)
+Wszystkie te błędy składają się na common fault który wysyłamy do sterownika i nim zapalamy lampkę (buczek).
+Przycisk kwituj powinien sprawdzać czy common fault dalej jest. Jesli nie ma common faulta to wtedy gasimy lampkę (zerujemy common fault w sterowniku).
+Najlepiej aby kwitowanie trwało ileś cykli żeby na pewno dotarło do sterownika. 
+Najlepiej to zrobić przy pomocy controlword i statusword.
+
+
+
+(((Bufor przed i bufor po)))
+znieczulić na wejscie rury i na wyjście rury, dodac na poczatku 64 probki (od strony wejsciowej bufora)
+jak gate jest empty to nic do tablicy nie wchodzi 
+jak gate nie jest empty to zaczynamy liczenie i 64 pierwsze probki są na straty
+na koncu jesli gate jest empty to kasujemy początek bufora
+
+
+
+Mniej wazne:
+rysowanie warunków logicznych czyli 1 gdy jest za dużo lumpw i za duyzo neckow - sume w oknie trzeba wyliczać i porownywac z tym ustawieniem
+dodac batch do bazy danych
+os x - w metrach (niewazne za bardzo)
+rozgranicznie pomiedzy produkcyjnymi nastawami i nieprodukcyjnymi
+filtracja po wiekszej liczbie na stronie nastaw
+dodac gdzie siega okno na wykresach diameter i defekty
+jak ktoras srednica bedzie poza zakresem tolerancji to ma sie swiecic na czerwono (UX)

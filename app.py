@@ -19,7 +19,6 @@ from data_processing import FastAcquisitionBuffer
 from flaw_detection import FlawDetector
 # Import stron
 from main_page import MainPage
-from alarm_handling import AlarmHandler
 from settings_page import SettingsPage
 from config import OFFLINE_MODE
 
@@ -130,13 +129,6 @@ class App(QMainWindow):
         self.update_timer.timeout.connect(self.update_plc_status)
         print("[App] Metoda update_plc_status przypisana do timera.", flush=True)
         self.update_timer.start(1000)  # check every 1 second
-
-        self.alarm_handler = AlarmHandler(
-            db_params=self.db_params,
-            id_register_settings=1,  # lub pobrany z konfiguracji/ustawień
-            product_nr=self.main_page.entry_product.text(),
-            batch_nr=self.main_page.entry_batch.text()
-        )
 
         self.start_update_loop()
 
