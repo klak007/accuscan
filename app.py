@@ -106,7 +106,14 @@ class App(QMainWindow):
         # Bufor akwizycji
         self.acquisition_buffer = FastAcquisitionBuffer(max_samples=1024)
         self.flaw_detector = FlawDetector()
-        self.alarm_manager = AlarmManager(db_params=self.db_params, plc_client=self.plc_client)
+        self.plc_client = None
+        if not OFFLINE_MODE:
+            self.plc_client = connect_plc(PLC_IP, PLC_RACK, PLC_SLOT)
+            if self.plc_client and self.plc_client.get_connected():
+                print("[Main] PLC connected in main process.")
+            else:
+                print("[Main] Failed to connect to PLC in main process.")
+
         
         # Kontener na strony (MainPage, SettingsPage)
         central_widget = QWidget(self)
@@ -131,9 +138,9 @@ class App(QMainWindow):
         self.start_acquisition_process()
         
         self.update_timer = QTimer(self)
-        print("[App] Timer aktualizacji utworzony.", flush=True)
+        # print("[App] Timer aktualizacji utworzony.", flush=True)
         self.update_timer.timeout.connect(self.update_plc_status)
-        print("[App] Metoda update_plc_status przypisana do timera.", flush=True)
+        # print("[App] Metoda update_plc_status przypisana do timera.", flush=True)
         self.update_timer.start(1000)  # check every 1 second
 
         self.start_update_loop()
@@ -142,9 +149,17 @@ class App(QMainWindow):
         if self.plc_connected_flag.value == 1:
             self.main_page.plc_status_label.setText("Połączono z PLC")
             self.main_page.plc_status_label.setStyleSheet("color: green;")
+            self.settings_page.plc_status_label.setText("Połączono z PLC")
+            self.settings_page.plc_status_label.setStyleSheet("color: green;")
+            self.history_page.plc_status_label.setText("Połączono z PLC")
+            self.history_page.plc_status_label.setStyleSheet("color: green;")
         else:
             self.main_page.plc_status_label.setText("Rozłączono z PLC")
             self.main_page.plc_status_label.setStyleSheet("color: red;")
+            self.settings_page.plc_status_label.setText("Rozłączono z PLC")
+            self.settings_page.plc_status_label.setStyleSheet("color: red;")
+            self.history_page.plc_status_label.setText("Rozłączono z PLC")
+            self.history_page.plc_status_label.setStyleSheet("color: red;")
 
     def closeEvent(self, event):
         self._on_closing()

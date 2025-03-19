@@ -65,6 +65,8 @@ class HistoryPage(QFrame):
         self.top_bar = QFrame(self)
         self.top_bar.setFrameShape(QFrame.Box)
         self.top_bar.setLineWidth(2)
+        self.top_bar.setFrameShadow(QFrame.Raised)  # Gives a raised (or Sunken) look
+        self.top_bar.setStyleSheet("fusion")
         top_bar_layout = QHBoxLayout(self.top_bar)
         top_bar_layout.setContentsMargins(5, 5, 5, 5)
         top_bar_font = QFont()
