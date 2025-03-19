@@ -2,7 +2,7 @@ import mysql.connector
 from mysql.connector import Error
 from PyQt5.QtWidgets import (
     QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit,
-    QTableWidget, QTableWidgetItem, QMessageBox, QSpacerItem, QSizePolicy, QHeaderView
+    QTableWidget, QTableWidgetItem, QMessageBox, QSpacerItem, QSizePolicy, QHeaderView, QApplication
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QKeySequence
@@ -69,8 +69,10 @@ class HistoryPage(QFrame):
         self.top_bar.setStyleSheet("fusion")
         top_bar_layout = QHBoxLayout(self.top_bar)
         top_bar_layout.setContentsMargins(5, 5, 5, 5)
-        top_bar_font = QFont()
+        top_bar_layout.setSpacing(5)
+        top_bar_font = QFont(QApplication.font())
         top_bar_font.setPointSize(12)
+        top_bar_font.setBold(False)
 
         # Przycisk Pomiary
         self.btn_pomiary = QPushButton("Pomiary (F2)", self.top_bar)

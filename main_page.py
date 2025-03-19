@@ -24,52 +24,41 @@ import sys
 
 class MainPage(QWidget):
     """
-    Główna strona aplikacji z:
-    1. Górną belką na przyciski,
-    2. Kolumna 0 (lewa) – batch, product, przycisk,
-    3. Kolumna 1 (środkowa) – parametry symulacji,
-    4. Kolumna 2 (prawa) – wykres, przyciski sterujące (Start/Stop/Kwituj).
+    Main page of the application, with the following components:
+    - Top bar with navigation buttons
+    - Left panel with batch/product settings
+    - Middle panel with real-time plots
+    - Right panel with status messages and FFT plot
     """
     def __init__(self, parent, controller, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.controller = controller
 
-        # Utworzenie layoutu grid
+        # Layout 
         self.layout = QGridLayout(self)
         self.setLayout(self.layout)
         
-        # Ustawiamy rozciąganie wierszy:
-        # Wiersz 0: top bar, nie rozciąga się (stretch = 0)
-        # Wiersz 1: pozostałe elementy, rozciąga się (stretch = 1)
+        # Row Stretch
         self.layout.setRowStretch(0, 0)
         self.layout.setRowStretch(1, 1)
 
-
-        
-
-        
-        # Ustawiamy kolumny:
-        # Kolumna 0 (lewa): minimalna szerokość 300, brak rozciągania (stretch = 0)
-        # Kolumna 1 (środkowa): minimalna szerokość 300, brak rozciągania (stretch = 0)
-        # Kolumna 2 (prawa): rozciąga się (stretch = 1)
+        # Column stretch
         self.layout.setColumnStretch(0, 0)
         self.layout.setColumnStretch(1, 0)
         self.layout.setColumnStretch(2, 1)
-        # Aby zapewnić minimalną szerokość, można ustawić to na widgetach w kolejnych metodach
         
-        # Historie lumps/necks do wykresu
-        self.lumps_history = []
-        self.necks_history = []
-        self.x_history = []
-        self.MAX_POINTS = 1024  # Increased to 1024 samples
-        self.display_range = 10  # ile „metrów” pokazywać na wykresie
-        self.last_update_time = None
-        self.current_x = 0.0
-        self.FFT_BUFFER_SIZE = 512
-        self.diameter_history = []  # Values
-        self.diameter_x = []        # X-coordinates for diameter values
-        self.last_plot_update = None  # new attribute for plot update frequency
-        self.plc_sample_time = 0.0  # Time taken to retrieve a sample from PLC
+        self.lumps_history = []         # Store lumps history for plotting
+        self.necks_history = []         # Store necks history for plotting
+        self.x_history = []             # X-coordinates for history plots
+        self.MAX_POINTS = 1024          # Maximum number of points to display on the plot
+        # self.display_range = 10         # Display range for the plot
+        self.last_update_time = None    # Last update time for the plot
+        self.current_x = 0.0            # Current X-coordinate for plotting
+        self.FFT_BUFFER_SIZE = 512      # Size of the FFT buffer
+        self.diameter_history = []      # Store diameter values for plotting
+        self.diameter_x = []            # X-coordinates for diameter values
+        self.last_plot_update = None    # attribute for plot update frequency
+        self.plc_sample_time = 0.0      # Time taken to retrieve a sample from PLC
 
         # UI interaction state
         self.ui_busy = False  # Flag to indicate UI interaction is in progress
@@ -516,7 +505,7 @@ class MainPage(QWidget):
         # Wiersz 1: Przycisk "Zapisz do PLC"
         self.btn_save_plc = QPushButton("Zapisz do PLC", self.lower_frame)
         self.btn_save_plc.setToolTip("Wysyła ustawienia do sterownika PLC.")
-        self.btn_save_plc.setFixedSize(360, 40)
+        self.btn_save_plc.setFixedSize(350, 40)
         self.btn_save_plc.setAutoDefault(True)
         self.btn_save_plc.clicked.connect(self._save_settings_to_plc)
         lower_layout.addWidget(self.btn_save_plc, 1, 0, alignment=Qt.AlignCenter)
@@ -1454,30 +1443,40 @@ class MainPage(QWidget):
         davg = sum(diameters) / 4.0
         dsd = (sum((x - davg) ** 2 for x in diameters) / 4.0) ** 0.5
         dov = ((dmax - dmin) / davg * 100) if davg != 0 else 0
-        
-        # Update labels - this is fast
-        label_update_start = time.perf_counter()
-        self.label_d1.setText(f"<small>D1 [mm]:</small><br><span style='font-size: 40px;'>{d1:.2f}</span>")
-        self.label_d2.setText(f"<small>D2 [mm]:</small><br><span style='font-size: 40px;'>{d2:.2f}</span>")
-        self.label_d3.setText(f"<small>D3 [mm]:</small><br><span style='font-size: 40px;'>{d3:.2f}</span>")
-        self.label_d4.setText(f"<small>D4 [mm]:</small><br><span style='font-size: 40px;'>{d4:.2f}</span>")
+
+        # Check diameter tolerance 
+        diameter_preset = float(self.entry_diameter_setpoint.text() or 0.0)
+        tolerance_plus = float(self.entry_tolerance_plus.text() or 0.5)
+        tolerance_minus = float(self.entry_tolerance_minus.text() or 0.5)
+     
+        lower = diameter_preset - tolerance_minus
+        upper = diameter_preset + tolerance_plus
+
+        color = "black" if lower <= d1 <= upper else "red"
+        self.label_d1.setText(f"<small>D1 [mm]:</small><br><span style='font-size: 40px; color:{color};'>{d1:.2f}</span>")
+
+        color = "black" if lower <= d2 <= upper else "red"
+        self.label_d2.setText(f"<small>D2 [mm]:</small><br><span style='font-size: 40px; color:{color};'>{d2:.2f}</span>")
+
+        color = "black" if lower <= d3 <= upper else "red"
+        self.label_d3.setText(f"<small>D3 [mm]:</small><br><span style='font-size: 40px; color:{color};'>{d3:.2f}</span>")
+
+        color = "black" if lower <= d4 <= upper else "red"
+        self.label_d4.setText(f"<small>D4 [mm]:</small><br><span style='font-size: 40px; color:{color};'>{d4:.2f}</span>")
+
         self.label_davg.setText(f"<small>dAvg [mm]:</small><br><span style='font-size: 40px;'>{davg:.2f}</span>")
         self.label_dmin.setText(f"<small>Dmin [mm]:</small><br><span style='font-size: 40px;'>{dmin:.2f}</span>")
         self.label_dmax.setText(f"<small>Dmax [mm]:</small><br><span style='font-size: 40px;'>{dmax:.2f}</span>")
         self.label_dsd.setText(f"<small>dSD [mm]:</small><br><span style='font-size: 40px;'>{dsd:.3f}</span>")
         self.label_dov.setText(f"<small>dOV [%]:</small><br><span style='font-size: 40px;'>{dov:.2f}</span>")
         
-        
-        
             
-        # Get window data directly from the acquisition buffer
-        # This still adds the sample to ensure it's processed
+        # Get window data directly from the acquisition buffer, adds the sample to ensure it's processed
         self.window_processor.process_sample(
             data
         )
         
         # Get the window data directly from controller's acquisition buffer
-        # for better thread safety and performance
         window_data = self.controller.acquisition_buffer.get_window_data()
         
         # Update current_x from window data
@@ -1542,14 +1541,7 @@ class MainPage(QWidget):
         else:
             self.clear_alarm("Zagłębienia")
 
-        
-        
 
-        # Check diameter tolerance 
-        diameter_preset = float(self.entry_diameter_setpoint.text() or 0.0)
-        tolerance_plus = float(self.entry_tolerance_plus.text() or 0.5)
-        tolerance_minus = float(self.entry_tolerance_minus.text() or 0.5)
-        
         deviation = davg - diameter_preset
         self.diameter_deviation_label.setText(f"Dev: {deviation:.2f} mm")
         
@@ -1568,10 +1560,9 @@ class MainPage(QWidget):
 
         self._check_and_update_defects_alarm(lumps_in_window, necks_in_window, d1, d2, d3, d4, current_x)
 
-        # Set the plot_dirty flag on the PlotManager
+        # Prepare data for the plot manager using window_data from acquisition buffer
         self.plot_manager.plot_dirty = True
         
-        # Prepare data for the plot manager using window_data from acquisition buffer
         plot_data = {
             'x_history': window_data['x_history'],
             'lumps_history': window_data['lumps_history'],
@@ -1583,8 +1574,8 @@ class MainPage(QWidget):
             'diameter_history': window_data['diameter_history'],
             'diameter_preset': diameter_preset,
             'fft_buffer_size': self.FFT_BUFFER_SIZE,
-            'timestamp': time.time(),  # Add timestamp for debugging
-            'update_id': id(self) % 10000,  # Add unique update ID for tracking updates
+            'timestamp': time.time(),  
+            'update_id': id(self) % 10000,  
             'processing_time': self.controller.processing_time,
         }
         
@@ -1596,8 +1587,6 @@ class MainPage(QWidget):
             
             # Force a direct update in the main thread to ensure plots are visible even if process is not working
             if not hasattr(self.plot_manager, 'plot_process') or not self.plot_manager.plot_process or not self.plot_manager.plot_process.is_alive():
-                # print("[MainPage] Plot process not active, updating in main thread")
-                # Do direct updates for the important plots
                 self.plot_manager.update_status_plot(
                     plot_data['x_history'], 
                     plot_data['lumps_history'], 
@@ -1631,10 +1620,6 @@ class MainPage(QWidget):
         else:
             # Optionally clear or skip plot updates when measurement is stopped.
             pass
-
-        
-    
-
 
 
     def update_data(self):
