@@ -1370,50 +1370,50 @@ class MainPage(QWidget):
         except Exception as e:
             print(f"[GUI] Error clearing reset bits: {e}")
 
-    def _check_and_update_defects_alarm(self, lumps_in_window: int, necks_in_window: int, d1: float, d2: float, d3: float, d4: float, current_x: float):
-        """
-        Metoda pomocnicza – pobiera limity z pól tekstowych,
-        buduje measurement_data i wywołuje update_alarm() w alarm_manager.
-        Dodatkowo drukuje (print) informację o wejściu/wyjściu z alarmu.
-        """
-        from datetime import datetime
+    # def _check_and_update_defects_alarm(self, lumps_in_window: int, necks_in_window: int, d1: float, d2: float, d3: float, d4: float, current_x: float):
+    #     """
+    #     Metoda pomocnicza – pobiera limity z pól tekstowych,
+    #     buduje measurement_data i wywołuje update_alarm() w alarm_manager.
+    #     Dodatkowo drukuje (print) informację o wejściu/wyjściu z alarmu.
+    #     """
+    #     from datetime import datetime
 
-        # 1) Pobieramy limity z UI
-        max_lumps_str = self.entry_max_lumps.text()
-        max_necks_str = self.entry_max_necks.text()
-        max_lumps = int(max_lumps_str) if max_lumps_str.isdigit() else 5
-        max_necks = int(max_necks_str) if max_necks_str.isdigit() else 5
+    #     # 1) Pobieramy limity z UI
+    #     max_lumps_str = self.entry_max_lumps.text()
+    #     max_necks_str = self.entry_max_necks.text()
+    #     max_lumps = int(max_lumps_str) if max_lumps_str.isdigit() else 5
+    #     max_necks = int(max_necks_str) if max_necks_str.isdigit() else 5
 
-        # 2) Budujemy measurement_data
-        measurement_data = {
-            "timestamp": datetime.now(),
-            "xCoord": current_x,  
-            "product": self.entry_product.text(),
-            "batch": self.entry_batch.text(),
-            "statusword": 0,
-            "D1": d1,
-            "D2": d2,
-            "D3": d3,
-            "D4": d4,
-            "lumps": lumps_in_window,
-            "necks": necks_in_window,
-        }
+    #     # 2) Budujemy measurement_data
+    #     measurement_data = {
+    #         "timestamp": datetime.now(),
+    #         "xCoord": current_x,  
+    #         "product": self.entry_product.text(),
+    #         "batch": self.entry_batch.text(),
+    #         "statusword": 0,
+    #         "D1": d1,
+    #         "D2": d2,
+    #         "D3": d3,
+    #         "D4": d4,
+    #         "lumps": lumps_in_window,
+    #         "necks": necks_in_window,
+    #     }
 
-        # 3) Wywołujemy alarm_manager.update_alarm i odbieramy info o zmianie stanu
-        change_status = self.controller.alarm_manager.update_alarm(
-            lumps_in_window=lumps_in_window,
-            necks_in_window=necks_in_window,
-            max_lumps=max_lumps,
-            max_necks=max_necks,
-            measurement_data=measurement_data
-        )
+    #     # 3) Wywołujemy alarm_manager.update_alarm i odbieramy info o zmianie stanu
+    #     change_status = self.controller.alarm_manager.update_alarm(
+    #         lumps_in_window=lumps_in_window,
+    #         necks_in_window=necks_in_window,
+    #         max_lumps=max_lumps,
+    #         max_necks=max_necks,
+    #         measurement_data=measurement_data
+    #     )
 
-        # # # 4) Jeśli była zmiana stanu, drukujemy (print) komunikat:
-        # if change_status == "entered":
-        #     print(">>> [AlarmManager] Alarm defektów WŁĄCZONY (wejście w alarm).")
-        # elif change_status == "exited":
-        #     print(">>> [AlarmManager] Alarm defektów WYŁĄCZONY (zejście z alarmu).")
-        # "no_change" nie drukujemy
+    #     # # # 4) Jeśli była zmiana stanu, drukujemy (print) komunikat:
+    #     # if change_status == "entered":
+    #     #     print(">>> [AlarmManager] Alarm defektów WŁĄCZONY (wejście w alarm).")
+    #     # elif change_status == "exited":
+    #     #     print(">>> [AlarmManager] Alarm defektów WYŁĄCZONY (zejście z alarmu).")
+    #     # "no_change" nie drukujemy
 
     # ---------------------------------------------------------------------------------
     # 5. Metoda update_readings – aktualizacja etykiet i wykresu
@@ -1526,8 +1526,16 @@ class MainPage(QWidget):
             'window_necks_count': self.controller.flaw_detector.flaw_necks_count,
         }
         
-        max_lumps = int(self.entry_max_lumps.text() or "3")
-        max_necks = int(self.entry_max_necks.text() or "3")
+        # 2) Odczyt limitów i progów z UI
+        try:
+            max_lumps = int(self.entry_max_lumps.text() or "3")
+            max_necks = int(self.entry_max_necks.text() or "3")
+            upper_tol = float(self.entry_tolerance_plus.text() or "0.5")
+            lower_tol = float(self.entry_tolerance_minus.text() or "0.5")
+            pulsation_threshold = float(self.entry_pulsation_threshold.text() or "500.0")
+        except ValueError:
+            # Jeśli coś się nie da parsować, pomijamy
+            return
 
         thresholds = self.controller.flaw_detector.check_thresholds(max_lumps, max_necks)
         # Wyświetlanie alarmów:
@@ -1557,8 +1565,41 @@ class MainPage(QWidget):
 
         lumps_in_window = self.controller.flaw_detector.flaw_lumps_count
         necks_in_window = self.controller.flaw_detector.flaw_necks_count
+        pulsation_val = data.get("pulsation", 0.0)
+        
+        measurement_data = {
+            "timestamp": datetime.now(),
+            "xCoord": data.get("xCoord", 0.0),
+            "product": self.entry_product.text(),
+            "batch": self.entry_batch.text(),
+            "D1": d1,
+            "D2": d2,
+            "D3": d3,
+            "D4": d4,
+            "lumps": lumps_in_window,
+            "necks": necks_in_window,
+            "pulsation": pulsation_val
+        }
 
-        self._check_and_update_defects_alarm(lumps_in_window, necks_in_window, d1, d2, d3, d4, current_x)
+        # 4) Wywołanie nowych metod w AlarmManager
+        self.controller.alarm_manager.check_and_update_defects_alarm(
+            lumps_in_window, 
+            necks_in_window,
+            measurement_data,
+            max_lumps,
+            max_necks
+        )
+
+        self.controller.alarm_manager.check_and_update_diameter_alarm(
+            measurement_data,
+            upper_tol,
+            lower_tol
+        )
+
+        self.controller.alarm_manager.check_and_update_pulsation_alarm(
+            measurement_data,
+            pulsation_threshold
+        )
 
         # Prepare data for the plot manager using window_data from acquisition buffer
         self.plot_manager.plot_dirty = True
@@ -1606,8 +1647,8 @@ class MainPage(QWidget):
                 self.plot_manager.update_fft_plot(
                     plot_data['diameter_history'],
                     plot_data.get('fft_buffer_size', 0),
-                    plot_data.get('processing_time', 0)
-                )
+                    plot_data.get('processing_time', 0),
+                    )
                 # modulated_history = self.plot_manager.apply_pulsation(plot_data['diameter_history'], sample_rate=100, modulation_frequency=10, modulation_depth=0.5)
                 # self.plot_manager.update_fft_plot(
                 #     modulated_history,

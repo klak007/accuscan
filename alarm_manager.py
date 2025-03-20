@@ -23,47 +23,108 @@ class AlarmManager:
         """
         self.db_params = db_params
         self.plc_client = plc_client
-        self.alarm_active = False  # Bieżący stan alarmu defektów (False - nieaktywny, True - aktywny)
+        # Stan obecnego alarmu defektów (może być rozwinięte o stany alarmu średnicy i pulsacji)
+        self.defects_alarm_active = False
+        self.diameter_alarm_active = False
+        self.pulsation_alarm_active = False
 
-    def update_alarm(self, lumps_in_window: int, necks_in_window: int,
-                    max_lumps: int, max_necks: int,
-                    measurement_data: dict) -> str:
+    def check_and_update_defects_alarm(
+        self,
+        lumps_in_window: int,
+        necks_in_window: int,
+        measurement_data: dict,
+        max_lumps: int,
+        max_necks: int
+    ) -> str:
         """
-        Aktualizuje stan alarmu defektów.
-        Zwraca:
-        "entered"  - jeśli alarm właśnie się uaktywnił,
-        "exited"   - jeśli alarm właśnie się wyłączył,
-        "no_change" - jeśli stan alarmu nie uległ zmianie.
+        Sprawdza, czy przekroczono limity defektów (wybrzuszeń i zagłębień).
+        Jeśli tak, ustawia/wyłącza alarm defektów. Zwraca "entered", "exited" lub "no_change".
         """
-        # 1) Obliczamy nowy stan (dla przykładu: alarm, jeśli lumps>max_lumps AND necks>max_necks)
+        # Warunek alarmu, gdy lumps>max_lumps ORAZ necks>max_necks (wg Twojej logiki)
         new_state = (lumps_in_window > max_lumps) and (necks_in_window > max_necks)
-        
-        # 2) Domyślnie brak zmiany
-        state_change = "no_change"
+        old_state = self.defects_alarm_active
 
-        if new_state != self.alarm_active:
-            # event_type = 0 => wejście, 1 => zejście
-            event_type = 0 if new_state else 1
-            self._save_event(measurement_data, event_type)
+        if new_state != old_state:
+            # Zmiana stanu
+            event_type = 0 if new_state else 1  # 0=wejście, 1=wyjście
+            alarm_type = "defects_alarm"
+            comment = "Wejście w alarm defektów" if new_state else "Zejście z alarmu defektów"
+
+            self._save_event(measurement_data, event_type, alarm_type, comment)
             self._update_common_fault(new_state)
 
-            # Ustal, czy weszliśmy w alarm, czy z niego wyszliśmy
-            if new_state:
-                state_change = "entered"
-            else:
-                state_change = "exited"
+            self.defects_alarm_active = new_state
+            return "entered" if new_state else "exited"
+        return "no_change"
 
-        # 3) Zapisujemy nowy stan
-        self.alarm_active = new_state
-        
-        return state_change
-
-    def _save_event(self, measurement_data: dict, event_type: int):
+    def check_and_update_diameter_alarm(
+        self,
+        measurement_data: dict,
+        upper_tol: float,
+        lower_tol: float
+    ) -> str:
         """
-        Rejestruje zdarzenie w bazie danych za pomocą funkcji save_event z db_helper.
+        Sprawdza, czy którakolwiek z wartości D1, D2, D3, D4
+        jest poza zakresem [dAvg - lower_tol, dAvg + upper_tol].
+        """
+        d1 = measurement_data.get("D1", 0.0)
+        d2 = measurement_data.get("D2", 0.0)
+        d3 = measurement_data.get("D3", 0.0)
+        d4 = measurement_data.get("D4", 0.0)
+        diameters = [d1, d2, d3, d4]
+        d_avg = sum(diameters) / 4.0
 
-        :param measurement_data: Słownik zawierający dane pomiarowe.
-        :param event_type: Typ zdarzenia: 0 - wejście w alarm, 1 - zejście z alarmu.
+        out_of_range = any(
+            (d < d_avg - lower_tol) or (d > d_avg + upper_tol)
+            for d in diameters
+        )
+        new_state = bool(out_of_range)
+        old_state = self.diameter_alarm_active
+
+        if new_state != old_state:
+            # Zmiana stanu alarmu
+            event_type = 0 if new_state else 1
+            alarm_type = "diameter_error"
+            comment = ("Wejście w alarm średnicy" if new_state
+                       else "Zejście z alarmu średnicy")
+
+            self._save_event(measurement_data, event_type, alarm_type, comment)
+            self._update_common_fault(new_state)
+
+            self.diameter_alarm_active = new_state
+            return "entered" if new_state else "exited"
+        return "no_change"
+
+    def check_and_update_pulsation_alarm(
+        self,
+        measurement_data: dict,
+        pulsation_threshold: float
+    ) -> str:
+        """
+        Sprawdza, czy wartość 'pulsation' w measurement_data > pulsation_threshold.
+        """
+        pulsation_val = measurement_data.get("pulsation", 0.0)
+
+        new_state = pulsation_val > pulsation_threshold
+        old_state = self.pulsation_alarm_active
+
+        if new_state != old_state:
+            event_type = 0 if new_state else 1
+            alarm_type = "pulsation_error"
+            comment = ("Wejście w alarm pulsacji" if new_state
+                       else "Zejście z alarmu pulsacji")
+
+            self._save_event(measurement_data, event_type, alarm_type, comment)
+            self._update_common_fault(new_state)
+
+            self.pulsation_alarm_active = new_state
+            return "entered" if new_state else "exited"
+        return "no_change"
+
+    def _save_event(self, measurement_data: dict, event_type: int,
+                    alarm_type: str, comment: str):
+        """
+        Rejestruje zdarzenie w bazie danych.
         """
         event_data = {
             "id_register_settings": measurement_data.get("id_register_settings"),
@@ -78,16 +139,16 @@ class AlarmManager:
             "D4": measurement_data.get("D4", 0.0),
             "lumps": measurement_data.get("lumps", 0),
             "necks": measurement_data.get("necks", 0),
-            "alarm_type": "defects_alarm",
+            "alarm_type": alarm_type,
             "event_type": event_type,
-            "comment": "Wejście w alarm defektów" if event_type == 0 else "Zejście z alarmu defektów"
+            "comment": comment
         }
 
         if OFFLINE_MODE or not check_database(self.db_params):
             return
 
         if not save_event(self.db_params, event_data):
-            print("Błąd zapisu zdarzenia w bazie dla alarmu defektów.")
+            print(f"[AlarmManager] Błąd zapisu zdarzenia w bazie dla alarmu: {alarm_type}")
 
 
     def _update_common_fault(self, is_active: bool):

@@ -38,6 +38,7 @@ class PlotManager:
         self.last_update_time = None
         self.plot_dirty = False
         self.fft_threshold = 500.0
+        self.current_pulsation_val = 0.0
         
         # Performance monitoring
         self.plot_update_count = 0
@@ -193,7 +194,13 @@ class PlotManager:
                 diameter_fft = np.abs(np.fft.rfft(diameter_array))
                 freqs = np.fft.rfftfreq(len(diameter_array), d=1.0 / sample_rate)
                 peak_idxs = self.detect_peaks(freqs, diameter_fft, threshold=self.fft_threshold)
-                
+
+                if len(peak_idxs) > 0:
+                    max_amp = max(diameter_fft[i] for i in peak_idxs)
+                else:
+                    max_amp = 0.0
+                self.current_pulsation_val = max_amp
+                # print(f"[PlotManager] Detected pulsation amplitude: {max_amp:.2f}")
                 # Uaktualnij tytuł wykresu, dodając sample rate i processing time
                 title_text = f"Diameter FFT Analysis (Sample rate: {sample_rate:.2f} Hz, Proc time: {processing_time:.4f} s)"
                 plot_widget.setTitle(title_text)
@@ -236,9 +243,7 @@ class PlotManager:
                 self.plot_update_count += 1
 
                 plc_sample_time = data_dict.get('plc_sample_time', 0)
-                status_time = 0
-                diameter_time = 0
-                fft_time = 0
+
 
                 # Aktualizacja wykresu średnicy (zawsze aktualizowany)
                 if 'diameter' in self.plot_widgets:
@@ -274,7 +279,7 @@ class PlotManager:
                         data_dict.get('fft_buffer_size', 256),
                         data_dict.get('processing_time', 83)
                     )
-                    fft_time = time.perf_counter() - start
+                    data_dict['pulsation_val'] = self.current_pulsation_val
 
                 # W PyQtGraph zmiany rysujemy bezpośrednio; opcjonalnie możemy wymusić odświeżenie widgetu
                 for key, widget in self.plot_widgets.items():
