@@ -1408,12 +1408,12 @@ class MainPage(QWidget):
             measurement_data=measurement_data
         )
 
-        # # 4) Jeśli była zmiana stanu, drukujemy (print) komunikat:
+        # # # 4) Jeśli była zmiana stanu, drukujemy (print) komunikat:
         # if change_status == "entered":
         #     print(">>> [AlarmManager] Alarm defektów WŁĄCZONY (wejście w alarm).")
         # elif change_status == "exited":
         #     print(">>> [AlarmManager] Alarm defektów WYŁĄCZONY (zejście z alarmu).")
-        # # "no_change" nie drukujemy
+        # "no_change" nie drukujemy
 
     # ---------------------------------------------------------------------------------
     # 5. Metoda update_readings – aktualizacja etykiet i wykresu
