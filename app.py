@@ -84,6 +84,7 @@ class App(QMainWindow):
         self.acquisition_thread_running = False
         self.acquisition_thread = None
         self.db_queue = queue.Queue(maxsize=100)
+        self.analysis_queue = queue.Queue(maxsize=100)
         self.plc_write_queue = queue.Queue(maxsize=20)
         
         if not OFFLINE_MODE:
@@ -135,7 +136,7 @@ class App(QMainWindow):
         self.history_page.hide()
         
         # Start workerów
-        self.start_db_worker()
+        self.start_analysis_worker()
         self.start_acquisition_process()
         
         self.update_timer = QTimer(self)
@@ -331,12 +332,45 @@ class App(QMainWindow):
                 # Minimal processing for each sample
                 data["batch"] = batch_cache
                 data["product"] = product_cache
-                
+
+                if hasattr(self, 'main_page'):
+                    try:
+                        data["max_lumps"] = self.main_page.get_max_lumps()  # np. metoda pobierająca wartość z entry_max_lumps
+                    except Exception:
+                        data["max_lumps"] = 3  # domyślna wartość
+                    try:
+                        data["max_necks"] = self.main_page.get_max_necks()  # analogicznie, z entry_max_necks
+                    except Exception:
+                        data["max_necks"] = 3
+                    try:
+                        data["upper_tol"] = float(self.main_page.entry_tolerance_plus.text() or "0.5")
+                    except ValueError:
+                        data["upper_tol"] = 0.5
+                    try:
+                        data["lower_tol"] = float(self.main_page.entry_tolerance_minus.text() or "0.5")
+                    except ValueError:
+                        data["lower_tol"] = 0.5
+                    try:
+                        data["pulsation_threshold"] = float(self.main_page.entry_pulsation_threshold.text() or "500.0")
+                    except ValueError:
+                        data["pulsation_threshold"] = 500.0
+
+                # Następnie wrzuć próbkę do nowej kolejki analizy
+                try:
+                    self.analysis_queue.put_nowait(data)
+                except queue.Full:
+                    print("[Data Receiver] Analysis queue is full, dropping sample")
+                                
                 
                 # Add to buffer but skip some unnecessary processing steps for bulk items
                 self.acquisition_buffer.add_sample(data)
                 x_coord = self.acquisition_buffer.current_x
                 self.flaw_detector.process_flaws(data, x_coord)
+                if hasattr(self.main_page, "update_flaw_counts"):
+                    self.main_page.update_flaw_counts(
+                        self.flaw_detector.total_lumps_count,
+                        self.flaw_detector.total_necks_count
+                    )
                 self.latest_data = data
                 samples_processed += 1
                 for _ in range(batch_size - 1):
@@ -732,42 +766,83 @@ class App(QMainWindow):
             except Exception as e:
                 print(f"[PLC Writer] Error: {e}")
 
-    def start_db_worker(self):
-        """Start worker thread for database operations"""
+
+    def start_analysis_worker(self):
+        """Uruchamia wątek do analizy danych i wywoływania alarmów."""
         if OFFLINE_MODE:
-            print("[App] Offline mode: Skipped DB worker.")
+            print("[App] Offline mode: Skipped analysis worker.")
             return
-        # Start database worker thread
-        self.db_worker_running = True
-        self.db_worker_thread = threading.Thread(target=self._db_worker, daemon=True)
-        self.db_worker_thread.start()
-        print("[App] Database worker thread started")
+        self.analysis_worker_running = True
+        self.analysis_thread = threading.Thread(target=self._analysis_worker, daemon=True)
+        self.analysis_thread.start()
+        print("[App] Analysis worker thread started.")
         
-    def _db_worker(self):
-        """Worker function for database operations thread - no longer saves measurement samples"""
-        print("[DB Worker] Database worker started (measurement sample saving disabled)")
+    def _analysis_worker(self):
+        """
+        Wątek analizy danych i wywoływania alarmów – niezależny od ekranu w UI.
+        Pobiera dane z analysis_queue, liczy defekty, średnice, pulsację,
+        i wywołuje alarm_manager.update_*.
+        """
+        print("[Analysis Worker] Worker started.")
+
+        # Możesz stworzyć osobny egzemplarz flaw_detector, 
+        # albo skorzystać z self.flaw_detector, jeżeli jest thread-safe
         
-        while self.db_worker_running:
+
+        while self.analysis_worker_running:
             try:
-                # Clear any items from the queue but don't save them
-                try:
-                    params, data = self.db_queue.get(timeout=0.1)
-                    # Just mark as done without saving
-                    self.db_queue.task_done()
-                except queue.Empty:
-                    # No items in queue
-                    pass
-                    
-                # Sleep to avoid CPU spinning
-                time.sleep(1.0)
+                # Czekamy na dane max 0.5s
+                measurement_data = self.analysis_queue.get(timeout=0.01)
+                # print("[Analysis Worker] measurement_data:", measurement_data)
+                # *** TU ROBISZ WSZYSTKIE WOLNIEJSZE OPERACJE ***
+                # 1) Przetworzenie defektów (np. lumps, necks)
+                x_coord = measurement_data.get("xCoord", 0.0)
+                self.flaw_detector.process_flaws(measurement_data, x_coord)
+
+                lumps_in_window = self.flaw_detector.flaw_lumps_count
+                if lumps_in_window > 0:
+                    print(f"[Analysis Worker] Lumps in window: {lumps_in_window}")
+                necks_in_window = self.flaw_detector.flaw_necks_count
+
+                # 2) Sprawdzasz warunki alarmu defektów:
+                #    (pobierz max_lumps, max_necks z settings? 
+                #     w tym wątku też muszą być dostępne te wartości,
+                #     lub przechowuj je w measurement_data)
+                max_lumps = measurement_data.get("max_lumps", 3)
+                max_necks = measurement_data.get("max_necks", 3)
+                self.alarm_manager.check_and_update_defects_alarm(
+                    lumps_in_window,
+                    necks_in_window,
+                    measurement_data,
+                    max_lumps,
+                    max_necks
+                )
+
+                # 3) Średnica
+                upper_tol = measurement_data.get("upper_tol", 0.5)
+                lower_tol = measurement_data.get("lower_tol", 0.5)
+                self.alarm_manager.check_and_update_diameter_alarm(
+                    measurement_data,
+                    upper_tol,
+                    lower_tol
+                )
+
+                # 4) Pulsacja
+                pulsation_threshold = measurement_data.get("pulsation_threshold", 500.0)
+                self.alarm_manager.check_and_update_pulsation_alarm(
+                    measurement_data,
+                    pulsation_threshold
+                )
                 
+                # Oznacz zadanie jako wykonane
+                self.analysis_queue.task_done()
+
+            except queue.Empty:
+                # co 0.5s sprawdzamy czy wątek ma działać dalej
+                pass
             except Exception as e:
-                print(f"[DB Worker] Error: {e}")
-                # Mark task as done if we got one
-                try:
-                    self.db_queue.task_done()
-                except:
-                    pass
+                print(f"[Analysis Worker] Error: {e}")
+                # ewentualne logowanie błędu, ale wątek dalej żyje
     
     def _on_closing(self):
         if self._closing:
