@@ -82,7 +82,7 @@ class SettingsPage(QFrame):
         self.table.setRowCount(0)
         self.table.insertRow(0)
         for col in range(self.table.columnCount()):
-            text = "<Brak połączenia z bazą>" if col == 1 else "-"
+            text = "<Błąd bazy danych>" if col == 1 else "-"
             if col == 2:
                 text = "Funkcje edycji niedostępne"
             item = QTableWidgetItem(text)

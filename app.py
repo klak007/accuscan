@@ -261,85 +261,62 @@ class App(QMainWindow):
         ui_refresh_counter = 0
         batch_cache = "XABC1566"
         product_cache = "18X0600"
-        # Performance monitoring
         last_perf_log = time.time()
         samples_processed = 0
-        
-        # Process a larger batch size to keep up with high data rates
-        MAX_BATCH_SIZE = 100  # Increased from 20 to 100
-        QUEUE_WARNING_THRESHOLD = 50  # Log warnings if queue exceeds this size
-        QUEUE_CRITICAL_THRESHOLD = 200  # Start dropping samples if queue exceeds this size
-        
+
+        MAX_BATCH_SIZE = 100
+        QUEUE_WARNING_THRESHOLD = 50
+        QUEUE_CRITICAL_THRESHOLD = 200
+
         while self.data_receiver_running:
             try:
-                # Check if we need to handle queue overflow situation
                 current_queue_size = self.data_queue.qsize()
                 if current_queue_size > 10:
                     print(f"[Data Receiver] Current queue size: {current_queue_size}")
-                
-                # Critical overflow - need to drop samples to catch up
+
                 if current_queue_size > QUEUE_CRITICAL_THRESHOLD:
                     print(f"[Data Receiver] CRITICAL: Queue size {current_queue_size} exceeds threshold, dropping samples to catch up")
-                    # Drop samples to catch up, keeping only the most recent samples
                     samples_to_drop = current_queue_size - QUEUE_WARNING_THRESHOLD
                     for _ in range(samples_to_drop):
                         try:
-                            # Get and discard samples, mp.Queue doesn't have task_done method 
                             _ = self.data_queue.get_nowait()
                         except queue.Empty:
                             break
                     print(f"[Data Receiver] Dropped {samples_to_drop} samples, new queue size: {self.data_queue.qsize()}")
-                
-                # Process in larger batches to avoid falling behind when UI is busy
+
                 batch_size = min(MAX_BATCH_SIZE, self.data_queue.qsize())
                 if batch_size == 0:
-                    # No data available, try to get at least one sample with timeout
                     try:
                         data = self.data_queue.get(timeout=0.01)
                         batch_size = 1
                     except queue.Empty:
                         continue
                 else:
-                    # Get the first item in the batch
                     data = self.data_queue.get(timeout=0.01)
-                
+
                 batch_start = time.perf_counter()
-                
-                # Only refresh UI values occasionally to reduce overhead
                 ui_refresh_counter += 1
-                if ui_refresh_counter >= 10:  # Reduced frequency of UI updates from 10 to 20 cycles
+
+                if ui_refresh_counter >= 10:
                     ui_refresh_counter = 0
-                    # Update cached values from UI using the safer methods if available
                     if hasattr(self, 'main_page'):
                         try:
-                            # Check if UI is busy - if so, skip refreshing
-                            if not hasattr(self.main_page, 'ui_busy') or not self.main_page.ui_busy:
-                                # Use safe getter methods if available
-                                if hasattr(self.main_page, 'get_batch_name'):
-                                    batch_cache = self.main_page.get_batch_name()
-                                else:
-                                    batch_cache = self.main_page.entry_batch.get() if hasattr(self.main_page, 'entry_batch') else "XABC1566"
-                                    
-                                if hasattr(self.main_page, 'get_product_name'):
-                                    product_cache = self.main_page.get_product_name()
-                                else:
-                                    product_cache = self.main_page.entry_product.get() if hasattr(self.main_page, 'entry_product') else "18X0600"
-                                    
-                                
+                            if not getattr(self.main_page, 'ui_busy', False):
+                                batch_cache = getattr(self.main_page, 'get_batch_name', lambda: batch_cache)()
+                                product_cache = getattr(self.main_page, 'get_product_name', lambda: product_cache)()
                         except Exception as e:
                             print(f"[Data Receiver] UI access error: {e}")
-                
-                # Minimal processing for each sample
+
                 data["batch"] = batch_cache
                 data["product"] = product_cache
 
                 if hasattr(self, 'main_page'):
                     try:
-                        data["max_lumps"] = self.main_page.get_max_lumps()  # np. metoda pobierająca wartość z entry_max_lumps
+                        data["max_lumps"] = self.main_page.get_max_lumps()
                     except Exception:
-                        data["max_lumps"] = 3  # domyślna wartość
+                        data["max_lumps"] = 3
                     try:
-                        data["max_necks"] = self.main_page.get_max_necks()  # analogicznie, z entry_max_necks
+                        data["max_necks"] = self.main_page.get_max_necks()
                     except Exception:
                         data["max_necks"] = 3
                     try:
@@ -355,79 +332,50 @@ class App(QMainWindow):
                     except ValueError:
                         data["pulsation_threshold"] = 500.0
 
-                # Następnie wrzuć próbkę do nowej kolejki analizy
                 try:
                     self.analysis_queue.put_nowait(data)
                 except queue.Full:
                     print("[Data Receiver] Analysis queue is full, dropping sample")
-                                
-                
-                # Add to buffer but skip some unnecessary processing steps for bulk items
+
                 self.acquisition_buffer.add_sample(data)
                 x_coord = self.acquisition_buffer.current_x
-                self.flaw_detector.process_flaws(data, x_coord)
-                if hasattr(self.main_page, "update_flaw_counts"):
-                    self.main_page.update_flaw_counts(
-                        self.flaw_detector.total_lumps_count,
-                        self.flaw_detector.total_necks_count
-                    )
+                data["xCoord"] = x_coord
                 self.latest_data = data
                 samples_processed += 1
+
                 for _ in range(batch_size - 1):
                     try:
                         data = self.data_queue.get_nowait()
-                        
-                        # Use cached UI values - minimal processing
                         data["batch"] = batch_cache
                         data["product"] = product_cache
-                        
-                        
-                        # Add to buffer - minimal processing
                         self.acquisition_buffer.add_sample(data)
-                        # Update latest data
                         self.latest_data = data
-                        
                         x_coord = data.get("xCoord", 0.0)
                         print(f"[Data Receiver] Processing data at x={x_coord:.2f} m")
-                        self.flaw_detector.process_flaws(data, x_coord)  
-                        print(f"[Flaws] Lumps = {self.flaw_detector.total_lumps_count}, "
-                              f"Necks = {self.flaw_detector.total_necks_count}, "
-                              f"Total = {self.flaw_detector.get_total_flaws_count()}")
-                        
-                        # Note: mp.Queue doesn't have task_done method
                         samples_processed += 1
-                        
-                        # Database saving removed - no longer saving measurement samples
-                            
                     except queue.Empty:
                         break
-                
-                # Log performance only periodically or when queue is large
+
                 current_queue_size = self.data_queue.qsize()
                 now = time.time()
-                
                 if (now - last_perf_log > 5.0) or (current_queue_size > QUEUE_WARNING_THRESHOLD):
                     elapsed = now - last_perf_log
                     avg_time = elapsed / samples_processed if samples_processed > 0 else 0
-                    # Log more information if queue size is concerning
                     if current_queue_size > QUEUE_WARNING_THRESHOLD:
                         print(f"[Data Receiver] WARNING - Queue size: {current_queue_size}, "
                             f"Average processing time: {avg_time:.4f} s/sample, "
                             f"Batch time: {time.perf_counter() - batch_start:.4f}s for {batch_size} samples")
-                    else:
-                        #print once every 1000 cycles
-                        if samples_processed % 1000 == 0:
-                            print(f"[Data Receiver] Average processing time: {avg_time:.4f} s/sample, Queue size: {current_queue_size}")
-                    
+                    elif samples_processed % 1000 == 0:
+                        print(f"[Data Receiver] Average processing time: {avg_time:.4f} s/sample, Queue size: {current_queue_size}")
+
                     self.processing_time = avg_time
-                    # print(f"[Data Receiver] Processing time: {self.processing_time:.4f} s/sample")
                     last_perf_log = now
-                    samples_processed = 0  # Reset sample count after logging
-                        
+                    samples_processed = 0
+
             except Exception as e:
                 print(f"[Data Receiver] Error: {e}")
-                # Sleep a tiny bit to avoid CPU spinning on repeated errors
                 time.sleep(0.01)
+
     
     @staticmethod
     def _acquisition_process_worker(process_running, run_measurement, data_queue, plc_ip, plc_rack, plc_slot, plc_connected_flag):
@@ -778,71 +726,49 @@ class App(QMainWindow):
         print("[App] Analysis worker thread started.")
         
     def _analysis_worker(self):
-        """
-        Wątek analizy danych i wywoływania alarmów – niezależny od ekranu w UI.
-        Pobiera dane z analysis_queue, liczy defekty, średnice, pulsację,
-        i wywołuje alarm_manager.update_*.
+        """Worker thread for analyzing measurement data and triggering alarms.
+        W tym wątku wykonywana jest analiza defektów przy użyciu flaw_detector.
         """
         print("[Analysis Worker] Worker started.")
-
-        # Możesz stworzyć osobny egzemplarz flaw_detector, 
-        # albo skorzystać z self.flaw_detector, jeżeli jest thread-safe
-        
-
         while self.analysis_worker_running:
             try:
-                # Czekamy na dane max 0.5s
                 measurement_data = self.analysis_queue.get(timeout=0.01)
-                # print("[Analysis Worker] measurement_data:", measurement_data)
-                # *** TU ROBISZ WSZYSTKIE WOLNIEJSZE OPERACJE ***
-                # 1) Przetworzenie defektów (np. lumps, necks)
                 x_coord = measurement_data.get("xCoord", 0.0)
+                # print(f"[Analysis Worker] Processing data at x={x_coord:.2f} m")
+                # Wykonaj flaw detection tylko tutaj
                 self.flaw_detector.process_flaws(measurement_data, x_coord)
 
                 lumps_in_window = self.flaw_detector.flaw_lumps_count
-                if lumps_in_window > 0:
-                    print(f"[Analysis Worker] Lumps in window: {lumps_in_window}")
                 necks_in_window = self.flaw_detector.flaw_necks_count
 
-                # 2) Sprawdzasz warunki alarmu defektów:
-                #    (pobierz max_lumps, max_necks z settings? 
-                #     w tym wątku też muszą być dostępne te wartości,
-                #     lub przechowuj je w measurement_data)
+                # if lumps_in_window > 0 or necks_in_window > 0:
+                #     print(f"[Analysis Worker] Lumps in window: {lumps_in_window}, Neck in window: {necks_in_window}")
+
                 max_lumps = measurement_data.get("max_lumps", 3)
                 max_necks = measurement_data.get("max_necks", 3)
+
                 self.alarm_manager.check_and_update_defects_alarm(
-                    lumps_in_window,
-                    necks_in_window,
-                    measurement_data,
-                    max_lumps,
-                    max_necks
+                    lumps_in_window, necks_in_window, measurement_data, max_lumps, max_necks
                 )
 
-                # 3) Średnica
                 upper_tol = measurement_data.get("upper_tol", 0.5)
                 lower_tol = measurement_data.get("lower_tol", 0.5)
                 self.alarm_manager.check_and_update_diameter_alarm(
-                    measurement_data,
-                    upper_tol,
-                    lower_tol
+                    measurement_data, upper_tol, lower_tol
                 )
 
-                # 4) Pulsacja
                 pulsation_threshold = measurement_data.get("pulsation_threshold", 500.0)
                 self.alarm_manager.check_and_update_pulsation_alarm(
-                    measurement_data,
-                    pulsation_threshold
+                    measurement_data, pulsation_threshold
                 )
-                
-                # Oznacz zadanie jako wykonane
+
                 self.analysis_queue.task_done()
 
             except queue.Empty:
-                # co 0.5s sprawdzamy czy wątek ma działać dalej
-                pass
+                continue
             except Exception as e:
                 print(f"[Analysis Worker] Error: {e}")
-                # ewentualne logowanie błędu, ale wątek dalej żyje
+
     
     def _on_closing(self):
         if self._closing:
@@ -880,8 +806,9 @@ class App(QMainWindow):
         if hasattr(self, 'data_receiver_thread') and self.data_receiver_thread and self.data_receiver_thread.is_alive():
             self.data_receiver_thread.join(timeout=1.0)
             
-        if hasattr(self, 'db_worker_thread') and self.db_worker_thread and self.db_worker_thread.is_alive():
-            self.db_worker_thread.join(timeout=1.0)
+        # wait to finish analysis thread
+        if hasattr(self, 'analysis_thread') and self.analysis_thread and self.analysis_thread.is_alive():
+            self.analysis_thread.join(timeout=1.0)
             
         if hasattr(self, 'plc_writer_thread') and self.plc_writer_thread and self.plc_writer_thread.is_alive():
             self.plc_writer_thread.join(timeout=1.0)

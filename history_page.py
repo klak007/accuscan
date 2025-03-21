@@ -65,7 +65,7 @@ class HistoryPage(QFrame):
         self.top_bar = QFrame(self)
         self.top_bar.setFrameShape(QFrame.Box)
         self.top_bar.setLineWidth(2)
-        self.top_bar.setFrameShadow(QFrame.Raised)  # Gives a raised (or Sunken) look
+        self.top_bar.setFrameShadow(QFrame.Raised)
         self.top_bar.setStyleSheet("fusion")
         top_bar_layout = QHBoxLayout(self.top_bar)
         top_bar_layout.setContentsMargins(5, 5, 5, 5)
@@ -147,6 +147,13 @@ class HistoryPage(QFrame):
         self.product_entry.setFixedSize(150, 40)
         filter_layout.addWidget(self.product_entry)
 
+        # Filtruj po typie alarmu
+        self.alarm_label = QLabel("Filtruj po typie alarmu:", self.filter_frame)
+        filter_layout.addWidget(self.alarm_label)
+        self.alarm_entry = QLineEdit(self.filter_frame)
+        self.alarm_entry.setFixedSize(150, 40)
+        filter_layout.addWidget(self.alarm_entry)
+
         # Przycisk Filtruj
         self.btn_filter = QPushButton("Filtruj", self.filter_frame)
         self.btn_filter.setFixedSize(150, 40)
@@ -172,8 +179,9 @@ class HistoryPage(QFrame):
         table_layout = QGridLayout(self.table_container)
         self.table_container.setLayout(table_layout)
 
+        # Zmodyfikowana lista kolumn – teraz osobno "Data" i "Godzina"
         columns = [
-            "Godzina", "Batch", "Produkt", "D1", "D2", "D3", "D4",
+            "Data", "Godzina", "Batch", "Produkt", "D1", "D2", "D3", "D4",
             "Liczba flawów", "Liczba necków", "Koordynat", "Komentarz", "Typ alarmu"
         ]
         self.table = QTableWidget(0, len(columns), self.table_container)
@@ -222,7 +230,6 @@ class HistoryPage(QFrame):
         self.batch_entry.clear()
         self.product_entry.clear()
         self.load_data()
-
     def load_data(self):
         self.table.setRowCount(0)
         if not check_database(self.controller.db_params):
@@ -230,50 +237,64 @@ class HistoryPage(QFrame):
             self.show_offline_message()
             self.update_db_status()
             return
-
         try:
             connection = mysql.connector.connect(**self.controller.db_params)
             cursor = connection.cursor(dictionary=True)
-
+            # Zmodyfikowane zapytanie – pobieramy osobno datę i godzinę
             sql = """
-            SELECT DATE_FORMAT(`Date time`, '%H:%i:%s') AS godzina,
-                   `Batch nr` AS batch,
-                   `Product nr` AS produkt,
-                   D1, D2, D3, D4,
-                   `lumps number of` AS flaws,
-                   `necks number of` AS necks,
-                   `X-coordinate` AS koordynat,
-                   comment,
-                   alarm_type
+            SELECT DATE_FORMAT(`Date time`, '%Y-%m-%d') AS data,
+                DATE_FORMAT(`Date time`, '%H:%i:%s') AS godzina,
+                `Batch nr` AS batch,
+                `Product nr` AS produkt,
+                D1, D2, D3, D4,
+                `lumps number of` AS flaws,
+                `necks number of` AS necks,
+                `X-coordinate` AS koordynat,
+                comment,
+                alarm_type
             FROM event
             """
             filters = []
-            params = []
             date_filter = self.date_entry.text().strip()
             batch_filter = self.batch_entry.text().strip()
             product_filter = self.product_entry.text().strip()
-
+            alarm_filter = self.alarm_entry.text().strip()
+            
+            print(f"DEBUG wartość filtra daty: '{date_filter}'")
+            print(f"DEBUG wartość filtra batch: '{batch_filter}'")
+            print(f"DEBUG wartość filtra produktu: '{product_filter}'")
+            print(f"DEBUG wartość filtra alarmu: '{alarm_filter}'")
+            
             if date_filter:
-                filters.append("DATE(`Date time`) = %s")
-                params.append(date_filter)
+                date_sql = f"DATE(`Date time`) = '{date_filter}'"
+                filters.append(date_sql)
+                
             if batch_filter:
-                filters.append("`Batch nr` LIKE %s")
-                params.append(f"%{batch_filter}%")
+                batch_sql = f"`Batch nr` LIKE '%{batch_filter}%'"
+                filters.append(batch_sql)
+                
             if product_filter:
-                filters.append("`Product nr` LIKE %s")
-                params.append(f"%{product_filter}%")
+                product_sql = f"`Product nr` LIKE '%{product_filter}%'"
+                filters.append(product_sql)
 
+            if alarm_filter:
+                alarm_sql = f"alarm_type LIKE '%{alarm_filter}%'"
+                filters.append(alarm_sql)
+                
             if filters:
                 sql += " WHERE " + " AND ".join(filters)
             sql += " ORDER BY `Date time` DESC"
-
-            cursor.execute(sql, tuple(params))
+            
+            print("DEBUG finalne zapytanie:", sql)
+            
+            cursor.execute(sql)
             rows = cursor.fetchall()
-
             for row in rows:
                 current_row = self.table.rowCount()
                 self.table.insertRow(current_row)
+                # Pierwsza kolumna: Data, druga: Godzina, a potem pozostałe dane
                 values = [
+                    str(row.get("data", "")),
                     str(row.get("godzina", "")),
                     str(row.get("batch", "")),
                     str(row.get("produkt", "")),
@@ -291,13 +312,12 @@ class HistoryPage(QFrame):
                     item = QTableWidgetItem(value)
                     item.setTextAlignment(Qt.AlignCenter)
                     self.table.setItem(current_row, col, item)
-
             if connection.is_connected():
                 connection.close()
             self.controller.db_connected = True
             self.update_db_status()
         except mysql.connector.Error as e:
-            print(f"Błąd połączenia z bazą danych: {e}")
+            print(f"Błąd bazy danych: {e}")
             self.show_offline_message()
             self.controller.db_connected = False
             self.update_db_status()
