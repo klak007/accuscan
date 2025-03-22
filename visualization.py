@@ -18,7 +18,7 @@ class PlotManager:
     Handles throttling of plot updates to improve performance.
     """
     
-    def __init__(self, plot_widgets=None, min_update_interval=0.2):
+    def __init__(self, plot_widgets=None, min_update_interval=0.2, analysis_queue=None):
         """
         Initialize the PlotManager with pyqtgraph plot widgets.
         
@@ -40,6 +40,7 @@ class PlotManager:
         self.fft_threshold = 500.0
         self.current_pulsation_val = 0.0
         
+        self.analysis_queue = analysis_queue
         # Performance monitoring
         self.plot_update_count = 0
         self.throttle_level = 1  # 1 = normal (update all plots), 2 = skip FFT, 3 = essential only
@@ -175,7 +176,7 @@ class PlotManager:
         peak_indices_above_thresh = [i for i in peak_indices if amplitudes[i] > threshold]
         return peak_indices_above_thresh
 
-    def update_fft_plot(self, diameter_history, fft_buffer_size=256, processing_time=0):
+    def update_fft_plot(self, diameter_history, fft_buffer_size=256, processing_time=0, measurement_data=None):
         if 'fft' not in self.plot_widgets:
             return
 
@@ -200,6 +201,10 @@ class PlotManager:
                 else:
                     max_amp = 0.0
                 self.current_pulsation_val = max_amp
+
+                if measurement_data is not None:
+                    measurement_data['pulsation_val'] = max_amp 
+                print(f"[PlotManager] Detected pulsation amplitude: {max_amp:.2f}")
                 # print(f"[PlotManager] Detected pulsation amplitude: {max_amp:.2f}")
                 # Uaktualnij tytuł wykresu, dodając sample rate i processing time
                 title_text = f"Diameter FFT Analysis (Sample rate: {sample_rate:.2f} Hz, Proc time: {processing_time:.4f} s)"
@@ -277,10 +282,15 @@ class PlotManager:
                     self.update_fft_plot(
                         data_dict['diameter_history'],
                         data_dict.get('fft_buffer_size', 256),
-                        data_dict.get('processing_time', 83)
+                        data_dict.get('processing_time', 83),
+                        measurement_data=data_dict
                     )
-                    data_dict['pulsation_val'] = self.current_pulsation_val
-
+                    # data_dict['pulsation_val'] = self.current_pulsation_val
+                if self.analysis_queue is not None:
+                    try:
+                        self.analysis_queue.put_nowait(data_dict)
+                    except:
+                        print("[PlotManager] Analysis queue is full.")
                 # W PyQtGraph zmiany rysujemy bezpośrednio; opcjonalnie możemy wymusić odświeżenie widgetu
                 for key, widget in self.plot_widgets.items():
                     if (key == 'diameter' or 

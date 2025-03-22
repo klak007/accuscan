@@ -101,11 +101,16 @@ class AlarmManager:
         pulsation_threshold: float
     ) -> str:
         """
-        Sprawdza, czy wartość 'pulsation' w measurement_data > pulsation_threshold.
+        Sprawdza, czy wartość 'pulsation_val' w measurement_data > pulsation_threshold.
         """
-        pulsation_val = measurement_data.get("pulsation", 0.0)
+        pulsation_val = measurement_data.get("pulsation_val", 1.0)
 
+        print("Pulsation value:", pulsation_val)
         new_state = pulsation_val > pulsation_threshold
+        # print pulse threshold val and new state
+        print("Pulsation threshold:", pulsation_threshold)
+        print("New state:", new_state)
+        
         old_state = self.pulsation_alarm_active
 
         if new_state != old_state:

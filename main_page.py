@@ -1584,6 +1584,7 @@ class MainPage(QWidget):
                     plot_data['diameter_history'],
                     plot_data.get('fft_buffer_size', 0),
                     plot_data.get('processing_time', 0),
+                    measurement_data=plot_data
                     )
                 # modulated_history = self.plot_manager.apply_pulsation(plot_data['diameter_history'], sample_rate=100, modulation_frequency=10, modulation_depth=0.5)
                 # self.plot_manager.update_fft_plot(
@@ -1594,10 +1595,32 @@ class MainPage(QWidget):
             else:
                 # Normal case - update through PlotManager process 
                 self.plot_manager.update_all_plots(plot_data)
+                
         else:
             # Optionally clear or skip plot updates when measurement is stopped.
             pass
 
+    def update_alarm_labels(self):
+        # Pobierz aktualne liczby defektów z flaw_detector (przyjmujemy, że jest dostępny przez self.controller.flaw_detector)
+        current_lumps = self.controller.flaw_detector.flaw_lumps_count
+        current_necks = self.controller.flaw_detector.flaw_necks_count
+
+        # Pobierz maksymalne wartości ustawione przez użytkownika (konwersja na int, domyślnie 0 jeśli błąd)
+        try:
+            max_lumps = int(self.entry_max_lumps.text())
+        except ValueError:
+            max_lumps = 0
+
+        try:
+            max_necks = int(self.entry_max_necks.text())
+        except ValueError:
+            max_necks = 0
+
+        # print(f"[GUI] Aktualizacja etykiet alarmowych: Wybrzuszenia: {current_lumps}/{max_lumps}, Zagłębienia: {current_necks}/{max_necks}")
+
+        # Aktualizuj etykiety alarmowe (metoda show_alarm ustawia kolor i treść)
+        self.show_alarm("Wybrzuszenia", current_lumps, max_lumps)
+        self.show_alarm("Zagłębienia", current_necks, max_necks)
 
     def update_data(self):
         # Get latest data directly from the acquisition buffer instead of data_mgr
@@ -1607,10 +1630,13 @@ class MainPage(QWidget):
             self.update_readings(data)
         speed = data.get("speed", 0.0)
         self.label_speed.setText(f"<small>Speed [m/min]:</small><br><span style='font-size: 20px;'>{speed:.2f}</span>")
+        self.update_alarm_labels()
 
-    def update_flaw_counts(self, lumps, necks):
-        # Zakładając, że etykiety do wyświetlania wyników istnieją (np. self.label_alarm_lumps, self.label_alarm_necks)
-        if hasattr(self, "label_alarm_lumps"):
-            self.label_alarm_lumps.setText(f"Lumps: {lumps}")
-        if hasattr(self, "label_alarm_necks"):
-            self.label_alarm_necks.setText(f"Necks: {necks}")
+
+    # def update_flaw_counts(self, lumps, necks):
+    #     # Zakładając, że etykiety do wyświetlania wyników istnieją (np. self.label_alarm_lumps, self.label_alarm_necks)
+    #     if hasattr(self, "label_alarm_lumps"):
+    #         self.label_alarm_lumps.setText(f"Lumps: {lumps}")
+    #     if hasattr(self, "label_alarm_necks"):
+    #         self.label_alarm_necks.setText(f"Necks: {necks}")
+
