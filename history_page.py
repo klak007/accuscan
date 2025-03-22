@@ -4,9 +4,9 @@ from PyQt5.QtWidgets import (
     QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit,
     QTableWidget, QTableWidgetItem, QMessageBox, QSpacerItem, QSizePolicy, QHeaderView, QApplication
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QDate
 from PyQt5.QtGui import QFont, QKeySequence
-from PyQt5.QtWidgets import QShortcut
+from PyQt5.QtWidgets import QShortcut, QDateEdit
 from db_helper import check_database
 
 class HistoryPage(QFrame):
@@ -40,6 +40,8 @@ class HistoryPage(QFrame):
 
         # Panel statusu bazy danych
         self.status_frame = QFrame(self.main_frame)
+        self.offset = 0
+        self.base_query = ""
         status_layout = QHBoxLayout(self.status_frame)
         self.status_frame.setLayout(status_layout)
         status_layout.setContentsMargins(5, 5, 5, 5)
@@ -51,6 +53,16 @@ class HistoryPage(QFrame):
         self.btn_check_db.setFixedSize(200, 40)
         self.btn_check_db.clicked.connect(self.check_db_connection)
         status_layout.addWidget(self.btn_check_db)
+
+        self.btn_load_200 = QPushButton("Załaduj kolejne 200", self.status_frame)
+        self.btn_load_200.setFixedSize(200, 40)
+        self.btn_load_200.clicked.connect(lambda: self.load_more(200))
+        status_layout.addWidget(self.btn_load_200)
+
+        self.btn_load_1000 = QPushButton("Załaduj kolejne 1000", self.status_frame)
+        self.btn_load_1000.setFixedSize(200, 40)
+        self.btn_load_1000.clicked.connect(lambda: self.load_more(1000))
+        status_layout.addWidget(self.btn_load_1000)
 
         main_frame_layout.addWidget(self.status_frame, 3, 0)
 
@@ -126,12 +138,25 @@ class HistoryPage(QFrame):
         filter_layout.setContentsMargins(5, 5, 5, 5)
         filter_layout.setSpacing(5)
 
-        # Filtruj po dacie
-        self.date_label = QLabel("Filtruj po dacie (YYYY-MM-DD):", self.filter_frame)
-        filter_layout.addWidget(self.date_label)
-        self.date_entry = QLineEdit(self.filter_frame)
-        self.date_entry.setFixedSize(150, 40)
-        filter_layout.addWidget(self.date_entry)
+        # Filtruj od daty
+        self.start_date_label = QLabel("Od daty:", self.filter_frame)
+        filter_layout.addWidget(self.start_date_label)
+
+        self.start_date_edit = QDateEdit(self.filter_frame)
+        self.start_date_edit.setCalendarPopup(True)
+        self.start_date_edit.setDisplayFormat("yyyy-MM-dd")
+        self.start_date_edit.setDate(QDate.currentDate())
+        filter_layout.addWidget(self.start_date_edit)
+
+        # Filtruj do daty
+        self.end_date_label = QLabel("Do daty:", self.filter_frame)
+        filter_layout.addWidget(self.end_date_label)
+
+        self.end_date_edit = QDateEdit(self.filter_frame)
+        self.end_date_edit.setCalendarPopup(True)
+        self.end_date_edit.setDisplayFormat("yyyy-MM-dd")
+        self.end_date_edit.setDate(QDate.currentDate())
+        filter_layout.addWidget(self.end_date_edit)
 
         # Filtruj po batchu
         self.batch_label = QLabel("Filtruj po batchu:", self.filter_frame)
@@ -173,6 +198,7 @@ class HistoryPage(QFrame):
         filter_layout.addWidget(self.btn_reload)
 
         self.main_frame.layout().addWidget(self.filter_frame, 0, 0)
+
 
     def _create_table(self):
         self.table_container = QFrame(self.main_frame)
@@ -226,100 +252,81 @@ class HistoryPage(QFrame):
             self.table.setItem(0, col, item)
 
     def clear_filter(self):
-        self.date_entry.clear()
         self.batch_entry.clear()
         self.product_entry.clear()
-        self.load_data()
-    def load_data(self):
+        self.alarm_entry.clear()
+        # pomijamy daty → ignorujemy je tylko przy tej jednej akcji
+        self.load_data(ignore_date=True)
+
+    def load_data(self, ignore_date=False):
         self.table.setRowCount(0)
+        self.offset = 0
+
         if not check_database(self.controller.db_params):
             self.controller.db_connected = False
             self.show_offline_message()
             self.update_db_status()
             return
-        try:
-            connection = mysql.connector.connect(**self.controller.db_params)
-            cursor = connection.cursor(dictionary=True)
-            # Zmodyfikowane zapytanie – pobieramy osobno datę i godzinę
-            sql = """
+
+        filters = []
+        if not ignore_date:
+            start = self.start_date_edit.date().toString("yyyy-MM-dd")
+            end   = self.end_date_edit.date().toString("yyyy-MM-dd")
+            filters.append(f"DATE(`Date time`) >= '{start}'")
+            filters.append(f"DATE(`Date time`) <= '{end}'")
+
+        for col, val in (("Batch nr", self.batch_entry.text().strip()),
+                        ("Product nr", self.product_entry.text().strip()),
+                        ("alarm_type", self.alarm_entry.text().strip())):
+            if val:
+                filters.append(f"`{col}` LIKE '%{val}%'")
+
+        self.base_query = """
             SELECT DATE_FORMAT(`Date time`, '%Y-%m-%d') AS data,
                 DATE_FORMAT(`Date time`, '%H:%i:%s') AS godzina,
-                `Batch nr` AS batch,
-                `Product nr` AS produkt,
+                `Batch nr` AS batch, `Product nr` AS produkt,
                 D1, D2, D3, D4,
-                `lumps number of` AS flaws,
-                `necks number of` AS necks,
-                `X-coordinate` AS koordynat,
-                comment,
-                alarm_type
+                `lumps number of` AS flaws, `necks number of` AS necks,
+                `X-coordinate` AS koordynat, comment, alarm_type
             FROM event
-            """
-            filters = []
-            date_filter = self.date_entry.text().strip()
-            batch_filter = self.batch_entry.text().strip()
-            product_filter = self.product_entry.text().strip()
-            alarm_filter = self.alarm_entry.text().strip()
-            
-            print(f"DEBUG wartość filtra daty: '{date_filter}'")
-            print(f"DEBUG wartość filtra batch: '{batch_filter}'")
-            print(f"DEBUG wartość filtra produktu: '{product_filter}'")
-            print(f"DEBUG wartość filtra alarmu: '{alarm_filter}'")
-            
-            if date_filter:
-                date_sql = f"DATE(`Date time`) = '{date_filter}'"
-                filters.append(date_sql)
-                
-            if batch_filter:
-                batch_sql = f"`Batch nr` LIKE '%{batch_filter}%'"
-                filters.append(batch_sql)
-                
-            if product_filter:
-                product_sql = f"`Product nr` LIKE '%{product_filter}%'"
-                filters.append(product_sql)
+        """
+        if filters:
+            self.base_query += " WHERE " + " AND ".join(filters)
 
-            if alarm_filter:
-                alarm_sql = f"alarm_type LIKE '%{alarm_filter}%'"
-                filters.append(alarm_sql)
-                
-            if filters:
-                sql += " WHERE " + " AND ".join(filters)
-            sql += " ORDER BY `Date time` DESC"
-            
-            print("DEBUG finalne zapytanie:", sql)
-            
-            cursor.execute(sql)
-            rows = cursor.fetchall()
-            for row in rows:
-                current_row = self.table.rowCount()
-                self.table.insertRow(current_row)
-                # Pierwsza kolumna: Data, druga: Godzina, a potem pozostałe dane
-                values = [
-                    str(row.get("data", "")),
-                    str(row.get("godzina", "")),
-                    str(row.get("batch", "")),
-                    str(row.get("produkt", "")),
-                    str(row.get("D1", 0.0)),
-                    str(row.get("D2", 0.0)),
-                    str(row.get("D3", 0.0)),
-                    str(row.get("D4", 0.0)),
-                    str(row.get("flaws", 0)),
-                    str(row.get("necks", 0)),
-                    str(row.get("koordynat", 0.0)),
-                    str(row.get("comment", "")),
-                    str(row.get("alarm_type", ""))
-                ]
-                for col, value in enumerate(values):
-                    item = QTableWidgetItem(value)
-                    item.setTextAlignment(Qt.AlignCenter)
-                    self.table.setItem(current_row, col, item)
-            if connection.is_connected():
-                connection.close()
-            self.controller.db_connected = True
-            self.update_db_status()
-        except mysql.connector.Error as e:
-            print(f"Błąd bazy danych: {e}")
-            self.show_offline_message()
-            self.controller.db_connected = False
-            self.update_db_status()
-        except Exception as e:
-            QMessageBox.warning(self, "Błąd", f"Wystąpił nieoczekiwany błąd: {str(e)}")
+        sql = self.base_query + " ORDER BY `Date time` DESC LIMIT 500"
+        self._execute_and_populate(sql)
+        self.offset = self.table.rowCount()
+        self.controller.db_connected = True
+        self.update_db_status()
+
+    def load_more(self, count):
+        if not self.controller.db_connected:
+            return
+
+        sql = self.base_query + f" ORDER BY `Date time` DESC LIMIT {self.offset}, {count}"
+        added = self._execute_and_populate(sql, append=True)
+        self.offset += added
+
+    def _execute_and_populate(self, sql, append=False):
+        connection = mysql.connector.connect(**self.controller.db_params)
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute(sql)
+        rows = cursor.fetchall()
+        start_row = self.table.rowCount() if append else 0
+
+        for row in rows:
+            idx = self.table.rowCount()
+            self.table.insertRow(idx)
+            values = [
+                row["data"], row["godzina"], row["batch"], row["produkt"],
+                row["D1"], row["D2"], row["D3"], row["D4"],
+                row["flaws"], row["necks"], row["koordynat"],
+                row["comment"], row["alarm_type"]
+            ]
+            for col, val in enumerate(values):
+                item = QTableWidgetItem(str(val))
+                item.setTextAlignment(Qt.AlignCenter)
+                self.table.setItem(idx, col, item)
+
+        connection.close()
+        return len(rows)
