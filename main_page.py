@@ -1099,13 +1099,17 @@ class MainPage(QWidget):
         default_font = QApplication.font()
         default_font.setPointSize(15)
         
-        self.label_alarm_lumps = QLabel("Wybrzuszenia OK", self.left_panel) 
+        alarms_layout = QHBoxLayout()
+        self.label_alarm_lumps = QLabel("Wybrzuszenia OK", self.readings_frame)
         self.label_alarm_lumps.setFont(default_font)
-        readings_layout.addWidget(self.label_alarm_lumps, alignment=Qt.AlignCenter)
+        alarms_layout.addWidget(self.label_alarm_lumps)
 
-        self.label_alarm_necks = QLabel("Zagłębienia OK", self.left_panel) 
-        self.label_alarm_necks.setFont(default_font) 
-        readings_layout.addWidget(self.label_alarm_necks, alignment=Qt.AlignCenter)
+        self.label_alarm_necks = QLabel("Zagłębienia OK", self.readings_frame)
+        self.label_alarm_necks.setFont(default_font)
+        alarms_layout.addWidget(self.label_alarm_necks)
+
+        alarms_layout.setAlignment(Qt.AlignCenter)
+        readings_layout.addLayout(alarms_layout)
 
         # Wskaźniki średnicy
         self.label_diameter_indicator = QLabel("Średnica: OK", self.readings_frame)
@@ -1517,41 +1521,6 @@ class MainPage(QWidget):
                     value = stats.get(label_key, 0)
                     self.flaw_stats_labels[label_key].setText(f"{value:.2f}")
 
-        
-        
-        # flaw_results = {
-        #     'lumps_count': self.controller.flaw_detector.total_lumps_count,
-        #     'necks_count': self.controller.flaw_detector.total_necks_count,
-        #     'window_lumps_count': self.controller.flaw_detector.flaw_lumps_count,
-        #     'window_necks_count': self.controller.flaw_detector.flaw_necks_count,
-        # }
-        #print lumps count
-        # if flaw_results['window_lumps_count'] > 0:
-        #     print(f"[GUI] Lumps count: {flaw_results['lumps_count']}")
-        
-        # 2) Odczyt limitów i progów z UI
-        try:
-            max_lumps = int(self.entry_max_lumps.text() or "3")
-            max_necks = int(self.entry_max_necks.text() or "3")
-            # upper_tol = float(self.entry_tolerance_plus.text() or "0.5")
-            # lower_tol = float(self.entry_tolerance_minus.text() or "0.5")
-            # pulsation_threshold = float(self.entry_pulsation_threshold.text() or "500.0")
-        except ValueError:
-            # Jeśli coś się nie da parsować, pomijamy
-            return
-
-        # thresholds = self.controller.flaw_detector.check_thresholds(max_lumps, max_necks)
-        # # Wyświetlanie alarmów:
-        # if thresholds["lumps_exceeded"]:
-        #     self.show_alarm("Wybrzuszenia", flaw_results["window_lumps_count"], max_lumps)
-        # else:
-        #     self.clear_alarm("Wybrzuszenia")
-
-        # if thresholds["necks_exceeded"]:
-        #     self.show_alarm("Zagłębienia", flaw_results["window_necks_count"], max_necks)
-        # else:
-        #     self.clear_alarm("Zagłębienia")
-
 
         deviation = davg - diameter_preset
         self.diameter_deviation_label.setText(f"Dev: {deviation:.2f} mm")
@@ -1566,43 +1535,7 @@ class MainPage(QWidget):
             self.label_diameter_indicator.setText("Diameter: OK")
             self.label_diameter_indicator.setStyleSheet("color: green;")
 
-        # lumps_in_window = self.controller.flaw_detector.flaw_lumps_count
-        # necks_in_window = self.controller.flaw_detector.flaw_necks_count
-        # pulsation_val = data.get("pulsation", 0.0)
         
-        # measurement_data = {
-        #     "timestamp": datetime.now(),
-        #     "xCoord": data.get("xCoord", 0.0),
-        #     "product": self.entry_product.text(),
-        #     "batch": self.entry_batch.text(),
-        #     "D1": d1,
-        #     "D2": d2,
-        #     "D3": d3,
-        #     "D4": d4,
-        #     "lumps": lumps_in_window,
-        #     "necks": necks_in_window,
-        #     "pulsation": pulsation_val
-        # }
-
-        # # 4) Wywołanie nowych metod w AlarmManager
-        # self.controller.alarm_manager.check_and_update_defects_alarm(
-        #     lumps_in_window, 
-        #     necks_in_window,
-        #     measurement_data,
-        #     max_lumps,
-        #     max_necks
-        # )
-
-        # self.controller.alarm_manager.check_and_update_diameter_alarm(
-        #     measurement_data,
-        #     upper_tol,
-        #     lower_tol
-        # )
-
-        # self.controller.alarm_manager.check_and_update_pulsation_alarm(
-        #     measurement_data,
-        #     pulsation_threshold
-        # )
 
         # Prepare data for the plot manager using window_data from acquisition buffer
         self.plot_manager.plot_dirty = True
