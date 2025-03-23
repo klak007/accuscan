@@ -1145,18 +1145,18 @@ class MainPage(QWidget):
         group_flaw_stats.setLayout(flaw_stats_layout)
         readings_layout.addWidget(group_flaw_stats)
         
-        # Create the terminal output field (using QPlainTextEdit)
-        self.terminal_output = QPlainTextEdit(self.middle_panel)
-        self.terminal_output.setReadOnly(True)
-        self.terminal_output.setFixedHeight(120)  # Adjust height as needed
+        # # Create the terminal output field (using QPlainTextEdit)
+        # self.terminal_output = QPlainTextEdit(self.middle_panel)
+        # self.terminal_output.setReadOnly(True)
+        # self.terminal_output.setFixedHeight(120)  # Adjust height as needed
 
-        # Add the terminal_output widget to the layout, e.g. in a new row:
-        middle_layout.addWidget(self.terminal_output, 1, 0)
+        # # Add the terminal_output widget to the layout, e.g. in a new row:
+        # middle_layout.addWidget(self.terminal_output, 1, 0)
 
-        # Set up the emitting stream to capture print output
-        self.emitting_stream = EmittingStream()
-        self.emitting_stream.textWritten.connect(self.terminal_output.insertPlainText)
-        sys.stdout = self.emitting_stream  # Redirect standard output to the terminal widget
+        # # Set up the emitting stream to capture print output
+        # self.emitting_stream = EmittingStream()
+        # self.emitting_stream.textWritten.connect(self.terminal_output.insertPlainText)
+        # sys.stdout = self.emitting_stream  # Redirect standard output to the terminal widget
 
 
     # ---------------------------------------------------------------------------------
