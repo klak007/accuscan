@@ -205,7 +205,7 @@ class PlotManager:
                 if measurement_data is not None:
                     measurement_data['pulsation_val'] = max_amp 
                 print(f"[PlotManager] Detected pulsation amplitude: {max_amp:.2f}")
-                # print(f"[PlotManager] Detected pulsation amplitude: {max_amp:.2f}")
+
                 # Uaktualnij tytuł wykresu, dodając sample rate i processing time
                 title_text = f"Diameter FFT Analysis (Sample rate: {sample_rate:.2f} Hz, Proc time: {processing_time:.4f} s)"
                 plot_widget.setTitle(title_text)
@@ -241,6 +241,7 @@ class PlotManager:
         Args:
             data_dict: Słownik zawierający wszystkie dane potrzebne do rysowania.
         """
+        print("[PlotManager] Updating all plots...")
         now = time.time()
         if (self.last_update_time is None or (now - self.last_update_time) >= self.min_update_interval) and self.plot_dirty:
             try:

@@ -105,11 +105,11 @@ class AlarmManager:
         """
         pulsation_val = measurement_data.get("pulsation_val", 1.0)
 
-        print("Pulsation value:", pulsation_val)
+        # print("Pulsation value:", pulsation_val)
         new_state = pulsation_val > pulsation_threshold
         # print pulse threshold val and new state
-        print("Pulsation threshold:", pulsation_threshold)
-        print("New state:", new_state)
+        # print("Pulsation threshold:", pulsation_threshold)
+        # print("New state:", new_state)
         
         old_state = self.pulsation_alarm_active
 

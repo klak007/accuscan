@@ -1592,9 +1592,6 @@ class MainPage(QWidget):
                 #     plot_data.get('fft_buffer_size', 512)
                 # )
                 
-            else:
-                # Normal case - update through PlotManager process 
-                self.plot_manager.update_all_plots(plot_data)
                 
         else:
             # Optionally clear or skip plot updates when measurement is stopped.
