@@ -24,7 +24,8 @@ from settings_page import SettingsPage
 from history_page import HistoryPage
 from config import OFFLINE_MODE
 
-
+import numpy as np
+from scipy.signal import find_peaks
 
 
 # PLC connection parameters
@@ -756,8 +757,48 @@ class App(QMainWindow):
                 self.alarm_manager.check_and_update_diameter_alarm(
                     measurement_data, upper_tol, lower_tol
                 )
-
+                # Ustal wartość pulsation_threshold niezależnie od warunków
                 pulsation_threshold = measurement_data.get("pulsation_threshold", 500.0)
+                # Ustalamy rozmiar bufora do FFT (można go dostosować)
+                fft_buffer_size = 256
+
+                # Pobieramy dane okna z bufora akwizycji
+                window_data = self.acquisition_buffer.get_window_data()
+                diameter_history = window_data.get("diameter_history", [])
+
+                if len(diameter_history) >= fft_buffer_size:
+                    processing_time = window_data.get("processing_time", 0.01)
+                    sample_rate = 1 / processing_time if processing_time > 0 else 83.123
+
+                    # Pobierz ostatnie fft_buffer_size próbek
+                    diameter_array = np.array(diameter_history[-fft_buffer_size:], dtype=np.float32)
+                    diameter_mean = np.mean(diameter_array)
+                    diameter_array -= diameter_mean
+
+                    if len(diameter_array) > 1:
+                        fft_magnitude = np.abs(np.fft.rfft(diameter_array))
+                        fft_freqs = np.fft.rfftfreq(len(diameter_array), d=1.0 / sample_rate)
+                        peak_idxs, _ = find_peaks(fft_magnitude, prominence=100, distance=5)
+                        pulsation_threshold = measurement_data.get("pulsation_threshold", 500.0)
+                        pulsation_vals = [
+                            (float(fft_freqs[i]), float(fft_magnitude[i]))
+                            for i in peak_idxs if fft_magnitude[i] > pulsation_threshold
+                        ]
+                        
+                        # Dodaj klucze do measurement_data
+                        measurement_data["pulsation_vals"] = pulsation_vals
+                        measurement_data["fft_freqs"] = fft_freqs
+                        measurement_data["fft_magnitude"] = fft_magnitude
+                        
+                        # print("[Analysis Worker] FFT computed, keys set in measurement_data:", list(measurement_data.keys()))
+                        self.fft_data = {
+                            "fft_freqs": fft_freqs,
+                            "fft_magnitude": fft_magnitude,
+                            "pulsation_vals": pulsation_vals
+                        }
+                        # print("[Analysis Worker] Updated self.fft_data with keys:", list(self.fft_data.keys()))
+                                        
+
                 self.alarm_manager.check_and_update_pulsation_alarm(
                     measurement_data, pulsation_threshold
                 )
@@ -843,29 +884,39 @@ class App(QMainWindow):
         self.update_timer.start(update_delay)
     
     def update_ui(self):
-        # Limit UI updates to improve performance
         now = time.time()
         if hasattr(self, 'latest_data'):
-            current_page = self.get_current_page()
             ui_start = time.perf_counter()
+
+            # Pobierz kopię najnowszych danych z odbiornika
+            data_dict = self.latest_data.copy()
+            # print("[update_ui] Latest data keys:", list(data_dict.keys()))
+            # Scal z danymi FFT, jeśli są dostępne
+            if hasattr(self, "fft_data"):
+                # print("[update_ui] FFT data keys:", list(self.fft_data.keys()))
+                data_dict.update(self.fft_data)
+
+            # Dodaj czas przetwarzania
+            data_dict["processing_time"] = self.processing_time
+            # print("[update_ui] Merged data keys:", list(data_dict.keys()))
+            # Aktualizuj UI strony
+            current_page = self.get_current_page()
             if hasattr(current_page, 'update_data'):
-                # Budujemy słownik danych przekazywanych do wykresów
-                data_dict = getattr(self, "latest_data", {}).copy()
-                # Dodajemy processing_time obliczony w _data_receiver_worker
-                data_dict["processing_time"] = self.processing_time
                 current_page.update_data()
+
             ui_time = time.perf_counter() - ui_start
-            
-            # Log UI update time if it's slow (>100ms)
-            if ui_time > 0.1 and (now - self.last_log_time) > 5:
+
+            # Log UI update time jeśli przekroczy 100 ms, ale nie częściej niż co 5 sekund
+            if ui_time > 0.1 and (now - getattr(self, 'last_log_time', 0)) > 5:
                 print(f"[PERF] UI Update time: {ui_time:.4f}s")
                 self.last_log_time = now
-        
+
         # Adjust timer interval based on current page
-        if self.current_page == "MainPage":
+        if getattr(self, 'current_page', None) == "MainPage":
             self.update_timer.setInterval(100)  # plot-heavy main page
         else:
             self.update_timer.setInterval(50)   # for other pages
+
         
         
     

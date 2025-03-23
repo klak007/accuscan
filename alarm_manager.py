@@ -95,67 +95,50 @@ class AlarmManager:
             return "entered" if new_state else "exited"
         return "no_change"
 
-    def check_and_update_pulsation_alarm(
-        self,
-        measurement_data: dict,
-        pulsation_threshold: float
-    ) -> str:
+    def check_and_update_pulsation_alarm(self, measurement_data: dict, pulsation_threshold: float) -> str:
         """
-        Sprawdza, czy w measurement_data pojawiły się pulsacje (lista krotek (częstotliwość, amplituda))
-        przekraczające zadany próg. Dla każdej pulsacji, której amplituda jest większa od pulsation_threshold,
-        wyzwala osobny alarm (loguje wejście, jeśli wcześniej nie był aktywny).
-        Jeśli pulsacja przestaje występować, loguje zejście.
-        Zwraca "changed" jeśli stan któregokolwiek alarmu uległ zmianie, w przeciwnym wypadku "no_change".
+        Sprawdza, ile pików (elementów) znajduje się w measurement_data pod kluczem 'pulsation_vals'
+        (przy czym same wartości amplitudy nie mają znaczenia, liczy się tylko ich liczba).
+        Jeśli liczba pików jest różna od poprzednio zarejestrowanej, loguje wejście/aktualizację alarmu,
+        lub zejście z alarmu, jeśli pików już nie ma.
+        Zwraca "changed", jeśli stan alarmu uległ zmianie, w przeciwnym razie "no_change".
         """
+        # Pobierz listę pików
+        current_pulsation_peaks = measurement_data.get("pulsation_vals", [])
+        peak_count = len(current_pulsation_peaks)
 
-        # Dodatkowe debugujące printy
-        print("DEBUG: measurement_data.keys() =", list(measurement_data.keys()))
-        
-        # Pobierz aktualną listę pulsacji
-        current_pulsations = measurement_data.get("pulsation_vals", [])
-        print("DEBUG: current_pulsations =", current_pulsations)
+        # Jeśli nie ma wcześniej śledzonej liczby, inicjujemy ją
+        if not hasattr(self, "active_pulsation_alarm_count"):
+            self.active_pulsation_alarm_count = 0
 
-        # Zbiór częstotliwości, dla których aktualnie powinien być alarm (wg pomiaru)
-        current_alarm_freqs = set()
-        changes = []
+        old_peak_count = self.active_pulsation_alarm_count
 
-        # Przetwarzamy wykryte pulsacje
-        for freq, amplitude in current_pulsations:
-            print(f"DEBUG: freq={freq}, amplitude={amplitude}")
-            if amplitude > pulsation_threshold:
-                # Zaokrąglamy częstotliwość, aby uniknąć drobnych różnic
-                freq_key = round(freq, 2)
-                print(f"DEBUG: freq_key={freq_key} -> alarm state check.")
-                current_alarm_freqs.add(freq_key)
-                # Jeśli alarm dla tej częstotliwości nie był wcześniej aktywny, logujemy wejście
-                if not self.active_pulsation_alarms.get(freq_key, False):
-                    event_type = 0  # 0 = wejście
-                    alarm_type = f"pulsation_error_{freq_key}Hz"
-                    comment = f"Wejście alarmu pulsacji na {freq_key} Hz"
-                    print(f"DEBUG: Trigger ENTER alarm for freq_key={freq_key}")
-                    self._save_event(measurement_data, event_type, alarm_type, comment)
-                    self.active_pulsation_alarms[freq_key] = True
-                    changes.append(f"entered {freq_key}Hz")
+        # Przy zmianie liczby wykrytych pików logujemy zdarzenie
+        if peak_count != old_peak_count:
+            if peak_count > 0 and old_peak_count == 0:
+                event_type = 0  # wejście w alarm
+                comment = f"Wejście alarmu pulsacji: {peak_count} peaków"
+            elif peak_count == 0 and old_peak_count > 0:
+                event_type = 1  # zejście z alarmu
+                comment = "Zejście z alarmu pulsacji"
+            else:
+                # Zmiana liczby pików (np. aktualizacja liczby alarmów)
+                event_type = 0
+                comment = f"Aktualizacja alarmu pulsacji: {peak_count} peaków"
 
-        # Sprawdzamy, czy jakieś wcześniej aktywne alarmy zanikły
-        for freq_key in list(self.active_pulsation_alarms.keys()):
-            if self.active_pulsation_alarms[freq_key] and freq_key not in current_alarm_freqs:
-                event_type = 1  # 1 = zejście
-                alarm_type = f"pulsation_error_{freq_key}Hz"
-                comment = f"Zejście z alarmu pulsacji na {freq_key} Hz"
-                print(f"DEBUG: Trigger EXIT alarm for freq_key={freq_key}")
-                self._save_event(measurement_data, event_type, alarm_type, comment)
-                self.active_pulsation_alarms[freq_key] = False
-                changes.append(f"exited {freq_key}Hz")
+            self.active_pulsation_alarm_count = peak_count
 
-        # Uaktualniamy wspólny stan fault – jeśli choć jeden alarm jest aktywny, common fault powinien być włączony
-        overall_active = any(self.active_pulsation_alarms.values())
-        print(f"DEBUG: overall_active={overall_active}, active_pulsation_alarms={self.active_pulsation_alarms}")
+            # Aktualizujemy stan common fault – alarm aktywny, jeśli wykryto choć jeden pik
+            overall_active = (peak_count > 0)
+            self._update_common_fault(overall_active)
+
+            self._save_event(measurement_data, event_type, "pulsation_error", comment)
+            return "changed"
+
+        # Jeśli liczba pików się nie zmieniła, nadal ustawiamy stan common fault
+        overall_active = (peak_count > 0)
         self._update_common_fault(overall_active)
-
-        result = "changed" if changes else "no_change"
-        print(f"DEBUG: Returning {result} from check_and_update_pulsation_alarm")
-        return result
+        return "no_change"
 
 
     def _save_event(self, measurement_data: dict, event_type: int,

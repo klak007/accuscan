@@ -173,60 +173,35 @@ class PlotManager:
         peak_indices_above_thresh = [i for i in peak_indices if amplitudes[i] > threshold]
         return peak_indices_above_thresh
 
-    def update_fft_plot(self, diameter_history, fft_buffer_size=256, processing_time=0, measurement_data=None):
+    def update_fft_plot(self, measurement_data, processing_time=0):
         if 'fft' not in self.plot_widgets:
             return
 
         plot_widget = self.plot_widgets['fft']
         plot_widget.clear()
-
-        if len(diameter_history) > 0:
-            # Ustal dynamiczny sample rate na podstawie processing_time, używając 74 Hz jako domyślnej wartości
+        # print("[update_fft_plot] Received measurement_data keys:", list(measurement_data.keys()))
+   
+        if measurement_data and "fft_freqs" in measurement_data and "fft_magnitude" in measurement_data:
+            fft_freqs = measurement_data["fft_freqs"]
+            fft_magnitude = measurement_data["fft_magnitude"]
             sample_rate = 1 / processing_time if processing_time > 0 else 83.123
-                
-            diameter_array = np.array(diameter_history[-fft_buffer_size:], dtype=np.float32)
-            diameter_mean = np.mean(diameter_array)
-            diameter_array -= diameter_mean
-
-            if len(diameter_array) > 1:
-                diameter_fft = np.abs(np.fft.rfft(diameter_array))
-                freqs = np.fft.rfftfreq(len(diameter_array), d=1.0 / sample_rate)
-                peak_idxs = self.detect_peaks(freqs, diameter_fft, threshold=self.fft_threshold)
-
-                self.current_pulsation_vals = [
-                    (float(freqs[i]), float(diameter_fft[i]))
-                    for i in peak_idxs
-                ]
-                # print(
-                #     f"Detected {len(self.current_pulsation_vals)} peaks above threshold {self.fft_threshold}\n"
-                #     f"Current pulsations (frequency [Hz], amplitude): {self.current_pulsation_vals}"
-                # )
-
-                if measurement_data is not None:
-                    measurement_data['pulsation_vals'] = self.current_pulsation_vals
-
-
-
-                # Uaktualnij tytuł wykresu, dodając sample rate i processing time
-                title_text = f"Diameter FFT Analysis (Sample rate: {sample_rate:.2f} Hz, Proc time: {processing_time:.4f} s)"
-                plot_widget.setTitle(title_text)
-                
-                plot_widget.plot(freqs, diameter_fft, pen='m', name="FFT")
-                plot_widget.setLabel('bottom', "Frequency [Hz]")
-                plot_widget.setLabel('left', "Magnitude")
-                
-                threshold_line = pg.InfiniteLine(pos=self.fft_threshold, angle=0, pen='r')
-                plot_widget.addItem(threshold_line)
-                
-                for idx in peak_idxs:
+            title_text = f"Diameter FFT Analysis (Sample rate: {sample_rate:.2f} Hz, Proc time: {processing_time:.4f} s)"
+            plot_widget.setTitle(title_text)
+            plot_widget.plot(fft_freqs, fft_magnitude, pen='m', name="FFT")
+            threshold_line = pg.InfiniteLine(pos=self.fft_threshold, angle=0, pen='r')
+            plot_widget.addItem(threshold_line)
+            # Dodaj pionowe linie dla wykrytych pików
+            if "pulsation_vals" in measurement_data:
+                for (freq, amp) in measurement_data["pulsation_vals"]:
                     vertical_line = pg.InfiniteLine(
-                        pos=freqs[idx],
+                        pos=freq,
                         angle=90,
                         pen=pg.mkPen(color='b', style=pg.QtCore.Qt.DashLine)
                     )
                     plot_widget.addItem(vertical_line)
+        else:
+            plot_widget.setTitle("FFT Data not available")
 
-       
     def initialize_plots(self):
         # Configure each plot widget
         if self.plot_widgets['status']:

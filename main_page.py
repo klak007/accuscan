@@ -1555,6 +1555,9 @@ class MainPage(QWidget):
             'update_id': id(self) % 10000,  
             'processing_time': self.controller.processing_time,
         }
+
+        if hasattr(self.controller, "fft_data") and self.controller.fft_data:
+            plot_data.update(self.controller.fft_data)
         
         # Add debug log if we have data but no visible updates
         if self.controller.run_measurement:
@@ -1581,11 +1584,10 @@ class MainPage(QWidget):
                     plot_data['plc_sample_time']
                 )
                 self.plot_manager.update_fft_plot(
-                    plot_data['diameter_history'],
-                    plot_data.get('fft_buffer_size', 0),
-                    plot_data.get('processing_time', 0),
-                    measurement_data=plot_data
-                    )
+                    measurement_data=plot_data,
+                    processing_time=plot_data.get('processing_time', 0)
+                )
+
                 # modulated_history = self.plot_manager.apply_pulsation(plot_data['diameter_history'], sample_rate=100, modulation_frequency=10, modulation_depth=0.5)
                 # self.plot_manager.update_fft_plot(
                 #     modulated_history,
@@ -1620,14 +1622,21 @@ class MainPage(QWidget):
         self.show_alarm("Zagłębienia", current_necks, max_necks)
 
     def update_data(self):
-        # Get latest data directly from the acquisition buffer instead of data_mgr
-        data = self.controller.acquisition_buffer.get_latest_data()
-        if data:  # If there's data available
-             # Process data through our pipeline
-            self.update_readings(data)
+        # Pobierz najnowsze dane z bufora akwizycji
+        data = self.controller.acquisition_buffer.get_latest_data() or {}
+        
+        # Scal z danymi FFT, jeśli są dostępne
+        if hasattr(self.controller, "fft_data") and self.controller.fft_data:
+            data.update(self.controller.fft_data)
+        
+        # Przetwarzanie danych – przykładowo aktualizacja wykresów i odczytów
+        self.update_readings(data)
+        
         speed = data.get("speed", 0.0)
         self.label_speed.setText(f"<small>Speed [m/min]:</small><br><span style='font-size: 20px;'>{speed:.2f}</span>")
         self.update_alarm_labels()
+
+
 
 
     # def update_flaw_counts(self, lumps, necks):
