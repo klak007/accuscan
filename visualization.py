@@ -197,10 +197,10 @@ class PlotManager:
                     (float(freqs[i]), float(diameter_fft[i]))
                     for i in peak_idxs
                 ]
-                print(
-                    f"Detected {len(self.current_pulsation_vals)} peaks above threshold {self.fft_threshold}\n"
-                    f"Current pulsations (frequency [Hz], amplitude): {self.current_pulsation_vals}"
-                )
+                # print(
+                #     f"Detected {len(self.current_pulsation_vals)} peaks above threshold {self.fft_threshold}\n"
+                #     f"Current pulsations (frequency [Hz], amplitude): {self.current_pulsation_vals}"
+                # )
 
                 if measurement_data is not None:
                     measurement_data['pulsation_vals'] = self.current_pulsation_vals
