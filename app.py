@@ -787,14 +787,6 @@ class App(QMainWindow):
         self.db_worker_running = False
         self.plc_writer_running = False
         
-        # Clean up plot process if it exists in main_page
-        if hasattr(self, 'main_page') and hasattr(self.main_page, 'plot_manager'):
-            try:
-                self.main_page.plot_manager.stop_plot_process()
-                print("[App] Plot process stopped")
-            except Exception as e:
-                print(f"[App] Error stopping plot process: {e}")
-        
         # Stop the update timer
         if hasattr(self, 'update_timer'):
             self.update_timer.stop()
