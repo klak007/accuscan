@@ -1,7 +1,4 @@
-"""
-Visualization module for AccuScan application.
-Handles plotting functionality separated from the main UI using a separate process.
-"""
+# visualization.py
 
 import pyqtgraph as pg
 import time
@@ -38,7 +35,7 @@ class PlotManager:
         self.last_update_time = None
         self.plot_dirty = False
         self.fft_threshold = 500.0
-        self.current_pulsation_val = 0.0
+        self.current_pulsation_vals = []
         
         self.analysis_queue = analysis_queue
         # Performance monitoring
@@ -196,15 +193,19 @@ class PlotManager:
                 freqs = np.fft.rfftfreq(len(diameter_array), d=1.0 / sample_rate)
                 peak_idxs = self.detect_peaks(freqs, diameter_fft, threshold=self.fft_threshold)
 
-                if len(peak_idxs) > 0:
-                    max_amp = max(diameter_fft[i] for i in peak_idxs)
-                else:
-                    max_amp = 0.0
-                self.current_pulsation_val = max_amp
+                self.current_pulsation_vals = [
+                    (float(freqs[i]), float(diameter_fft[i]))
+                    for i in peak_idxs
+                ]
+                print(
+                    f"Detected {len(self.current_pulsation_vals)} peaks above threshold {self.fft_threshold}\n"
+                    f"Current pulsations (frequency [Hz], amplitude): {self.current_pulsation_vals}"
+                )
 
                 if measurement_data is not None:
-                    measurement_data['pulsation_val'] = max_amp 
-                print(f"[PlotManager] Detected pulsation amplitude: {max_amp:.2f}")
+                    measurement_data['pulsation_vals'] = self.current_pulsation_vals
+
+
 
                 # Uaktualnij tytuł wykresu, dodając sample rate i processing time
                 title_text = f"Diameter FFT Analysis (Sample rate: {sample_rate:.2f} Hz, Proc time: {processing_time:.4f} s)"
@@ -225,13 +226,6 @@ class PlotManager:
                     )
                     plot_widget.addItem(vertical_line)
 
-    
-
-    def check_plot_process(self):
-        """Since we're updating plots in the main thread, no separate plot process is used."""
-        print("[PlotManager] Using main thread for plotting; no plot process to check or restart.")
-        return False
-
        
     def initialize_plots(self):
         # Configure each plot widget
@@ -242,11 +236,3 @@ class PlotManager:
         if self.plot_widgets['fft']:
             self.plot_widgets['fft'].setTitle("FFT Plot")
 
-    def stop_plot_process(self):
-        """
-        Clean method to stop any plotting processes.
-        This is called during application shutdown.
-        """
-        # For PyQtGraph we're using the main thread, so this is a no-op
-        print("[PlotManager] No separate process to stop in PyQtGraph mode")
-        return True
