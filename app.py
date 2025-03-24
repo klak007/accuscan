@@ -80,6 +80,7 @@ class App(QMainWindow):
         self.last_plc_retry = 0
         self._closing = False   
         self.processing_time = 0.0  # Czas przetwarzania danych
+        self.last_fft_time = time.perf_counter()
 
         
         # Kolejki, wątki/procesy
@@ -260,12 +261,26 @@ class App(QMainWindow):
         
 
     def _data_receiver_worker(self):
-        """Worker thread that receives data from the acquisition process and updates the buffer"""
+        """
+        Worker thread that receives data from the acquisition process and updates the buffer.
+
+        Dodatkowo mierzymy czas pobrania próbki z kolejki (queue_get_time) oraz czas jej przetworzenia 
+        (processing_time). Co 500 próbek wypisujemy średnie wartości obu czasów.
+        """
+
+
         ui_refresh_counter = 0
         batch_cache = "XABC1566"
         product_cache = "18X0600"
         last_perf_log = time.time()
         samples_processed = 0
+
+        # Listy do akumulacji czasów dla obliczeń średnich.
+        # queue_get_times     – mierzy czas potrzebny na pobranie danej z kolejki.
+        # processing_times    – mierzy czas przetwarzania danej (dodanie do bufora, itp.).
+        queue_get_times = []
+        processing_times = []
+        samples_since_last_log = 0  # licznik próbek od ostatniego logu 500
 
         MAX_BATCH_SIZE = 100
         QUEUE_WARNING_THRESHOLD = 50
@@ -277,6 +292,7 @@ class App(QMainWindow):
                 if current_queue_size > 10:
                     print(f"[Data Receiver] Current queue size: {current_queue_size}")
 
+                # Jeśli kolejka za duża – część odrzucamy.
                 if current_queue_size > QUEUE_CRITICAL_THRESHOLD:
                     print(f"[Data Receiver] CRITICAL: Queue size {current_queue_size} exceeds threshold, dropping samples to catch up")
                     samples_to_drop = current_queue_size - QUEUE_WARNING_THRESHOLD
@@ -287,19 +303,33 @@ class App(QMainWindow):
                             break
                     print(f"[Data Receiver] Dropped {samples_to_drop} samples, new queue size: {self.data_queue.qsize()}")
 
+                # Ustalamy rozmiar partii
                 batch_size = min(MAX_BATCH_SIZE, self.data_queue.qsize())
                 if batch_size == 0:
+                    # Jeśli w kolejce może być 0 elementów – pobieramy pojedynczy z timeoutem
                     try:
+                        # Pomiar czasu pobrania z kolejki
+                        queue_start = time.perf_counter()
                         data = self.data_queue.get(timeout=0.01)
+                        queue_end = time.perf_counter()
+                        queue_time = queue_end - queue_start
+                        queue_get_times.append(queue_time)
+
                         batch_size = 1
                     except queue.Empty:
                         continue
                 else:
+                    # Pobieramy pierwszą próbkę partii
+                    queue_start = time.perf_counter()
                     data = self.data_queue.get(timeout=0.01)
+                    queue_end = time.perf_counter()
+                    queue_time = queue_end - queue_start
+                    queue_get_times.append(queue_time)
 
-                batch_start = time.perf_counter()
+                batch_start = time.perf_counter()  # start przetwarzania pierwszej próbki w batchu
                 ui_refresh_counter += 1
 
+                # Co pewien czas odświeżamy nazwy w UI (o ile nie jest "busy")
                 if ui_refresh_counter >= 10:
                     ui_refresh_counter = 0
                     if hasattr(self, 'main_page'):
@@ -313,6 +343,7 @@ class App(QMainWindow):
                 data["batch"] = batch_cache
                 data["product"] = product_cache
 
+                # Pobieramy parametry z interfejsu (o ile istnieje)
                 if hasattr(self, 'main_page'):
                     try:
                         data["max_lumps"] = self.main_page.get_max_lumps()
@@ -335,20 +366,48 @@ class App(QMainWindow):
                     except ValueError:
                         data["pulsation_threshold"] = 500.0
 
+                # Próbujemy wstawić do kolejki analizy
                 try:
                     self.analysis_queue.put_nowait(data)
                 except queue.Full:
                     print("[Data Receiver] Analysis queue is full, dropping sample")
 
+                # Dodajemy próbkę do bufora
                 self.acquisition_buffer.add_sample(data)
                 x_coord = self.acquisition_buffer.current_x
                 data["xCoord"] = x_coord
                 self.latest_data = data
                 samples_processed += 1
 
+                # Pomiar czasu przetwarzania tej jednej próbki
+                batch_end = time.perf_counter()
+                processing_time = batch_end - batch_start
+                processing_times.append(processing_time)
+
+                samples_since_last_log += 1
+
+                # Sprawdzamy, czy przekroczyliśmy 500 próbek od ostatniego logu.
+                if samples_since_last_log >= 500:
+                    avg_queue_get = sum(queue_get_times) / len(queue_get_times)
+                    avg_processing = sum(processing_times) / len(processing_times)
+                    print(f"[Data Receiver][Performance] Last 500 samples => "
+                        f"Avg queue get time: {avg_queue_get:.6f} s/sample, "
+                        f"Avg processing time: {avg_processing:.6f} s/sample")
+                    queue_get_times.clear()
+                    processing_times.clear()
+                    samples_since_last_log = 0
+
+                # Jeżeli w partii jest więcej próbek – pobieramy je i przetwarzamy w pętli
                 for _ in range(batch_size - 1):
                     try:
+                        queue_start = time.perf_counter()
                         data = self.data_queue.get_nowait()
+                        queue_end = time.perf_counter()
+                        queue_time = queue_end - queue_start
+                        queue_get_times.append(queue_time)
+
+                        batch_start = time.perf_counter()
+
                         data["batch"] = batch_cache
                         data["product"] = product_cache
                         self.acquisition_buffer.add_sample(data)
@@ -356,9 +415,26 @@ class App(QMainWindow):
                         x_coord = data.get("xCoord", 0.0)
                         print(f"[Data Receiver] Processing data at x={x_coord:.2f} m")
                         samples_processed += 1
+
+                        batch_end = time.perf_counter()
+                        processing_time = batch_end - batch_start
+                        processing_times.append(processing_time)
+
+                        samples_since_last_log += 1
+                        if samples_since_last_log >= 500:
+                            avg_queue_get = sum(queue_get_times) / len(queue_get_times)
+                            avg_processing = sum(processing_times) / len(processing_times)
+                            print(f"[Data Receiver][Performance] Last 500 samples => "
+                                f"Avg queue get time: {avg_queue_get:.6f} s/sample, "
+                                f"Avg processing time: {avg_processing:.6f} s/sample")
+                            queue_get_times.clear()
+                            processing_times.clear()
+                            samples_since_last_log = 0
+
                     except queue.Empty:
                         break
 
+                # Kontrola rozmiaru kolejki i logi wydajności
                 current_queue_size = self.data_queue.qsize()
                 now = time.time()
                 if (now - last_perf_log > 5.0) or (current_queue_size > QUEUE_WARNING_THRESHOLD):
@@ -367,7 +443,8 @@ class App(QMainWindow):
                     if current_queue_size > QUEUE_WARNING_THRESHOLD:
                         print(f"[Data Receiver] WARNING - Queue size: {current_queue_size}, "
                             f"Average processing time: {avg_time:.4f} s/sample, "
-                            f"Batch time: {time.perf_counter() - batch_start:.4f}s for {batch_size} samples")
+                            f"Batch time (this cycle): {time.perf_counter() - batch_start:.4f}s "
+                            f"for {batch_size} samples")
                     elif samples_processed % 1000 == 0:
                         print(f"[Data Receiver] Average processing time: {avg_time:.4f} s/sample, Queue size: {current_queue_size}")
 
@@ -381,6 +458,7 @@ class App(QMainWindow):
             except Exception as e:
                 print(f"[Data Receiver] Unexpected Error: {e!r}")
                 time.sleep(0.01)
+
 
 
 
@@ -734,88 +812,118 @@ class App(QMainWindow):
         print("[App] Analysis worker thread started.")
         
     def _analysis_worker(self):
-        """Worker thread for analyzing measurement data and triggering alarms.
-        W tym wątku wykonywana jest analiza defektów przy użyciu flaw_detector.
         """
+        Worker thread for analyzing measurement data and triggering alarms.
+        W tym wątku wykonywana jest analiza defektów przy użyciu flaw_detector.
+        Dodatkowo mierzymy czas wykonywania FFT i ograniczamy jego wywołania
+        do co najmniej raz na 0.5 sekundy.
+        """
+
         print("[Analysis Worker] Worker started.")
+
+        # Jeżeli nie ma self.last_fft_time, możemy zainicjować tutaj (jednorazowo).
+        # self.last_fft_time = time.perf_counter()
+
+        # Określamy minimalny interwał czasowy (w sekundach) między kolejnymi obliczeniami FFT
+        FFT_INTERVAL = 0.5
+
         while self.analysis_worker_running:
             try:
                 measurement_data = self.analysis_queue.get(timeout=0.01)
                 x_coord = measurement_data.get("xCoord", 0.0)
-                # print(f"[Analysis Worker] Processing data at x={x_coord:.2f} m")
-                # Wykonaj flaw detection tylko tutaj
+
+                # --- Główna logika: analiza defektów ---
                 self.flaw_detector.process_flaws(measurement_data, x_coord)
 
                 lumps_in_window = self.flaw_detector.flaw_lumps_count
                 necks_in_window = self.flaw_detector.flaw_necks_count
 
-                # if lumps_in_window > 0 or necks_in_window > 0:
-                #     print(f"[Analysis Worker] Lumps in window: {lumps_in_window}, Neck in window: {necks_in_window}")
-
                 max_lumps = measurement_data.get("max_lumps", 3)
                 max_necks = measurement_data.get("max_necks", 3)
 
                 self.alarm_manager.check_and_update_defects_alarm(
-                    lumps_in_window, necks_in_window, measurement_data, max_lumps, max_necks
+                    lumps_in_window,
+                    necks_in_window,
+                    measurement_data,
+                    max_lumps,
+                    max_necks
                 )
 
                 upper_tol = measurement_data.get("upper_tol", 0.5)
                 lower_tol = measurement_data.get("lower_tol", 0.5)
+
                 self.alarm_manager.check_and_update_diameter_alarm(
-                    measurement_data, upper_tol, lower_tol
+                    measurement_data,
+                    upper_tol,
+                    lower_tol
                 )
-                # Ustal wartość pulsation_threshold niezależnie od warunków
+
                 pulsation_threshold = measurement_data.get("pulsation_threshold", 500.0)
-                # Ustalamy rozmiar bufora do FFT (można go dostosować)
-                fft_buffer_size = 256
+                fft_buffer_size = 256  # Rozmiar bufora do FFT
 
                 # Pobieramy dane okna z bufora akwizycji
                 window_data = self.acquisition_buffer.get_window_data()
                 diameter_history = window_data.get("diameter_history", [])
 
+                # Sprawdzamy, czy mamy wystarczającą liczbę próbek do przeprowadzenia FFT
                 if len(diameter_history) >= fft_buffer_size:
-                    processing_time = window_data.get("processing_time", 0.01)
-                    sample_rate = 1 / processing_time if processing_time > 0 else 83.123
+                    current_time = time.perf_counter()
+                    # Czy od ostatniego obliczenia FFT minęło co najmniej FFT_INTERVAL?
+                    if current_time - self.last_fft_time >= FFT_INTERVAL:
+                        fft_start = time.perf_counter()
 
-                    # Pobierz ostatnie fft_buffer_size próbek
-                    diameter_array = np.array(diameter_history[-fft_buffer_size:], dtype=np.float32)
-                    diameter_mean = np.mean(diameter_array)
-                    diameter_array -= diameter_mean
+                        processing_time = window_data.get("processing_time", 0.01)
+                        sample_rate = 1 / processing_time if processing_time > 0 else 83.123
 
-                    if len(diameter_array) > 1:
-                        fft_magnitude = np.abs(np.fft.rfft(diameter_array))
-                        fft_freqs = np.fft.rfftfreq(len(diameter_array), d=1.0 / sample_rate)
-                        peak_idxs, _ = find_peaks(fft_magnitude, prominence=100, distance=5)
-                        pulsation_threshold = measurement_data.get("pulsation_threshold", 500.0)
-                        pulsation_vals = [
-                            (float(fft_freqs[i]), float(fft_magnitude[i]))
-                            for i in peak_idxs if fft_magnitude[i] > pulsation_threshold
-                        ]
-                        
-                        # Dodaj klucze do measurement_data
-                        measurement_data["pulsation_vals"] = pulsation_vals
-                        measurement_data["fft_freqs"] = fft_freqs
-                        measurement_data["fft_magnitude"] = fft_magnitude
-                        
-                        # print("[Analysis Worker] FFT computed, keys set in measurement_data:", list(measurement_data.keys()))
-                        self.fft_data = {
-                            "fft_freqs": fft_freqs,
-                            "fft_magnitude": fft_magnitude,
-                            "pulsation_vals": pulsation_vals
-                        }
-                        # print("[Analysis Worker] Updated self.fft_data with keys:", list(self.fft_data.keys()))
-                                        
+                        # Pobierz ostatnie fft_buffer_size próbek
+                        diameter_array = np.array(diameter_history[-fft_buffer_size:], dtype=np.float32)
+                        diameter_mean = np.mean(diameter_array)
+                        diameter_array -= diameter_mean  # Sygnał centrowany wokół zera
 
+                        if len(diameter_array) > 1:
+                            fft_magnitude = np.abs(np.fft.rfft(diameter_array))
+                            fft_freqs = np.fft.rfftfreq(len(diameter_array), d=1.0 / sample_rate)
+                            peak_idxs, _ = find_peaks(fft_magnitude, prominence=100, distance=5)
+
+                            pulsation_vals = [
+                                (float(fft_freqs[i]), float(fft_magnitude[i]))
+                                for i in peak_idxs if fft_magnitude[i] > pulsation_threshold
+                            ]
+
+                            # Dodaj klucze do measurement_data
+                            measurement_data["pulsation_vals"] = pulsation_vals
+                            measurement_data["fft_freqs"] = fft_freqs
+                            measurement_data["fft_magnitude"] = fft_magnitude
+
+                            self.fft_data = {
+                                "fft_freqs": fft_freqs,
+                                "fft_magnitude": fft_magnitude,
+                                "pulsation_vals": pulsation_vals
+                            }
+
+                        fft_end = time.perf_counter()
+                        fft_time = fft_end - fft_start
+
+                        # Prosty log czasu wykonania FFT
+                        print(f"[Analysis Worker] FFT computation took {fft_time:.6f} s")
+
+                        # Aktualizujemy znacznik czasu ostatniego obliczenia FFT
+                        self.last_fft_time = current_time
+
+                # Sprawdzamy alarm dla pulsacji
                 self.alarm_manager.check_and_update_pulsation_alarm(
                     measurement_data, pulsation_threshold
                 )
 
+                # Kończymy obsługę elementu w kolejce
                 self.analysis_queue.task_done()
 
             except queue.Empty:
+                # Brak danych w kolejce - normalne, kontynuujemy pętlę
                 continue
             except Exception as e:
                 print(f"[Analysis Worker] Error: {e}")
+
 
     
     def _on_closing(self):

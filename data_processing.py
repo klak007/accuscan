@@ -59,16 +59,25 @@ class FastAcquisitionBuffer:
 
     def add_sample(self, data):
         """
-        Thread-safe method to add a new sample to the buffer.
-        
-        Args:
-            data: Dictionary containing measurement data
-            
-        Returns:
-            Dictionary with basic metrics about the operation
+        Thread-safe method to add a new sample to the buffer,
+        z dodatkowymi pomiarami czasu (lock_wait_time, processing_time).
         """
+        import time
+        from datetime import datetime
+        
+        # Pomiar czasu rozpoczęcia metody (przed próbą przejęcia locka).
+        method_start = time.perf_counter()
+
+        lock_wait_start = time.perf_counter()
         with self.lock:
-            start_time = time.perf_counter()
+            lock_acquired_time = time.perf_counter()
+            lock_wait_time = lock_acquired_time - lock_wait_start
+            
+            # Tutaj zaczynamy mierzyć faktyczny koszt operacji w sekcji krytycznej.
+            processing_start = time.perf_counter()
+
+            # -----------------------------------------
+            # Główna logika metody (operacje na deque, itp.)
             
             # Extract and store raw measurements
             for i in range(1, 5):
@@ -78,7 +87,7 @@ class FastAcquisitionBuffer:
             # Store defect indicators
             self.lumps.append(data.get("lumps_delta", 0))
             self.necks.append(data.get("necks_delta", 0))
-            # print(f"[Acquisition] lumps: {self.lumps[-1]}, necks: {self.necks[-1]}")
+            
             # Calculate and store average diameter
             values = [data.get(f"D{i}", 0) for i in range(1, 5)]
             avg = sum(values) / 4.0 if all(v != 0 for v in values) else 0
@@ -87,6 +96,7 @@ class FastAcquisitionBuffer:
             # Handle timestamp and dt calculation
             current_time = data.get("timestamp", datetime.now())
             self.timestamps.append(current_time)
+            
             dt = 0
             if self.last_update_time is not None:
                 dt = (current_time - self.last_update_time).total_seconds()
@@ -107,12 +117,33 @@ class FastAcquisitionBuffer:
             
             # Invalidate the statistics cache
             self.stats_cache = {}
-            self.acquisition_time = time.perf_counter() - start_time
             
-            return {
-                'acquisition_time': self.acquisition_time,
-                'samples_count': len(self.timestamps)
-            }
+            # -----------------------------------------
+            # Koniec głównej logiki.
+            
+            processing_end = time.perf_counter()
+            processing_time = processing_end - processing_start
+            
+        # Po wyjściu z bloku with, lock został zwolniony.
+        method_end = time.perf_counter()
+        total_method_time = method_end - method_start
+
+        # Zapamiętujemy czas wykonania w atrybucie
+        self.acquisition_time = processing_time
+
+        # Tutaj możemy zalogować (lub przechowywać w osobnej strukturze) szczegóły czasowe.
+        print(f"[add_sample] Lock wait time: {lock_wait_time:.6f} s, "
+            f"Processing time: {processing_time:.6f} s, "
+            f"Total method time: {total_method_time:.6f} s")
+
+        # Zwracamy te czasy dla ewentualnej dalszej analizy.
+        return {
+            'lock_wait_time': lock_wait_time,
+            'processing_time': processing_time,
+            'total_method_time': total_method_time,
+            'samples_count': len(self.timestamps)
+        }
+
     
     def get_latest_data(self):
         """Get the most recent data point (thread-safe)"""
