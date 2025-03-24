@@ -132,9 +132,9 @@ class FastAcquisitionBuffer:
         self.acquisition_time = processing_time
 
         # Tutaj możemy zalogować (lub przechowywać w osobnej strukturze) szczegóły czasowe.
-        print(f"[add_sample] Lock wait time: {lock_wait_time:.6f} s, "
-            f"Processing time: {processing_time:.6f} s, "
-            f"Total method time: {total_method_time:.6f} s")
+        # print(f"[add_sample] Lock wait time: {lock_wait_time:.6f} s, "
+        #     f"Processing time: {processing_time:.6f} s, "
+        #     f"Total method time: {total_method_time:.6f} s")
 
         # Zwracamy te czasy dla ewentualnej dalszej analizy.
         return {

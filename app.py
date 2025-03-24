@@ -814,33 +814,32 @@ class App(QMainWindow):
     def _analysis_worker(self):
         """
         Worker thread for analyzing measurement data and triggering alarms.
-        W tym wątku wykonywana jest analiza defektów przy użyciu flaw_detector.
-        Dodatkowo mierzymy czas wykonywania FFT i ograniczamy jego wywołania
-        do co najmniej raz na 0.5 sekundy.
         """
 
         print("[Analysis Worker] Worker started.")
-
-        # Jeżeli nie ma self.last_fft_time, możemy zainicjować tutaj (jednorazowo).
-        # self.last_fft_time = time.perf_counter()
-
-        # Określamy minimalny interwał czasowy (w sekundach) między kolejnymi obliczeniami FFT
-        FFT_INTERVAL = 0.5
-
         while self.analysis_worker_running:
             try:
                 measurement_data = self.analysis_queue.get(timeout=0.01)
                 x_coord = measurement_data.get("xCoord", 0.0)
 
                 # --- Główna logika: analiza defektów ---
+                # measure time taken by process flaws in ms
+                start = time.perf_counter()
                 self.flaw_detector.process_flaws(measurement_data, x_coord)
-
+                end = time.perf_counter()
+                process_time = end - start
+                # print in ms not s
+                # print(f"[Analysis Worker] Processing flaws took {process_time*1000:.6f} ms")
                 lumps_in_window = self.flaw_detector.flaw_lumps_count
                 necks_in_window = self.flaw_detector.flaw_necks_count
 
                 max_lumps = measurement_data.get("max_lumps", 3)
                 max_necks = measurement_data.get("max_necks", 3)
+                upper_tol = measurement_data.get("upper_tol", 0.5)
+                lower_tol = measurement_data.get("lower_tol", 0.5)
 
+                # Znacznik czasowy przed i po check_and_update_defects_alarm
+                start_alarm = time.perf_counter()
                 self.alarm_manager.check_and_update_defects_alarm(
                     lumps_in_window,
                     necks_in_window,
@@ -848,18 +847,21 @@ class App(QMainWindow):
                     max_lumps,
                     max_necks
                 )
+                end_alarm = time.perf_counter()
+                # print(f"[Analysis Worker] check_and_update_defects_alarm took {(end_alarm - start_alarm)*1000:.6f} ms")
 
-                upper_tol = measurement_data.get("upper_tol", 0.5)
-                lower_tol = measurement_data.get("lower_tol", 0.5)
-
+                # Znacznik czasowy przed i po check_and_update_diameter_alarm
+                start_alarm = time.perf_counter()
                 self.alarm_manager.check_and_update_diameter_alarm(
                     measurement_data,
                     upper_tol,
                     lower_tol
                 )
+                end_alarm = time.perf_counter()
+                # print(f"[Analysis Worker] check_and_update_diameter_alarm took {(end_alarm - start_alarm)*1000:.6f} ms")
 
                 pulsation_threshold = measurement_data.get("pulsation_threshold", 500.0)
-                fft_buffer_size = 256  # Rozmiar bufora do FFT
+                fft_buffer_size = 64  # Rozmiar bufora do FFT
 
                 # Pobieramy dane okna z bufora akwizycji
                 window_data = self.acquisition_buffer.get_window_data()
@@ -868,61 +870,57 @@ class App(QMainWindow):
                 # Sprawdzamy, czy mamy wystarczającą liczbę próbek do przeprowadzenia FFT
                 if len(diameter_history) >= fft_buffer_size:
                     current_time = time.perf_counter()
-                    # Czy od ostatniego obliczenia FFT minęło co najmniej FFT_INTERVAL?
-                    if current_time - self.last_fft_time >= FFT_INTERVAL:
-                        fft_start = time.perf_counter()
+                    fft_start = time.perf_counter()
 
-                        processing_time = window_data.get("processing_time", 0.01)
-                        sample_rate = 1 / processing_time if processing_time > 0 else 83.123
+                    processing_time = window_data.get("processing_time", 0.01)
+                    sample_rate = 1 / processing_time if processing_time > 0 else 83.123
 
-                        # Pobierz ostatnie fft_buffer_size próbek
-                        diameter_array = np.array(diameter_history[-fft_buffer_size:], dtype=np.float32)
-                        diameter_mean = np.mean(diameter_array)
-                        diameter_array -= diameter_mean  # Sygnał centrowany wokół zera
+                    # Pobierz ostatnie fft_buffer_size próbek
+                    diameter_array = np.array(diameter_history[-fft_buffer_size:], dtype=np.float32)
+                    diameter_mean = np.mean(diameter_array)
+                    diameter_array -= diameter_mean  # Sygnał centrowany wokół zera
 
-                        if len(diameter_array) > 1:
-                            fft_magnitude = np.abs(np.fft.rfft(diameter_array))
-                            fft_freqs = np.fft.rfftfreq(len(diameter_array), d=1.0 / sample_rate)
-                            peak_idxs, _ = find_peaks(fft_magnitude, prominence=100, distance=5)
+                    if len(diameter_array) > 1:
+                        fft_magnitude = np.abs(np.fft.rfft(diameter_array))
+                        fft_freqs = np.fft.rfftfreq(len(diameter_array), d=1.0 / sample_rate)
+                        peak_idxs, _ = find_peaks(fft_magnitude, prominence=100, distance=5)
 
-                            pulsation_vals = [
-                                (float(fft_freqs[i]), float(fft_magnitude[i]))
-                                for i in peak_idxs if fft_magnitude[i] > pulsation_threshold
-                            ]
+                        pulsation_vals = [
+                            (float(fft_freqs[i]), float(fft_magnitude[i]))
+                            for i in peak_idxs if fft_magnitude[i] > pulsation_threshold
+                        ]
 
-                            # Dodaj klucze do measurement_data
-                            measurement_data["pulsation_vals"] = pulsation_vals
-                            measurement_data["fft_freqs"] = fft_freqs
-                            measurement_data["fft_magnitude"] = fft_magnitude
+                        # Dodaj klucze do measurement_data
+                        measurement_data["pulsation_vals"] = pulsation_vals
+                        measurement_data["fft_freqs"] = fft_freqs
+                        measurement_data["fft_magnitude"] = fft_magnitude
 
-                            self.fft_data = {
-                                "fft_freqs": fft_freqs,
-                                "fft_magnitude": fft_magnitude,
-                                "pulsation_vals": pulsation_vals
-                            }
+                        self.fft_data = {
+                            "fft_freqs": fft_freqs,
+                            "fft_magnitude": fft_magnitude,
+                            "pulsation_vals": pulsation_vals
+                        }
 
-                        fft_end = time.perf_counter()
-                        fft_time = fft_end - fft_start
+                    fft_end = time.perf_counter()
+                    fft_time = fft_end - fft_start
+                    # print(f"[Analysis Worker] FFT computation took {fft_time:.6f} s")
+                    self.last_fft_time = current_time
 
-                        # Prosty log czasu wykonania FFT
-                        print(f"[Analysis Worker] FFT computation took {fft_time:.6f} s")
-
-                        # Aktualizujemy znacznik czasu ostatniego obliczenia FFT
-                        self.last_fft_time = current_time
-
-                # Sprawdzamy alarm dla pulsacji
+                # Znacznik czasowy przed i po check_and_update_pulsation_alarm
+                start_alarm = time.perf_counter()
                 self.alarm_manager.check_and_update_pulsation_alarm(
                     measurement_data, pulsation_threshold
                 )
+                end_alarm = time.perf_counter()
+                # print(f"[Analysis Worker] check_and_update_pulsation_alarm took {(end_alarm - start_alarm)*1000:.6f} ms")
 
-                # Kończymy obsługę elementu w kolejce
                 self.analysis_queue.task_done()
 
             except queue.Empty:
-                # Brak danych w kolejce - normalne, kontynuujemy pętlę
                 continue
             except Exception as e:
                 print(f"[Analysis Worker] Error: {e}")
+
 
 
     

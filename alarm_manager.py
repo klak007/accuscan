@@ -1,4 +1,5 @@
 import datetime
+import time
 from db_helper import save_event, check_database
 from config import OFFLINE_MODE
 import plc_helper
@@ -103,6 +104,7 @@ class AlarmManager:
         lub zejście z alarmu, jeśli pików już nie ma.
         Zwraca "changed", jeśli stan alarmu uległ zmianie, w przeciwnym razie "no_change".
         """
+        
         # Pobierz listę pików
         current_pulsation_peaks = measurement_data.get("pulsation_vals", [])
         peak_count = len(current_pulsation_peaks)
@@ -146,6 +148,7 @@ class AlarmManager:
         """
         Rejestruje zdarzenie w bazie danych.
         """
+        start_time = time.time()
         event_data = {
             "id_register_settings": measurement_data.get("id_register_settings"),
             "date_time": measurement_data.get("timestamp", datetime.datetime.now()),
@@ -169,6 +172,9 @@ class AlarmManager:
 
         if not save_event(self.db_params, event_data):
             print(f"[AlarmManager] Błąd zapisu zdarzenia w bazie dla alarmu: {alarm_type}")
+
+        end_time = time.time()
+        print(f"Zdarzenie zapisane w bazie danych w czasie: {end_time - start_time} s")
 
 
     def _update_common_fault(self, is_active: bool):
