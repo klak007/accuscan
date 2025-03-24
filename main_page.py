@@ -1542,7 +1542,7 @@ class MainPage(QWidget):
                 )
                 self.plot_manager.update_fft_plot(
                     measurement_data=plot_data,
-                    processing_time=plot_data.get('processing_time', 0)
+                    data_processing_time=plot_data.get('processing_time', 0)
                 )
 
                 # modulated_history = self.plot_manager.apply_pulsation(plot_data['diameter_history'], sample_rate=100, modulation_frequency=10, modulation_depth=0.5)

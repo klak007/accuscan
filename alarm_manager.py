@@ -1,4 +1,6 @@
 import datetime
+import queue
+import threading
 import time
 from db_helper import save_event, check_database
 from config import OFFLINE_MODE
@@ -28,6 +30,43 @@ class AlarmManager:
         self.defects_alarm_active = False
         self.diameter_alarm_active = False
         self.active_pulsation_alarms = {}  
+
+        self.db_event_queue = queue.Queue()
+        self.db_event_thread_running = True
+        self.db_event_thread = threading.Thread(target=self._process_db_events, daemon=True)
+        self.db_event_thread.start()
+
+    def _process_db_events(self):
+        """
+        Oddzielny wątek, który pobiera zdarzenia z kolejki i zapisuje je do bazy.
+        """
+        while self.db_event_thread_running:
+            try:
+                # Próba pobrania zdarzenia z kolejki (timeout 1 s, aby móc sprawdzić flagę wyłączenia)
+                event_data = self.db_event_queue.get(timeout=1)
+            except queue.Empty:
+                continue
+            start_time = time.perf_counter()
+            # Warunki: jeśli aplikacja nie działa w trybie offline oraz baza jest dostępna
+            if not (OFFLINE_MODE or not check_database(self.db_params)):
+                if not save_event(self.db_params, event_data):
+                    print(f"[AlarmManager] Błąd zapisu zdarzenia dla alarmu: {event_data.get('alarm_type')}")
+            elapsed = time.perf_counter() - start_time
+            print(f"Zdarzenie zapisane w bazie danych w czasie: {elapsed:.3f} s")
+            self.db_event_queue.task_done()
+    
+    def enqueue_event(self, event_data: dict):
+        """
+        Umieszcza zdarzenie do zapisu w kolejce.
+        """
+        self.db_event_queue.put(event_data)
+
+    def shutdown_db_event_thread(self):
+        """
+        Zatrzymuje wątek zapisu zdarzeń.
+        """
+        self.db_event_thread_running = False
+        self.db_event_thread.join(timeout=1)
 
     def check_and_update_defects_alarm(
         self,

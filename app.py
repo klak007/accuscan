@@ -958,6 +958,10 @@ class App(QMainWindow):
             
         if hasattr(self, 'plc_writer_thread') and self.plc_writer_thread and self.plc_writer_thread.is_alive():
             self.plc_writer_thread.join(timeout=1.0)
+        
+        # Zatrzymaj wątek zapisu zdarzeń (w AlarmManager)
+        if hasattr(self.alarm_manager, 'shutdown_db_event_thread'):
+            self.alarm_manager.shutdown_db_event_thread()
             
         # Wait for acquisition process to finish (with timeout)
         if hasattr(self, 'acquisition_process') and self.acquisition_process and self.acquisition_process.is_alive():

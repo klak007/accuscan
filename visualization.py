@@ -173,7 +173,7 @@ class PlotManager:
         peak_indices_above_thresh = [i for i in peak_indices if amplitudes[i] > threshold]
         return peak_indices_above_thresh
 
-    def update_fft_plot(self, measurement_data, processing_time=0):
+    def update_fft_plot(self, measurement_data, data_processing_time=0):
         if 'fft' not in self.plot_widgets:
             return
 
@@ -184,8 +184,8 @@ class PlotManager:
         if measurement_data and "fft_freqs" in measurement_data and "fft_magnitude" in measurement_data:
             fft_freqs = measurement_data["fft_freqs"]
             fft_magnitude = measurement_data["fft_magnitude"]
-            sample_rate = 1 / processing_time if processing_time > 0 else 83.123
-            title_text = f"Diameter FFT Analysis (Sample rate: {sample_rate:.2f} Hz, Proc time: {processing_time:.4f} s)"
+            sample_rate = 1 / data_processing_time if data_processing_time > 0 else 83.123
+            title_text = f"Diameter FFT Analysis (Sample rate: {sample_rate:.2f} Hz, Proc time: {data_processing_time:.4f} s)"
             plot_widget.setTitle(title_text)
             plot_widget.plot(fft_freqs, fft_magnitude, pen='m', name="FFT")
             threshold_line = pg.InfiniteLine(pos=self.fft_threshold, angle=0, pen='r')
