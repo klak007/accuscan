@@ -217,12 +217,12 @@ class AlarmManager:
 
 
     def _update_common_fault(self, is_active: bool):
-        """
-        Aktualizuje common fault w PLC. W zależności od stanu alarmu:
-        - Jeśli is_active = True → ustawia się bit 55.0 (LampON = True) i bit 55.1 (LampOFF = False).
-        - Jeśli is_active = False → ustawia się bit 55.0 (LampON = False) i bit 55.1 (LampOFF = True).
-        """
         try:
+
+            # if hasattr(self, 'last_common_fault_state') and self.last_common_fault_state == is_active:
+            #     return  
+            # self.last_common_fault_state = is_active  
+
             if self.plc_client:
                 if is_active:
                     plc_helper.write_plc_data(self.plc_client, lamp_on=True, lamp_off=False)
@@ -230,3 +230,4 @@ class AlarmManager:
                     plc_helper.write_plc_data(self.plc_client, lamp_on=False, lamp_off=True)
         except Exception as e:
             print("Błąd podczas aktualizacji common fault w PLC:", e)
+

@@ -780,9 +780,6 @@ class App(QMainWindow):
             try:
                 write_cmd = self.plc_write_queue.get(timeout=0.5)
                 if write_cmd.get("command") == "write_plc_settings":
-                    from plc_helper import write_plc_data
-                    # Użyj obiektu PLC, który masz – np. self.plc_client,
-                    # lub jeśli korzystasz z innego mechanizmu, przekaż odpowiedni obiekt.
                     if hasattr(self, "plc_client") and self.plc_client and self.plc_client.get_connected():
                         write_plc_data(
                             self.plc_client,
@@ -861,7 +858,7 @@ class App(QMainWindow):
                 # print(f"[Analysis Worker] check_and_update_diameter_alarm took {(end_alarm - start_alarm)*1000:.6f} ms")
 
                 pulsation_threshold = measurement_data.get("pulsation_threshold", 500.0)
-                fft_buffer_size = 64  # Rozmiar bufora do FFT
+                fft_buffer_size = 1024  # Rozmiar bufora do FFT
 
                 # Pobieramy dane okna z bufora akwizycji
                 window_data = self.acquisition_buffer.get_window_data()

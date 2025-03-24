@@ -1289,9 +1289,8 @@ class MainPage(QWidget):
     def _clear_reset_bits(self, plc_client):
         """Clear the reset bits after the initial reset"""
         try:
-            from plc_helper import write_plc_data
             print("[GUI] Clearing reset bits")
-            write_plc_data(
+            plc_helper.write_plc_data(
                 plc_client, db_number=2,
                 # Clear all reset bits
                 zl=False, zn=False, zf=False, zt=False,
@@ -1358,9 +1357,8 @@ class MainPage(QWidget):
     def _clear_reset_bits_all(self, plc_client):
         """Clear ALL reset bits after Kwituj reset"""
         try:
-            from plc_helper import write_plc_data
             print("[GUI] Clearing ALL reset bits after Kwituj")
-            write_plc_data(
+            plc_helper.write_plc_data(
                 plc_client, db_number=2,
                 # Clear all reset bits including zt
                 zl=False, zn=False, zf=False, zt=False,
