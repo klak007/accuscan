@@ -1,4 +1,5 @@
 # app.py
+import traceback
 from PyQt5.QtWidgets import QApplication, QMessageBox, QVBoxLayout, QMainWindow, QWidget, QStackedWidget
 from PyQt5.QtCore import QTimer  # Add this import
 from PyQt5.QtGui import QIcon
@@ -257,6 +258,7 @@ class App(QMainWindow):
         self.data_receiver_thread.start()
         print("[App] Data receiver thread started")
         
+
     def _data_receiver_worker(self):
         """Worker thread that receives data from the acquisition process and updates the buffer"""
         ui_refresh_counter = 0
@@ -373,9 +375,14 @@ class App(QMainWindow):
                     last_perf_log = now
                     samples_processed = 0
 
+            except queue.Empty:
+                # kolejka pusta — normalne, nic nie logujemy
+                continue
             except Exception as e:
-                print(f"[Data Receiver] Error: {e}")
+                print(f"[Data Receiver] Unexpected Error: {e!r}")
                 time.sleep(0.01)
+
+
 
     
     @staticmethod

@@ -1374,50 +1374,7 @@ class MainPage(QWidget):
         except Exception as e:
             print(f"[GUI] Error clearing reset bits: {e}")
 
-    # def _check_and_update_defects_alarm(self, lumps_in_window: int, necks_in_window: int, d1: float, d2: float, d3: float, d4: float, current_x: float):
-    #     """
-    #     Metoda pomocnicza – pobiera limity z pól tekstowych,
-    #     buduje measurement_data i wywołuje update_alarm() w alarm_manager.
-    #     Dodatkowo drukuje (print) informację o wejściu/wyjściu z alarmu.
-    #     """
-    #     from datetime import datetime
-
-    #     # 1) Pobieramy limity z UI
-    #     max_lumps_str = self.entry_max_lumps.text()
-    #     max_necks_str = self.entry_max_necks.text()
-    #     max_lumps = int(max_lumps_str) if max_lumps_str.isdigit() else 5
-    #     max_necks = int(max_necks_str) if max_necks_str.isdigit() else 5
-
-    #     # 2) Budujemy measurement_data
-    #     measurement_data = {
-    #         "timestamp": datetime.now(),
-    #         "xCoord": current_x,  
-    #         "product": self.entry_product.text(),
-    #         "batch": self.entry_batch.text(),
-    #         "statusword": 0,
-    #         "D1": d1,
-    #         "D2": d2,
-    #         "D3": d3,
-    #         "D4": d4,
-    #         "lumps": lumps_in_window,
-    #         "necks": necks_in_window,
-    #     }
-
-    #     # 3) Wywołujemy alarm_manager.update_alarm i odbieramy info o zmianie stanu
-    #     change_status = self.controller.alarm_manager.update_alarm(
-    #         lumps_in_window=lumps_in_window,
-    #         necks_in_window=necks_in_window,
-    #         max_lumps=max_lumps,
-    #         max_necks=max_necks,
-    #         measurement_data=measurement_data
-    #     )
-
-    #     # # # 4) Jeśli była zmiana stanu, drukujemy (print) komunikat:
-    #     # if change_status == "entered":
-    #     #     print(">>> [AlarmManager] Alarm defektów WŁĄCZONY (wejście w alarm).")
-    #     # elif change_status == "exited":
-    #     #     print(">>> [AlarmManager] Alarm defektów WYŁĄCZONY (zejście z alarmu).")
-    #     # "no_change" nie drukujemy
+    
 
     # ---------------------------------------------------------------------------------
     # 5. Metoda update_readings – aktualizacja etykiet i wykresu
