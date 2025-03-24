@@ -54,7 +54,7 @@ class MainPage(QWidget):
         # self.display_range = 10         # Display range for the plot
         self.last_update_time = None    # Last update time for the plot
         self.current_x = 0.0            # Current X-coordinate for plotting
-        self.FFT_BUFFER_SIZE = 512      # Size of the FFT buffer
+        self.FFT_BUFFER_SIZE = 1024      # Size of the FFT buffer
         self.diameter_history = []      # Store diameter values for plotting
         self.diameter_x = []            # X-coordinates for diameter values
         self.last_plot_update = None    # attribute for plot update frequency

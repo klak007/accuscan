@@ -342,6 +342,7 @@ class App(QMainWindow):
 
                 data["batch"] = batch_cache
                 data["product"] = product_cache
+                data["processing_time"] = self.processing_time
 
                 # Pobieramy parametry z interfejsu (o ile istnieje)
                 if hasattr(self, 'main_page'):
@@ -384,18 +385,18 @@ class App(QMainWindow):
                 processing_time = batch_end - batch_start
                 processing_times.append(processing_time)
 
-                samples_since_last_log += 1
+                # samples_since_last_log += 1
 
-                # Sprawdzamy, czy przekroczyliśmy 500 próbek od ostatniego logu.
-                if samples_since_last_log >= 500:
-                    avg_queue_get = sum(queue_get_times) / len(queue_get_times)
-                    avg_processing = sum(processing_times) / len(processing_times)
-                    print(f"[Data Receiver][Performance] Last 500 samples => "
-                        f"Avg queue get time: {avg_queue_get:.6f} s/sample, "
-                        f"Avg processing time: {avg_processing:.6f} s/sample")
-                    queue_get_times.clear()
-                    processing_times.clear()
-                    samples_since_last_log = 0
+                # # Sprawdzamy, czy przekroczyliśmy 500 próbek od ostatniego logu.
+                # if samples_since_last_log >= 500:
+                #     avg_queue_get = sum(queue_get_times) / len(queue_get_times)
+                #     avg_processing = sum(processing_times) / len(processing_times)
+                #     print(f"[Data Receiver][Performance] Last 500 samples => "
+                #         f"Avg queue get time: {avg_queue_get:.6f} s/sample, "
+                #         f"Avg processing time: {avg_processing:.6f} s/sample")
+                #     queue_get_times.clear()
+                #     processing_times.clear()
+                #     samples_since_last_log = 0
 
                 # Jeżeli w partii jest więcej próbek – pobieramy je i przetwarzamy w pętli
                 for _ in range(batch_size - 1):
@@ -420,16 +421,16 @@ class App(QMainWindow):
                         processing_time = batch_end - batch_start
                         processing_times.append(processing_time)
 
-                        samples_since_last_log += 1
-                        if samples_since_last_log >= 500:
-                            avg_queue_get = sum(queue_get_times) / len(queue_get_times)
-                            avg_processing = sum(processing_times) / len(processing_times)
-                            print(f"[Data Receiver][Performance] Last 500 samples => "
-                                f"Avg queue get time: {avg_queue_get:.6f} s/sample, "
-                                f"Avg processing time: {avg_processing:.6f} s/sample")
-                            queue_get_times.clear()
-                            processing_times.clear()
-                            samples_since_last_log = 0
+                        # samples_since_last_log += 1
+                        # if samples_since_last_log >= 500:
+                        #     avg_queue_get = sum(queue_get_times) / len(queue_get_times)
+                        #     avg_processing = sum(processing_times) / len(processing_times)
+                        #     print(f"[Data Receiver][Performance] Last 500 samples => "
+                        #         f"Avg queue get time: {avg_queue_get:.6f} s/sample, "
+                        #         f"Avg processing time: {avg_processing:.6f} s/sample")
+                        #     queue_get_times.clear()
+                        #     processing_times.clear()
+                        #     samples_since_last_log = 0
 
                     except queue.Empty:
                         break
@@ -869,9 +870,10 @@ class App(QMainWindow):
                     current_time = time.perf_counter()
                     fft_start = time.perf_counter()
 
-                    processing_time = window_data.get("processing_time", 0.01)
+                    processing_time = measurement_data.get("processing_time", 0.01)
+                    # print(f"[Analysis Worker] Processing time: {processing_time:.6f} s")
                     sample_rate = 1 / processing_time if processing_time > 0 else 83.123
-
+                    # print(f"[Analysis Worker] Sample rate: {sample_rate:.2f} Hz")
                     # Pobierz ostatnie fft_buffer_size próbek
                     diameter_array = np.array(diameter_history[-fft_buffer_size:], dtype=np.float32)
                     diameter_mean = np.mean(diameter_array)
@@ -1012,6 +1014,7 @@ class App(QMainWindow):
 
             # Dodaj czas przetwarzania
             data_dict["processing_time"] = self.processing_time
+            # print(f"[update_ui] Processing time: {self.processing_time:.6f} s")
             # print("[update_ui] Merged data keys:", list(data_dict.keys()))
             # Aktualizuj UI strony
             current_page = self.get_current_page()

@@ -140,8 +140,8 @@ class PlotManager:
                                             pen=pg.mkPen('r', style=pg.QtCore.Qt.DashLine))
                 plot_widget.addItem(preset_line)
             
-            plot_widget.setLabel('bottom', "X-Coord [m]")
-            plot_widget.setLabel('left', "Diameter [mm]")
+            plot_widget.setLabel('bottom', "Dystans [m]")
+            plot_widget.setLabel('left', "Uśredniona Średnica [mm]")
             
             # Ustalanie granic osi Y z marginesem 20%
             y_min = min(min(diameter_history), diameter_preset) if diameter_preset > 0 else min(diameter_history)
@@ -185,7 +185,8 @@ class PlotManager:
             fft_freqs = measurement_data["fft_freqs"]
             fft_magnitude = measurement_data["fft_magnitude"]
             sample_rate = 1 / data_processing_time if data_processing_time > 0 else 83.123
-            title_text = f"Diameter FFT Analysis (Sample rate: {sample_rate:.2f} Hz, Proc time: {data_processing_time:.4f} s)"
+            # title_text = f"Analiza FFT (fs: {sample_rate:.2f} Hz, Czas przetwarzania: {data_processing_time:.4f,} s), probki fft={len(fft_freqs)}"  
+            title_text = f"Diameter FFT (fs={sample_rate:.2f} Hz, FFT size={len(fft_freqs)*2})"
             plot_widget.setTitle(title_text)
             plot_widget.plot(fft_freqs, fft_magnitude, pen='m', name="FFT")
             threshold_line = pg.InfiniteLine(pos=self.fft_threshold, angle=0, pen='r')
@@ -199,8 +200,12 @@ class PlotManager:
                         pen=pg.mkPen(color='b', style=pg.QtCore.Qt.DashLine)
                     )
                     plot_widget.addItem(vertical_line)
+            plot_widget.enableAutoRange(axis=pg.ViewBox.XAxis, enable=False)  # WYŁĄCZ auto-rangę w poziomie
+            nyquist = sample_rate / 2.0
+            plot_widget.setXRange(0, nyquist, padding=0)
+        
         else:
-            plot_widget.setTitle("FFT Data not available")
+            plot_widget.setTitle("Trwa zbieranie danych do analizy FFT...")
 
     def initialize_plots(self):
         # Configure each plot widget

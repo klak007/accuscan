@@ -52,7 +52,7 @@ class AlarmManager:
                 if not save_event(self.db_params, event_data):
                     print(f"[AlarmManager] Błąd zapisu zdarzenia dla alarmu: {event_data.get('alarm_type')}")
             elapsed = time.perf_counter() - start_time
-            print(f"Zdarzenie zapisane w bazie danych w czasie: {elapsed:.3f} s")
+            # print(f"Zdarzenie zapisane w bazie danych w czasie: {elapsed:.3f} s")
             self.db_event_queue.task_done()
     
     def enqueue_event(self, event_data: dict):
@@ -213,7 +213,7 @@ class AlarmManager:
             print(f"[AlarmManager] Błąd zapisu zdarzenia w bazie dla alarmu: {alarm_type}")
 
         end_time = time.time()
-        print(f"Zdarzenie zapisane w bazie danych w czasie: {end_time - start_time} s")
+        # print(f"Zdarzenie zapisane w bazie danych w czasie: {end_time - start_time} s")
 
 
     def _update_common_fault(self, is_active: bool):
