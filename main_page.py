@@ -305,11 +305,11 @@ class MainPage(QWidget):
         upper_layout.addWidget(self.entry_product, 3, 0)
 
         # Wiersz 4: Przycisk "Przykładowe nastawy"
-        self.btn_typowy = QPushButton("Przykładowe nastawy", self.upper_frame)
-        self.btn_typowy.setToolTip("Ustawia przykładowe nastawy dla receptury.")
-        self.btn_typowy.setFixedHeight(40)
-        self.btn_typowy.clicked.connect(self._on_typowy_click)
-        upper_layout.addWidget(self.btn_typowy, 4, 0)
+        self.btn_example = QPushButton("Przykładowe nastawy", self.upper_frame)
+        self.btn_example.setToolTip("Ustawia przykładowe nastawy dla receptury.")
+        self.btn_example.setFixedHeight(40)
+        self.btn_example.clicked.connect(self._on_example_click)
+        upper_layout.addWidget(self.btn_example, 4, 0)
 
         # Wiersz 5: Przycisk "Zapisz nastawy"
         self.btn_save_settings_to_db = QPushButton("Zapisz nastawy do bazy danych", self.upper_frame)
@@ -963,7 +963,7 @@ class MainPage(QWidget):
         except (ValueError, AttributeError):
             return 7
 
-    def _on_typowy_click(self):
+    def _on_example_click(self):
         """Set example settings with batch UI update to avoid blocking data processing"""
         # First ensure measurement continues without blocking
         if hasattr(self.controller, 'run_measurement_flag'):
@@ -987,13 +987,14 @@ class MainPage(QWidget):
             field_values = {
                 "entry_recipe_name": f"recipe_{date_time_str}",
                 "entry_diameter_setpoint": "39",
-                "entry_tolerance_plus": "0.5",
-                "entry_tolerance_minus": "0.5",
+                "entry_tolerance_plus": "100",
+                "entry_tolerance_minus": "100",
                 "entry_lump_threshold": "0.1",
                 "entry_neck_threshold": "0.1",
                 "entry_flaw_window": "2",
-                "entry_max_lumps": "3",
-                "entry_max_necks": "3",
+                "entry_max_lumps": "120",
+                "entry_max_necks": "120",
+                "entry_pulsation_threshold": "6500",
                 }
             
             # Update all fields in a single batch to minimize UI processing
@@ -1075,12 +1076,24 @@ class MainPage(QWidget):
         # --------------------------
         group_stats = QGroupBox("Statystyki", self.readings_frame)
         stats_layout = QHBoxLayout()
+
         self.label_dsd = QLabel("dSD [mm]: --", group_stats)
         self.label_dov = QLabel("dOV [%]: --", group_stats)
+
+        # Dodajemy dwie nowe etykiety
+        self.label_diameter = QLabel("Diameter: --", group_stats)
+        self.label_dev = QLabel("Dev: --", group_stats)
+
         stats_layout.addWidget(self.label_dsd)
         stats_layout.addWidget(self.label_dov)
+
+        # Wstawiamy je w to samo miejsce obok dSD i dOV
+        stats_layout.addWidget(self.label_diameter)
+        stats_layout.addWidget(self.label_dev)
+
         group_stats.setLayout(stats_layout)
         readings_layout.addWidget(group_stats)
+
         
         # --------------------------
         # Grupa 4: Pozycja i prędkość
@@ -1112,10 +1125,10 @@ class MainPage(QWidget):
         readings_layout.addLayout(alarms_layout)
 
         # Wskaźniki średnicy
-        self.label_diameter_indicator = QLabel("Średnica: OK", self.readings_frame)
-        readings_layout.addWidget(self.label_diameter_indicator)
-        self.diameter_deviation_label = QLabel("Odchylenie: 0.00 mm", self.readings_frame)
-        readings_layout.addWidget(self.diameter_deviation_label)
+        # self.label_diameter_indicator = QLabel("Średnica: OK", self.readings_frame)
+        # readings_layout.addWidget(self.label_diameter_indicator)
+        # self.diameter_deviation_label = QLabel("Odchylenie: 0.00 mm", self.readings_frame)
+        # readings_layout.addWidget(self.diameter_deviation_label)
         
         
         # --------------------------
@@ -1145,18 +1158,18 @@ class MainPage(QWidget):
         group_flaw_stats.setLayout(flaw_stats_layout)
         readings_layout.addWidget(group_flaw_stats)
         
-        # # Create the terminal output field (using QPlainTextEdit)
-        # self.terminal_output = QPlainTextEdit(self.middle_panel)
-        # self.terminal_output.setReadOnly(True)
-        # self.terminal_output.setFixedHeight(120)  # Adjust height as needed
+        # Create the terminal output field (using QPlainTextEdit)
+        self.terminal_output = QPlainTextEdit(self.middle_panel)
+        self.terminal_output.setReadOnly(True)
+        self.terminal_output.setFixedHeight(120)  # Adjust height as needed
 
-        # # Add the terminal_output widget to the layout, e.g. in a new row:
-        # middle_layout.addWidget(self.terminal_output, 1, 0)
+        # Add the terminal_output widget to the layout, e.g. in a new row:
+        middle_layout.addWidget(self.terminal_output, 1, 0)
 
-        # # Set up the emitting stream to capture print output
-        # self.emitting_stream = EmittingStream()
-        # self.emitting_stream.textWritten.connect(self.terminal_output.insertPlainText)
-        # sys.stdout = self.emitting_stream  # Redirect standard output to the terminal widget
+        # Set up the emitting stream to capture print output
+        self.emitting_stream = EmittingStream()
+        self.emitting_stream.textWritten.connect(self.terminal_output.insertPlainText)
+        sys.stdout = self.emitting_stream  # Redirect standard output to the terminal widget
 
 
     # ---------------------------------------------------------------------------------
@@ -1426,8 +1439,8 @@ class MainPage(QWidget):
         self.label_davg.setText(f"<small>dAvg [mm]:</small><br><span style='font-size: 40px;'>{davg:.2f}</span>")
         self.label_dmin.setText(f"<small>Dmin [mm]:</small><br><span style='font-size: 40px;'>{dmin:.2f}</span>")
         self.label_dmax.setText(f"<small>Dmax [mm]:</small><br><span style='font-size: 40px;'>{dmax:.2f}</span>")
-        self.label_dsd.setText(f"<small>dSD [mm]:</small><br><span style='font-size: 40px;'>{dsd:.3f}</span>")
-        self.label_dov.setText(f"<small>dOV [%]:</small><br><span style='font-size: 40px;'>{dov:.2f}</span>")
+        self.label_dsd.setText(f"<small>dSD [mm]:</small><br><span style='font-size: 28px;'>{dsd:.3f}</span>")
+        self.label_dov.setText(f"<small>dOV [%]:</small><br><span style='font-size: 28px;'>{dov:.2f}</span>")
         
             
         # Get window data directly from the acquisition buffer, adds the sample to ensure it's processed
@@ -1478,17 +1491,21 @@ class MainPage(QWidget):
 
 
         deviation = davg - diameter_preset
-        self.diameter_deviation_label.setText(f"Dev: {deviation:.2f} mm")
-        
+        self.label_dev.setText(f"<small>Dev [mm]:</small><br><span style='font-size: 28px;'>{deviation:.2f}</span>")
+
+        # Diameter
         if deviation > tolerance_plus:
-            self.label_diameter_indicator.setText("Diameter: HIGH")
-            self.label_diameter_indicator.setStyleSheet("color: red;")
+            text = "HIGH"
+            color = "red"
         elif deviation < -tolerance_minus:
-            self.label_diameter_indicator.setText("Diameter: LOW")
-            self.label_diameter_indicator.setStyleSheet("color: red;")
+            text = "LOW"
+            color = "red"
         else:
-            self.label_diameter_indicator.setText("Diameter: OK")
-            self.label_diameter_indicator.setStyleSheet("color: green;")
+            text = "OK"
+            color = "green"
+
+        self.label_diameter.setText(f"<small>Diameter:</small><br><span style='font-size: 28px;'>{text}</span>")
+        self.label_diameter.setStyleSheet(f"color: {color};")
 
         
 

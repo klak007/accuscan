@@ -55,7 +55,7 @@ Wiec odpowiedni alarm (event) generujemy gdy:
 - jest przekroczony któryś diameter (d1, d2, d3, d4) poza zakresem tolerancji.
 - jest wykryta pulsacja czyli jest cos powyzej progu pulsacji
 Należy dodać też nastawy dla owalności i odchylenia standardowego i wtedy dodać też alarmy dla nich (czyli limity dla owalnosci i odchylenia standardowego)
-Wszystkie te błędy składają się na common fault który wysyłamy do sterownika i nim zapalamy lampkę (buczek).
+Wszystkie błędy składają się na common fault który wysyłamy do sterownika i nim zapalamy lampkę (buczek).
 Przycisk kwituj powinien sprawdzać czy common fault dalej jest. Jesli nie ma common faulta to wtedy gasimy lampkę (zerujemy common fault w sterowniku).
 Najlepiej aby kwitowanie trwało ileś cykli żeby na pewno dotarło do sterownika. 
 Najlepiej to zrobić przy pomocy controlword i statusword.
@@ -77,4 +77,4 @@ os x - w metrach (niewazne za bardzo)
 rozgranicznie pomiedzy produkcyjnymi nastawami i nieprodukcyjnymi
 filtracja po wiekszej liczbie na stronie nastaw
 dodac gdzie siega okno na wykresach diameter i defekty
-jak ktoras srednica bedzie poza zakresem tolerancji to ma sie swiecic na czerwono (UX)
+[x]jak ktoras srednica bedzie poza zakresem tolerancji to ma sie swiecic na czerwono (UX)
