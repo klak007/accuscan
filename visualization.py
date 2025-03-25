@@ -186,7 +186,7 @@ class PlotManager:
             fft_magnitude = measurement_data["fft_magnitude"]
             sample_rate = 1 / data_processing_time if data_processing_time > 0 else 83.123
             # title_text = f"Analiza FFT (fs: {sample_rate:.2f} Hz, Czas przetwarzania: {data_processing_time:.4f,} s), probki fft={len(fft_freqs)}"  
-            title_text = f"Diameter FFT (fs={sample_rate:.2f} Hz, FFT size={len(fft_freqs)*2})"
+            title_text = f"Analiza FFT (fs={sample_rate:.2f} Hz, Czas przetwarzania: {data_processing_time:.4f} s)"
             plot_widget.setTitle(title_text)
             plot_widget.plot(fft_freqs, fft_magnitude, pen='m', name="FFT")
             threshold_line = pg.InfiniteLine(pos=self.fft_threshold, angle=0, pen='r')

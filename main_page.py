@@ -18,7 +18,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout, QPushButton, QLabel, QSpacerItem, QSizePolicy, QLineEdit, QGroupBox, QApplication, QPlainTextEdit, QShortcut
 )
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QFont, QDoubleValidator, QIntValidator, QKeySequence
+from PyQt5.QtGui import QFont, QDoubleValidator, QIntValidator, QKeySequence, QColor
 
 import sys
 
@@ -480,6 +480,69 @@ class MainPage(QWidget):
         self.btn_pulsation_inc_2.clicked.connect(lambda: self._adjust_pulsation_threshold(100))
         pulsation_layout.addWidget(self.btn_pulsation_inc_2)
 
+        # Label
+        self.label_min_ovality = QLabel("Minimalna owalność:", self.upper_frame)
+        upper_layout.addWidget(self.label_min_ovality, 16, 0, alignment=Qt.AlignCenter)
+
+        # Frame + layout
+        min_ovality_frame = QFrame(self.upper_frame)
+        min_ovality_layout = QHBoxLayout(min_ovality_frame)
+        min_ovality_layout.setContentsMargins(0, 0, 0, 0)
+        min_ovality_frame.setLayout(min_ovality_layout)
+        upper_layout.addWidget(min_ovality_frame, 17, 0, alignment=Qt.AlignCenter)
+
+        # Decrease button
+        self.btn_min_ovality_dec = QPushButton("-", min_ovality_frame)
+        self.btn_min_ovality_dec.setFixedWidth(30)
+        self.btn_min_ovality_dec.clicked.connect(lambda: self._adjust_min_ovality(-0.1))
+        min_ovality_layout.addWidget(self.btn_min_ovality_dec)
+
+        # Input field
+        self.entry_min_ovality = QLineEdit(min_ovality_frame)
+        self.entry_min_ovality.setValidator(QDoubleValidator(0.0, 100.0, 3))
+        self.entry_min_ovality.setPlaceholderText("np.: 0.0")
+        self.entry_min_ovality.setMinimumWidth(220)
+        self.entry_min_ovality.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        min_ovality_layout.addWidget(self.entry_min_ovality)
+
+        # Increase button
+        self.btn_min_ovality_inc = QPushButton("+", min_ovality_frame)
+        self.btn_min_ovality_inc.setFixedWidth(30)
+        self.btn_min_ovality_inc.clicked.connect(lambda: self._adjust_min_ovality(0.1))
+        min_ovality_layout.addWidget(self.btn_min_ovality_inc)
+
+        # Label
+        self.label_max_std_dev = QLabel("Maksymalne odchylenie standardowe:", self.upper_frame)
+        upper_layout.addWidget(self.label_max_std_dev, 18, 0, alignment=Qt.AlignCenter)
+
+        # Frame + layout
+        max_std_dev_frame = QFrame(self.upper_frame)
+        max_std_dev_layout = QHBoxLayout(max_std_dev_frame)
+        max_std_dev_layout.setContentsMargins(0, 0, 0, 0)
+        max_std_dev_frame.setLayout(max_std_dev_layout)
+        upper_layout.addWidget(max_std_dev_frame, 19, 0, alignment=Qt.AlignCenter)
+
+        # Decrease button
+        self.btn_max_std_dev_dec = QPushButton("-", max_std_dev_frame)
+        self.btn_max_std_dev_dec.setFixedWidth(30)
+        self.btn_max_std_dev_dec.clicked.connect(lambda: (self._adjust_max_std_dev(-0.5), self._highlight_flaw_stats_std()))
+        max_std_dev_layout.addWidget(self.btn_max_std_dev_dec)
+
+        # Input field
+        self.entry_max_std_dev = QLineEdit(max_std_dev_frame)
+        self.entry_max_std_dev.setValidator(QDoubleValidator(0.0, 100.0, 3))
+        self.entry_max_std_dev.setPlaceholderText("np.: 0.0")
+        self.entry_max_std_dev.setMinimumWidth(220)
+        self.entry_max_std_dev.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        max_std_dev_layout.addWidget(self.entry_max_std_dev)
+        self.entry_max_std_dev.textChanged.connect(self._highlight_flaw_stats_std)
+
+        # Increase button
+        self.btn_max_std_dev_inc = QPushButton("+", max_std_dev_frame)
+        self.btn_max_std_dev_inc.setFixedWidth(30)
+        self.btn_max_std_dev_inc.clicked.connect(lambda: (self._adjust_max_std_dev(0.5), self._highlight_flaw_stats_std()))
+        max_std_dev_layout.addWidget(self.btn_max_std_dev_inc)
+
         # Wstawiamy poziomą linię:
         separator_line = QFrame(self.left_panel)
         separator_line.setFrameShape(QFrame.HLine)
@@ -718,7 +781,43 @@ class MainPage(QWidget):
 
 
 
+    def _highlight_flaw_stats_std(self):
+        threshold_str = self.entry_max_std_dev.text() or "0"
+        try:
+            threshold = float(threshold_str)
+        except ValueError:
+            threshold = 0.0
 
+        for key, label in self.flaw_stats_labels.items():
+            if key.endswith("_std"):
+                try:
+                    value = float(label.text())
+                except ValueError:
+                    value = 0.0
+
+                if value > threshold:
+                    label.setStyleSheet("color: red;")
+                else:
+                    label.setStyleSheet("color: black;")
+
+
+    def _adjust_min_ovality(self, delta: float):
+        val_str = self.entry_min_ovality.text() or "0"
+        try:
+            val = float(val_str)
+        except ValueError:
+            val = 0.0
+        new_val = max(0.0, val + delta)
+        self.entry_min_ovality.setText(f"{new_val:.1f}")
+
+    def _adjust_max_std_dev(self, delta: float):
+        val_str = self.entry_max_std_dev.text() or "0"
+        try:
+            val = float(val_str)
+        except ValueError:
+            val = 0.0
+        new_val = max(0.0, val + delta)
+        self.entry_max_std_dev.setText(f"{new_val:.1f}")
 
     def _adjust_pulsation_threshold(self, delta: float):
         val_str = self.entry_pulsation_threshold.text() or "0"
@@ -734,7 +833,7 @@ class MainPage(QWidget):
     def _adjust_fft_threshold(self, new_value: float):
         self.fft_threshold_value = new_value
         self.plot_manager.fft_threshold = new_value
-        print(f"[GUI] FFT threshold set to: {new_value:.1f}")
+        # print(f"[GUI] FFT threshold set to: {new_value:.1f}")
 
     def _adjust_diameter(self, delta: float):
         val_str = self.entry_diameter_setpoint.text() or "0"
@@ -842,6 +941,8 @@ class MainPage(QWidget):
         max_lumps_str = self.entry_max_lumps.text() or "3"
         max_necks_str = self.entry_max_necks.text() or "3"
         pulsation_str = self.entry_pulsation_threshold.text() or "550.0"
+        min_ovality_str = self.entry_min_ovality.text() or "0.0"
+        max_std_dev_str = self.entry_max_std_dev.text() or "0.0"
 
         # 2. Konwersje na float/int
         try:
@@ -854,6 +955,8 @@ class MainPage(QWidget):
             max_lumps = int(max_lumps_str)
             max_necks = int(max_necks_str)
             pulsation_threshold = float(pulsation_str)
+            min_ovality = float(min_ovality_str)
+            max_std_dev = float(max_std_dev_str)
         except ValueError:
             QMessageBox.critical(self, "Błąd", "Błędne dane wejściowe.")
             return None
@@ -876,7 +979,9 @@ class MainPage(QWidget):
             "diameter_histeresis": 0.0,
             "lump_histeresis": 0.0,
             "neck_histeresis": 0.0,
-            "pulsation_threshold": pulsation_threshold
+            "pulsation_threshold": pulsation_threshold,
+            "Min_ovality": min_ovality,
+            "Max_standard_deviation": max_std_dev
         }
 
         # 4. Zapis do bazy
@@ -995,6 +1100,8 @@ class MainPage(QWidget):
                 "entry_max_lumps": "120",
                 "entry_max_necks": "120",
                 "entry_pulsation_threshold": "6500",
+                "entry_min_ovality": "700.0",
+                "entry_max_std_dev": "8.0",
                 }
             
             # Update all fields in a single batch to minimize UI processing
@@ -1134,7 +1241,7 @@ class MainPage(QWidget):
         # --------------------------
         # Grupa 5: Szczegółowe statystyki dla flaw window dla średnic
         # --------------------------
-        group_flaw_stats = QGroupBox("Szczegółowe statystyki dla flaw window dla średnic", self.readings_frame)
+        group_flaw_stats = QGroupBox("Szczegółowe statystyki średnic dla okna defektów", self.readings_frame)
         flaw_stats_layout = QGridLayout()
 
         # Nagłówki kolumn
@@ -1161,7 +1268,7 @@ class MainPage(QWidget):
         # Create the terminal output field (using QPlainTextEdit)
         self.terminal_output = QPlainTextEdit(self.middle_panel)
         self.terminal_output.setReadOnly(True)
-        self.terminal_output.setFixedHeight(120)  # Adjust height as needed
+        self.terminal_output.setFixedHeight(160)  # Adjust height as needed
 
         # Add the terminal_output widget to the layout, e.g. in a new row:
         middle_layout.addWidget(self.terminal_output, 1, 0)
@@ -1236,7 +1343,7 @@ class MainPage(QWidget):
         
         self.fft_plot = pg.PlotWidget(title="Analiza FFT", parent=self.fft_frame)
         self.fft_plot.setLabel('left', "Amplituda")
-        self.fft_plot.setLabel('bottom', "Częstotliwośc [Hz]")
+        self.fft_plot.setLabel('bottom', "Częstotliwość [Hz]")
         self.fft_plot.showGrid(x=False, y=False)
         fft_frame_layout.addWidget(self.fft_plot)
 
@@ -1415,11 +1522,13 @@ class MainPage(QWidget):
         davg = sum(diameters) / 4.0
         dsd = (sum((x - davg) ** 2 for x in diameters) / 4.0) ** 0.5
         dov = ((dmax - dmin) / davg * 100) if davg != 0 else 0
+        
 
         # Check diameter tolerance 
         diameter_preset = float(self.entry_diameter_setpoint.text() or 0.0)
         tolerance_plus = float(self.entry_tolerance_plus.text() or 0.5)
         tolerance_minus = float(self.entry_tolerance_minus.text() or 0.5)
+        min_ovality = float(self.entry_min_ovality.text() or 0.0)
      
         lower = diameter_preset - tolerance_minus
         upper = diameter_preset + tolerance_plus
@@ -1440,7 +1549,8 @@ class MainPage(QWidget):
         self.label_dmin.setText(f"<small>Dmin [mm]:</small><br><span style='font-size: 40px;'>{dmin:.2f}</span>")
         self.label_dmax.setText(f"<small>Dmax [mm]:</small><br><span style='font-size: 40px;'>{dmax:.2f}</span>")
         self.label_dsd.setText(f"<small>dSD [mm]:</small><br><span style='font-size: 28px;'>{dsd:.3f}</span>")
-        self.label_dov.setText(f"<small>dOV [%]:</small><br><span style='font-size: 28px;'>{dov:.2f}</span>")
+        color = "black" if dov >= min_ovality else "red"
+        self.label_dov.setText(f"<small>dOV [%]:</small><br><span style='font-size: 28px; color:{color};'>{dov:.2f}</span>")
         
             
         # Get window data directly from the acquisition buffer, adds the sample to ensure it's processed
