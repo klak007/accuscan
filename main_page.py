@@ -1100,8 +1100,8 @@ class MainPage(QWidget):
                 "entry_max_lumps": "120",
                 "entry_max_necks": "120",
                 "entry_pulsation_threshold": "6500",
-                "entry_min_ovality": "700.0",
-                "entry_max_std_dev": "8.0",
+                "entry_min_ovality": "100.0",
+                "entry_max_std_dev": "10.0",
                 }
             
             # Update all fields in a single batch to minimize UI processing

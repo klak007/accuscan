@@ -181,6 +181,82 @@ class AlarmManager:
         self._update_common_fault(overall_active)
         return "no_change"
 
+    def check_and_update_ovality_alarm(self, measurement_data: dict, min_ovality_threshold: float) -> str:
+        """
+        Sprawdza, czy mierzona owalność (obliczana jako (dMax - dMin)/dAvg*100)
+        jest mniejsza niż zadany próg min_ovality_threshold.
+        Jeśli tak, aktywowany zostaje alarm 'Niska owalność'.
+        """
+        d1 = measurement_data.get("D1", 0.0)
+        d2 = measurement_data.get("D2", 0.0)
+        d3 = measurement_data.get("D3", 0.0)
+        d4 = measurement_data.get("D4", 0.0)
+
+        diameters = [d1, d2, d3, d4]
+        davg = sum(diameters) / 4.0 if sum(diameters) != 0 else 0.0
+        dmin = min(diameters)
+        dmax = max(diameters)
+        ovality = ((dmax - dmin) / davg * 100) if davg != 0 else 0.0
+
+        new_state = (ovality < min_ovality_threshold)
+
+        if not hasattr(self, "ovality_alarm_active"):
+            self.ovality_alarm_active = False
+        old_state = self.ovality_alarm_active
+
+        if new_state != old_state:
+            event_type = 0 if new_state else 1  # 0 = wejście w alarm, 1 = zejście z alarmu
+            alarm_type = "ovality_low"
+            comment = "Wejście w alarm niskiej owalności" if new_state else "Zejście z alarmu niskiej owalności"
+            self._save_event(measurement_data, event_type, alarm_type, comment)
+            self._update_common_fault(new_state)
+            self.ovality_alarm_active = new_state
+            return "entered" if new_state else "exited"
+
+        return "no_change"
+
+
+    def check_and_update_std_dev_alarms(self, measurement_data: dict, max_std_dev_threshold: float) -> dict:
+        """
+        Sprawdza osobno odchylenie standardowe dla każdej średnicy (D1, D2, D3, D4).
+        Jeśli wartość std dev dla danej średnicy przekracza max_std_dev_threshold,
+        alarm jest aktywowany, a odpowiednie zdarzenie rejestrowane w bazie danych.
+
+        Zwraca słownik, w którym kluczami są nazwy średnic,
+        a wartości to status zmiany alarmu: "entered", "exited" lub "no_change".
+        """
+        results = {}
+        diameters = ["D1", "D2", "D3", "D4"]
+
+        # Inicjalizacja stanu alarmów przy pierwszym użyciu
+        if not hasattr(self, "std_dev_alarm_states"):
+            self.std_dev_alarm_states = {d: False for d in diameters}
+
+        for d in diameters:
+            key = f"{d}_std"
+            std_value = measurement_data.get(key, 0.0)
+            new_state = (std_value > max_std_dev_threshold)
+            old_state = self.std_dev_alarm_states.get(d, False)
+
+            if new_state != old_state:
+                event_type = 0 if new_state else 1  # 0 = wejście w alarm, 1 = zejście
+                alarm_type = f"std_dev_high_{d}"
+                comment = (
+                    f"Wejście w alarm wysokiego odchylenia standardowego średnicy {d}"
+                    if new_state else
+                    f"Zejście z alarmu wysokiego odchylenia standardowego średnicy {d}"
+                )
+
+                self._save_event(measurement_data, event_type, alarm_type, comment)
+                self._update_common_fault(new_state)
+                self.std_dev_alarm_states[d] = new_state
+
+                results[d] = "entered" if new_state else "exited"
+            else:
+                results[d] = "no_change"
+
+        return results
+
 
     def _save_event(self, measurement_data: dict, event_type: int,
                     alarm_type: str, comment: str):

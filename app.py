@@ -367,6 +367,16 @@ class App(QMainWindow):
                     except ValueError:
                         data["pulsation_threshold"] = 500.0
 
+                    try:
+                        data["min_ovality"] = float(self.main_page.entry_min_ovality.text() or "0.0")
+                    except ValueError:
+                        data["min_ovality"] = 0.0
+
+                    try:
+                        data["max_standard_deviation"] = float(self.main_page.entry_max_std_dev.text() or "0.0")
+                    except ValueError:
+                        data["max_standard_deviation"] = 0.0
+
                 # Próbujemy wstawić do kolejki analizy
                 try:
                     self.analysis_queue.put_nowait(data)
@@ -810,24 +820,20 @@ class App(QMainWindow):
         print("[App] Analysis worker thread started.")
         
     def _analysis_worker(self):
-        """
-        Worker thread for analyzing measurement data and triggering alarms.
-        """
-
+        """Worker thread for analyzing measurement data and triggering alarms."""
         print("[Analysis Worker] Worker started.")
+
         while self.analysis_worker_running:
             try:
                 measurement_data = self.analysis_queue.get(timeout=0.01)
                 x_coord = measurement_data.get("xCoord", 0.0)
 
                 # --- Główna logika: analiza defektów ---
-                # measure time taken by process flaws in ms
                 start = time.perf_counter()
                 self.flaw_detector.process_flaws(measurement_data, x_coord)
                 end = time.perf_counter()
                 process_time = end - start
-                # print in ms not s
-                # print(f"[Analysis Worker] Processing flaws took {process_time*1000:.6f} ms")
+
                 lumps_in_window = self.flaw_detector.flaw_lumps_count
                 necks_in_window = self.flaw_detector.flaw_necks_count
 
@@ -836,7 +842,7 @@ class App(QMainWindow):
                 upper_tol = measurement_data.get("upper_tol", 0.5)
                 lower_tol = measurement_data.get("lower_tol", 0.5)
 
-                # Znacznik czasowy przed i po check_and_update_defects_alarm
+                # Wywołanie alarmu defektów (lumps & necks)
                 start_alarm = time.perf_counter()
                 self.alarm_manager.check_and_update_defects_alarm(
                     lumps_in_window,
@@ -846,9 +852,8 @@ class App(QMainWindow):
                     max_necks
                 )
                 end_alarm = time.perf_counter()
-                # print(f"[Analysis Worker] check_and_update_defects_alarm took {(end_alarm - start_alarm)*1000:.6f} ms")
 
-                # Znacznik czasowy przed i po check_and_update_diameter_alarm
+                # Wywołanie alarmu średnicy
                 start_alarm = time.perf_counter()
                 self.alarm_manager.check_and_update_diameter_alarm(
                     measurement_data,
@@ -856,44 +861,58 @@ class App(QMainWindow):
                     lower_tol
                 )
                 end_alarm = time.perf_counter()
-                # print(f"[Analysis Worker] check_and_update_diameter_alarm took {(end_alarm - start_alarm)*1000:.6f} ms")
 
+                # --- Uzupełnienie measurement_data o statystyki dla alarmów owalności i std dev ---
+                samples = list(self.acquisition_buffer.samples)
+                n = 0
+                flaw_window_size = measurement_data.get("flaw_window", 2.0)
+                for sample in reversed(samples):
+                    if x_coord - sample.get("xCoord", 0) <= flaw_window_size:
+                        n += 1
+                    else:
+                        break
+
+                if n > 0:
+                    stats = self.acquisition_buffer.get_statistics(last_n=n)
+                    if stats:
+                        measurement_data.update(stats)
+
+                # Wywołanie alarmu dla niskiej owalności
+                min_ovality_threshold = float(self.main_page.entry_min_ovality.text() or "0.0")
+                self.alarm_manager.check_and_update_ovality_alarm(measurement_data, min_ovality_threshold)
+
+                # Wywołanie alarmu dla wysokiego odchylenia standardowego
+                max_std_dev_threshold = float(self.main_page.entry_max_std_dev.text() or "0.0")
+                self.alarm_manager.check_and_update_std_dev_alarms(measurement_data, max_std_dev_threshold)
+
+                # --- Przetwarzanie FFT i alarm pulsacji ---
                 pulsation_threshold = measurement_data.get("pulsation_threshold", 500.0)
-                fft_buffer_size = 1024  # Rozmiar bufora do FFT
+                fft_buffer_size = 1024
 
-                # Pobieramy dane okna z bufora akwizycji
                 window_data = self.acquisition_buffer.get_window_data()
                 diameter_history = window_data.get("diameter_history", [])
 
-                # Sprawdzamy, czy mamy wystarczającą liczbę próbek do przeprowadzenia FFT
                 if len(diameter_history) >= fft_buffer_size:
                     current_time = time.perf_counter()
                     fft_start = time.perf_counter()
 
                     processing_time = measurement_data.get("processing_time", 0.01)
-                    # print(f"[Analysis Worker] Processing time: {processing_time:.6f} s")
                     sample_rate = 1 / processing_time if processing_time > 0 else 83.123
-                    # print(f"[Analysis Worker] Sample rate: {sample_rate:.2f} Hz")
-                    # Pobierz ostatnie fft_buffer_size próbek
                     diameter_array = np.array(diameter_history[-fft_buffer_size:], dtype=np.float32)
                     diameter_mean = np.mean(diameter_array)
-                    diameter_array -= diameter_mean  # Sygnał centrowany wokół zera
+                    diameter_array -= diameter_mean
 
                     if len(diameter_array) > 1:
                         fft_magnitude = np.abs(np.fft.rfft(diameter_array))
                         fft_freqs = np.fft.rfftfreq(len(diameter_array), d=1.0 / sample_rate)
                         peak_idxs, _ = find_peaks(fft_magnitude, prominence=100, distance=5)
-
                         pulsation_vals = [
                             (float(fft_freqs[i]), float(fft_magnitude[i]))
                             for i in peak_idxs if fft_magnitude[i] > pulsation_threshold
                         ]
-
-                        # Dodaj klucze do measurement_data
                         measurement_data["pulsation_vals"] = pulsation_vals
                         measurement_data["fft_freqs"] = fft_freqs
                         measurement_data["fft_magnitude"] = fft_magnitude
-
                         self.fft_data = {
                             "fft_freqs": fft_freqs,
                             "fft_magnitude": fft_magnitude,
@@ -901,17 +920,13 @@ class App(QMainWindow):
                         }
 
                     fft_end = time.perf_counter()
-                    fft_time = fft_end - fft_start
-                    # print(f"[Analysis Worker] FFT computation took {fft_time:.6f} s")
                     self.last_fft_time = current_time
 
-                # Znacznik czasowy przed i po check_and_update_pulsation_alarm
                 start_alarm = time.perf_counter()
                 self.alarm_manager.check_and_update_pulsation_alarm(
                     measurement_data, pulsation_threshold
                 )
                 end_alarm = time.perf_counter()
-                # print(f"[Analysis Worker] check_and_update_pulsation_alarm took {(end_alarm - start_alarm)*1000:.6f} ms")
 
                 self.analysis_queue.task_done()
 
@@ -919,7 +934,6 @@ class App(QMainWindow):
                 continue
             except Exception as e:
                 print(f"[Analysis Worker] Error: {e}")
-
 
 
     
