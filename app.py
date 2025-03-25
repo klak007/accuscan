@@ -380,6 +380,9 @@ class App(QMainWindow):
                 # Próbujemy wstawić do kolejki analizy
                 try:
                     self.analysis_queue.put_nowait(data)
+                    # print how many samples are in the queue
+                    # if self.analysis_queue.qsize() > 100:
+                    #     print(f"[Data Receiver] Analysis queue size: {self.analysis_queue.qsize()}")
                 except queue.Full:
                     print("[Data Receiver] Analysis queue is full, dropping sample")
 
@@ -649,6 +652,7 @@ class App(QMainWindow):
 
                 reset_start = time.perf_counter()
                 # Warunki resetu: duża wartość w licznikach lub długi brak przyrostu
+                # print (f"[ACQ Process] current_lumps={current_lumps}, current_necks={current_necks}, stable_count={stable_count}")
                 if current_lumps > 9000 or current_necks > 9000 or stable_count >= 128:
                     # print("[ACQ Process] Warunki resetu osiągnięte, wykonuję reset PLC")
                     # Maksymalna liczba prób resetu
@@ -661,12 +665,13 @@ class App(QMainWindow):
                         try:
                             # Wykonaj reset w PLC
                             write_plc_data(plc_client, db_number=2, zl=True, zn=True, zf=True, zt=False)
+                            time.sleep(0.001)
                             write_plc_data(plc_client, db_number=2, zl=False, zn=False, zf=False, zt=False)
                         except Exception as e:
                             print(f"[ACQ Process] Reset error: {e}")
                         
                         # Daj PLC chwilę na wykonanie resetu – np. 50 ms
-                        time.sleep(0.05)
+                        time.sleep(0.001)
                         
                         # Odczytaj ponownie dane z PLC
                         data_after_reset = read_plc_data(plc_client, db_number=2)
@@ -687,7 +692,7 @@ class App(QMainWindow):
                         necks_prev = 0
                         stable_count = 0
                     else:
-                        print("[ACQ Process] Reset nie udany po maksymalnej liczbie prób")
+                        print("[ACQ Process] Reset nieudany po maksymalnej liczbie prób")
                         # Jeśli reset nie zadziałał, możesz ustawić zmienne poprzednich odczytów na wartość odczytaną po ostatniej próbie
                         lumps_prev = post_reset_lumps
                         necks_prev = post_reset_necks
@@ -825,7 +830,7 @@ class App(QMainWindow):
 
         while self.analysis_worker_running:
             try:
-                measurement_data = self.analysis_queue.get(timeout=0.01)
+                measurement_data = self.analysis_queue.get(timeout=0.005)
                 x_coord = measurement_data.get("xCoord", 0.0)
 
                 # --- Główna logika: analiza defektów ---
@@ -864,8 +869,10 @@ class App(QMainWindow):
 
                 # --- Uzupełnienie measurement_data o statystyki dla alarmów owalności i std dev ---
                 samples = list(self.acquisition_buffer.samples)
+                # print(f"[Analysis Worker] Samples: {len(samples)}")
                 n = 0
                 flaw_window_size = measurement_data.get("flaw_window", 2.0)
+                # print(f"[Analysis Worker] Flaw window size: {flaw_window_size}")
                 for sample in reversed(samples):
                     if x_coord - sample.get("xCoord", 0) <= flaw_window_size:
                         n += 1
@@ -883,7 +890,7 @@ class App(QMainWindow):
 
                 # Wywołanie alarmu dla wysokiego odchylenia standardowego
                 max_std_dev_threshold = float(self.main_page.entry_max_std_dev.text() or "0.0")
-                self.alarm_manager.check_and_update_std_dev_alarms(measurement_data, max_std_dev_threshold)
+                self.alarm_manager.check_and_update_std_dev_alarm(measurement_data, max_std_dev_threshold)
 
                 # --- Przetwarzanie FFT i alarm pulsacji ---
                 pulsation_threshold = measurement_data.get("pulsation_threshold", 500.0)

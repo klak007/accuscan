@@ -777,7 +777,7 @@ class MainPage(QWidget):
         self.setTabOrder(self.entry_lump_threshold, self.entry_neck_threshold)
         self.setTabOrder(self.entry_neck_threshold, self.btn_save_settings_to_db)
         self.setTabOrder(self.btn_save_settings_to_db, self.btn_save_plc)
-        self.setTabOrder(self.btn_save_plc, self.entry_batch)
+        # self.setTabOrder(self.btn_save_plc, self.entry_batch)
 
 
 
@@ -1111,7 +1111,7 @@ class MainPage(QWidget):
                     field.clear()
                     field.setText(value)
             
-            print("[GUI] Example settings applied without blocking")
+            # print("[GUI] Example settings applied without blocking")
             
             # Release UI busy flag after all operations complete
             QTimer.singleShot(100, self._release_ui_busy)
@@ -1277,7 +1277,6 @@ class MainPage(QWidget):
         self.emitting_stream = EmittingStream()
         self.emitting_stream.textWritten.connect(self.terminal_output.insertPlainText)
         sys.stdout = self.emitting_stream  # Redirect standard output to the terminal widget
-
 
     # ---------------------------------------------------------------------------------
     # 4. Prawa kolumna (row=1, col=2) – Wykres 

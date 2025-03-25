@@ -2,7 +2,7 @@ import mysql.connector
 from mysql.connector import Error
 from PyQt5.QtWidgets import (
     QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit,
-    QTableWidget, QTableWidgetItem, QMessageBox, QSpacerItem, QSizePolicy, QHeaderView, QApplication
+    QTableWidget, QTableWidgetItem, QMessageBox, QSpacerItem, QSizePolicy, QHeaderView, QApplication, QComboBox  
 )
 from PyQt5.QtCore import Qt, QDate
 from PyQt5.QtGui import QFont, QKeySequence
@@ -175,9 +175,19 @@ class HistoryPage(QFrame):
         # Filtruj po typie alarmu
         self.alarm_label = QLabel("Filtruj po typie alarmu:", self.filter_frame)
         filter_layout.addWidget(self.alarm_label)
-        self.alarm_entry = QLineEdit(self.filter_frame)
-        self.alarm_entry.setFixedSize(150, 40)
-        filter_layout.addWidget(self.alarm_entry)
+
+        self.alarm_combo = QComboBox(self.filter_frame)
+        self.alarm_combo.setFixedSize(150, 40)
+
+        # Dodajemy opcję "Wszystkie", która oznacza brak filtra
+        self.alarm_combo.addItem("Wszystkie")
+        self.alarm_combo.addItem("defects_alarm")
+        self.alarm_combo.addItem("pulsation_error")
+        self.alarm_combo.addItem("diameter_error")
+        self.alarm_combo.addItem("std_dev_high")
+        self.alarm_combo.addItem("ovality_low")
+
+        filter_layout.addWidget(self.alarm_combo)
 
         # Przycisk Filtruj
         self.btn_filter = QPushButton("Filtruj", self.filter_frame)
@@ -275,11 +285,17 @@ class HistoryPage(QFrame):
             filters.append(f"DATE(`Date time`) >= '{start}'")
             filters.append(f"DATE(`Date time`) <= '{end}'")
 
-        for col, val in (("Batch nr", self.batch_entry.text().strip()),
-                        ("Product nr", self.product_entry.text().strip()),
-                        ("alarm_type", self.alarm_entry.text().strip())):
+        for col, val in (
+            ("Batch nr", self.batch_entry.text().strip()),
+            ("Product nr", self.product_entry.text().strip())
+        ):
             if val:
-                filters.append(f"`{col}` LIKE '%{val}%'")
+                filters.append(f"{col} LIKE '%{val}%'")
+
+        # Filtruj po typie alarmu tylko, gdy nie wybrano opcji "Wszystkie"
+        selected_alarm = self.alarm_combo.currentText().strip()
+        if selected_alarm and selected_alarm != "Wszystkie":
+            filters.append(f"alarm_type = '{selected_alarm}'")
 
         self.base_query = """
             SELECT DATE_FORMAT(`Date time`, '%Y-%m-%d') AS data,

@@ -135,51 +135,88 @@ class AlarmManager:
             return "entered" if new_state else "exited"
         return "no_change"
 
+    # def check_and_update_pulsation_alarm(self, measurement_data: dict, pulsation_threshold: float) -> str:
+    #     """
+    #     Sprawdza, ile pików (elementów) znajduje się w measurement_data pod kluczem 'pulsation_vals'
+    #     (przy czym same wartości amplitudy nie mają znaczenia, liczy się tylko ich liczba).
+    #     Jeśli liczba pików jest różna od poprzednio zarejestrowanej, loguje wejście/aktualizację alarmu,
+    #     lub zejście z alarmu, jeśli pików już nie ma.
+    #     Zwraca "changed", jeśli stan alarmu uległ zmianie, w przeciwnym razie "no_change".
+    #     """
+        
+    #     # Pobierz listę pików
+    #     current_pulsation_peaks = measurement_data.get("pulsation_vals", [])
+    #     peak_count = len(current_pulsation_peaks)
+
+    #     # Jeśli nie ma wcześniej śledzonej liczby, inicjujemy ją
+    #     if not hasattr(self, "active_pulsation_alarm_count"):
+    #         self.active_pulsation_alarm_count = 0
+
+    #     old_peak_count = self.active_pulsation_alarm_count
+
+    #     # Przy zmianie liczby wykrytych pików logujemy zdarzenie
+    #     if peak_count != old_peak_count:
+    #         if peak_count > 0 and old_peak_count == 0:
+    #             event_type = 0  # wejście w alarm
+    #             comment = f"Wejście alarmu pulsacji: {peak_count} peaków"
+    #         elif peak_count == 0 and old_peak_count > 0:
+    #             event_type = 1  # zejście z alarmu
+    #             comment = "Zejście z alarmu pulsacji"
+    #         else:
+    #             # Zmiana liczby pików (np. aktualizacja liczby alarmów)
+    #             event_type = 0
+    #             comment = f"Aktualizacja alarmu pulsacji: {peak_count} peaków"
+
+    #         self.active_pulsation_alarm_count = peak_count
+
+    #         # Aktualizujemy stan common fault – alarm aktywny, jeśli wykryto choć jeden pik
+    #         overall_active = (peak_count > 0)
+    #         self._update_common_fault(overall_active)
+
+    #         self._save_event(measurement_data, event_type, "pulsation_error", comment)
+    #         return "changed"
+
+    #     # Jeśli liczba pików się nie zmieniła, nadal ustawiamy stan common fault
+    #     overall_active = (peak_count > 0)
+    #     self._update_common_fault(overall_active)
+    #     return "no_change"
+
     def check_and_update_pulsation_alarm(self, measurement_data: dict, pulsation_threshold: float) -> str:
         """
-        Sprawdza, ile pików (elementów) znajduje się w measurement_data pod kluczem 'pulsation_vals'
-        (przy czym same wartości amplitudy nie mają znaczenia, liczy się tylko ich liczba).
-        Jeśli liczba pików jest różna od poprzednio zarejestrowanej, loguje wejście/aktualizację alarmu,
-        lub zejście z alarmu, jeśli pików już nie ma.
-        Zwraca "changed", jeśli stan alarmu uległ zmianie, w przeciwnym razie "no_change".
+        Sprawdza, czy wykryto choć jedną pulsację (czyli czy lista 'pulsation_vals' zawiera jakiekolwiek elementy).
+        Jeśli tak, alarm jest aktywowany, w przeciwnym razie alarm zostaje wyłączony.
+        Zmiana stanu alarmu (wejście lub zejście) jest rejestrowana jako zdarzenie.
         """
-        
         # Pobierz listę pików
         current_pulsation_peaks = measurement_data.get("pulsation_vals", [])
         peak_count = len(current_pulsation_peaks)
 
-        # Jeśli nie ma wcześniej śledzonej liczby, inicjujemy ją
-        if not hasattr(self, "active_pulsation_alarm_count"):
-            self.active_pulsation_alarm_count = 0
+        # Ustalamy nowy stan – alarm jest aktywny, gdy wykryto choć jeden pik
+        new_state = peak_count > 0
 
-        old_peak_count = self.active_pulsation_alarm_count
+        # Inicjalizacja stanu alarmu, jeśli jeszcze nie istnieje
+        if not hasattr(self, "pulsation_alarm_active"):
+            self.pulsation_alarm_active = False
 
-        # Przy zmianie liczby wykrytych pików logujemy zdarzenie
-        if peak_count != old_peak_count:
-            if peak_count > 0 and old_peak_count == 0:
-                event_type = 0  # wejście w alarm
-                comment = f"Wejście alarmu pulsacji: {peak_count} peaków"
-            elif peak_count == 0 and old_peak_count > 0:
-                event_type = 1  # zejście z alarmu
-                comment = "Zejście z alarmu pulsacji"
+        old_state = self.pulsation_alarm_active
+
+        if new_state != old_state:
+            event_type = 0 if new_state else 1  # 0 = wejście w alarm, 1 = zejście z alarmu
+            if new_state:
+                comment = "Wejście w alarm pulsacji: wykryto pulsację"
             else:
-                # Zmiana liczby pików (np. aktualizacja liczby alarmów)
-                event_type = 0
-                comment = f"Aktualizacja alarmu pulsacji: {peak_count} peaków"
-
-            self.active_pulsation_alarm_count = peak_count
-
-            # Aktualizujemy stan common fault – alarm aktywny, jeśli wykryto choć jeden pik
-            overall_active = (peak_count > 0)
-            self._update_common_fault(overall_active)
+                comment = "Zejście z alarmu pulsacji: brak wykrytych pulsacji"
 
             self._save_event(measurement_data, event_type, "pulsation_error", comment)
-            return "changed"
+            self._update_common_fault(new_state)
+            self.pulsation_alarm_active = new_state
 
-        # Jeśli liczba pików się nie zmieniła, nadal ustawiamy stan common fault
-        overall_active = (peak_count > 0)
-        self._update_common_fault(overall_active)
+            return "entered" if new_state else "exited"
+
+        # Aktualizacja stanu common fault, nawet jeśli stan alarmu nie uległ zmianie
+        self._update_common_fault(new_state)
         return "no_change"
+
 
     def check_and_update_ovality_alarm(self, measurement_data: dict, min_ovality_threshold: float) -> str:
         """
@@ -216,46 +253,90 @@ class AlarmManager:
         return "no_change"
 
 
-    def check_and_update_std_dev_alarms(self, measurement_data: dict, max_std_dev_threshold: float) -> dict:
-        """
-        Sprawdza osobno odchylenie standardowe dla każdej średnicy (D1, D2, D3, D4).
-        Jeśli wartość std dev dla danej średnicy przekracza max_std_dev_threshold,
-        alarm jest aktywowany, a odpowiednie zdarzenie rejestrowane w bazie danych.
+    # def check_and_update_std_dev_alarm(self, measurement_data: dict, max_std_dev_threshold: float) -> dict:
+    #     """
+    #     Sprawdza osobno odchylenie standardowe dla każdej średnicy (D1, D2, D3, D4).
+    #     Jeśli wartość std dev dla danej średnicy przekracza max_std_dev_threshold,
+    #     alarm jest aktywowany, a odpowiednie zdarzenie rejestrowane w bazie danych.
 
-        Zwraca słownik, w którym kluczami są nazwy średnic,
-        a wartości to status zmiany alarmu: "entered", "exited" lub "no_change".
+    #     Zwraca słownik, w którym kluczami są nazwy średnic,
+    #     a wartości to status zmiany alarmu: "entered", "exited" lub "no_change".
+    #     """
+    #     results = {}
+    #     diameters = ["D1", "D2", "D3", "D4"]
+
+    #     # Inicjalizacja stanu alarmów przy pierwszym użyciu
+    #     if not hasattr(self, "std_dev_alarm_states"):
+    #         self.std_dev_alarm_states = {d: False for d in diameters}
+
+    #     for d in diameters:
+    #         key = f"{d}_std"
+    #         std_value = measurement_data.get(key, 0.0)
+    #         new_state = (std_value > max_std_dev_threshold)
+    #         old_state = self.std_dev_alarm_states.get(d, False)
+
+    #         if new_state != old_state:
+    #             event_type = 0 if new_state else 1  # 0 = wejście w alarm, 1 = zejście
+    #             alarm_type = f"std_dev_high_{d}"
+    #             comment = (
+    #                 f"Wejście w alarm wysokiego odchylenia standardowego średnicy {d}"
+    #                 if new_state else
+    #                 f"Zejście z alarmu wysokiego odchylenia standardowego średnicy {d}"
+    #             )
+
+    #             self._save_event(measurement_data, event_type, alarm_type, comment)
+    #             self._update_common_fault(new_state)
+    #             self.std_dev_alarm_states[d] = new_state
+
+    #             results[d] = "entered" if new_state else "exited"
+    #         else:
+    #             results[d] = "no_change"
+
+    #     return results
+
+    def check_and_update_std_dev_alarm(self, measurement_data: dict, max_std_dev_threshold: float) -> str:
         """
-        results = {}
+        Sprawdza odchylenie standardowe dla średnic D1, D2, D3 i D4.
+        Jeśli którakolwiek z wartości przekracza max_std_dev_threshold, alarm jest aktywowany.
+        Alarm schodzi wtedy, gdy wszystkie średnice mają odchylenie standardowe poniżej tego progu.
+
+        Zwraca "entered", "exited" lub "no_change" w zależności od zmiany stanu alarmu.
+        """
         diameters = ["D1", "D2", "D3", "D4"]
-
-        # Inicjalizacja stanu alarmów przy pierwszym użyciu
-        if not hasattr(self, "std_dev_alarm_states"):
-            self.std_dev_alarm_states = {d: False for d in diameters}
+        new_state = False
+        exceeded = []
 
         for d in diameters:
             key = f"{d}_std"
             std_value = measurement_data.get(key, 0.0)
-            new_state = (std_value > max_std_dev_threshold)
-            old_state = self.std_dev_alarm_states.get(d, False)
+            if std_value > max_std_dev_threshold:
+                new_state = True
+                exceeded.append(d)
 
-            if new_state != old_state:
-                event_type = 0 if new_state else 1  # 0 = wejście w alarm, 1 = zejście
-                alarm_type = f"std_dev_high_{d}"
+        if not hasattr(self, "std_dev_alarm_active"):
+            self.std_dev_alarm_active = False
+        old_state = self.std_dev_alarm_active
+
+        if new_state != old_state:
+            event_type = 0 if new_state else 1  # 0 = wejście w alarm, 1 = zejście z alarmu
+            alarm_type = "std_dev_high"
+
+            if new_state:
                 comment = (
-                    f"Wejście w alarm wysokiego odchylenia standardowego średnicy {d}"
-                    if new_state else
-                    f"Zejście z alarmu wysokiego odchylenia standardowego średnicy {d}"
+                    "Wejście w alarm wysokiego odchylenia standardowego dla średnic: "
+                    + ", ".join(exceeded)
                 )
-
-                self._save_event(measurement_data, event_type, alarm_type, comment)
-                self._update_common_fault(new_state)
-                self.std_dev_alarm_states[d] = new_state
-
-                results[d] = "entered" if new_state else "exited"
             else:
-                results[d] = "no_change"
+                comment = "Zejście z alarmu wysokiego odchylenia standardowego dla średnic"
 
-        return results
+            self._save_event(measurement_data, event_type, alarm_type, comment)
+            self._update_common_fault(new_state)
+            self.std_dev_alarm_active = new_state
+
+            return "entered" if new_state else "exited"
+
+        return "no_change"
+
 
 
     def _save_event(self, measurement_data: dict, event_type: int,
