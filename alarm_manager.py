@@ -218,11 +218,11 @@ class AlarmManager:
         return "no_change"
 
 
-    def check_and_update_ovality_alarm(self, measurement_data: dict, min_ovality_threshold: float) -> str:
+    def check_and_update_ovality_alarm(self, measurement_data: dict, max_ovality_threshold: float) -> str:
         """
         Sprawdza, czy mierzona owalność (obliczana jako (dMax - dMin)/dAvg*100)
-        jest mniejsza niż zadany próg min_ovality_threshold.
-        Jeśli tak, aktywowany zostaje alarm 'Niska owalność'.
+        jest mniejsza niż zadany próg max_ovality_threshold.
+        Jeśli tak, aktywowany zostaje alarm 'Wysoka owalność'.
         """
         d1 = measurement_data.get("D1", 0.0)
         d2 = measurement_data.get("D2", 0.0)
@@ -235,7 +235,7 @@ class AlarmManager:
         dmax = max(diameters)
         ovality = ((dmax - dmin) / davg * 100) if davg != 0 else 0.0
 
-        new_state = (ovality < min_ovality_threshold)
+        new_state = (ovality < max_ovality_threshold)
 
         if not hasattr(self, "ovality_alarm_active"):
             self.ovality_alarm_active = False
@@ -243,8 +243,8 @@ class AlarmManager:
 
         if new_state != old_state:
             event_type = 0 if new_state else 1  # 0 = wejście w alarm, 1 = zejście z alarmu
-            alarm_type = "ovality_low"
-            comment = "Wejście w alarm niskiej owalności" if new_state else "Zejście z alarmu niskiej owalności"
+            alarm_type = "ovality_high"
+            comment = "Wejście w alarm wysokiej owalności" if new_state else "Zejście z alarmu wysokiej owalności"
             self._save_event(measurement_data, event_type, alarm_type, comment)
             self._update_common_fault(new_state)
             self.ovality_alarm_active = new_state

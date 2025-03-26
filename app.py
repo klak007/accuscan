@@ -368,9 +368,9 @@ class App(QMainWindow):
                         data["pulsation_threshold"] = 500.0
 
                     try:
-                        data["min_ovality"] = float(self.main_page.entry_min_ovality.text() or "0.0")
+                        data["max_ovality"] = float(self.main_page.entry_max_ovality.text() or "0.0")
                     except ValueError:
-                        data["min_ovality"] = 0.0
+                        data["max_ovality"] = 0.0
 
                     try:
                         data["max_standard_deviation"] = float(self.main_page.entry_max_std_dev.text() or "0.0")
@@ -427,7 +427,7 @@ class App(QMainWindow):
                         self.acquisition_buffer.add_sample(data)
                         self.latest_data = data
                         x_coord = data.get("xCoord", 0.0)
-                        print(f"[Data Receiver] Processing data at x={x_coord:.2f} m")
+                        # print(f"[Data Receiver] Processing data at x={x_coord:.2f} m")
                         samples_processed += 1
 
                         batch_end = time.perf_counter()
@@ -885,8 +885,8 @@ class App(QMainWindow):
                         measurement_data.update(stats)
 
                 # Wywołanie alarmu dla niskiej owalności
-                min_ovality_threshold = float(self.main_page.entry_min_ovality.text() or "0.0")
-                self.alarm_manager.check_and_update_ovality_alarm(measurement_data, min_ovality_threshold)
+                max_ovality_threshold = float(self.main_page.entry_max_ovality.text() or "0.0")
+                self.alarm_manager.check_and_update_ovality_alarm(measurement_data, max_ovality_threshold)
 
                 # Wywołanie alarmu dla wysokiego odchylenia standardowego
                 max_std_dev_threshold = float(self.main_page.entry_max_std_dev.text() or "0.0")

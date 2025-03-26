@@ -185,7 +185,7 @@ class HistoryPage(QFrame):
         self.alarm_combo.addItem("pulsation_error")
         self.alarm_combo.addItem("diameter_error")
         self.alarm_combo.addItem("std_dev_high")
-        self.alarm_combo.addItem("ovality_low")
+        self.alarm_combo.addItem("ovality_high")
 
         filter_layout.addWidget(self.alarm_combo)
 

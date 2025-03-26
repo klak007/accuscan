@@ -2,7 +2,7 @@ import mysql.connector
 from mysql.connector import Error
 from datetime import datetime
 from db_helper import check_database
-from PyQt5.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QMessageBox, QLineEdit, QTableWidgetItem, QDialog, QApplication, QShortcut
+from PyQt5.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QMessageBox, QLineEdit, QTableWidgetItem, QDialog, QApplication, QShortcut, QMenu, QAction, QCheckBox
 from PyQt5.QtGui import QFont, QKeySequence
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QPushButton, QLabel, QSpacerItem, QSizePolicy, QTableWidget, QHeaderView
 from PyQt5.QtCore import Qt
@@ -176,13 +176,19 @@ class SettingsPage(QFrame):
         filter_layout.setContentsMargins(5, 5, 5, 5)
         filter_layout.setSpacing(5)
         
+        # Przycisk "Wybierz kolumny" otwierający dialog wyboru kolumn
+        self.btn_choose_columns = QPushButton("Wybierz kolumny", self.filter_frame)
+        self.btn_choose_columns.setFixedSize(200, 40)
+        self.btn_choose_columns.clicked.connect(self.open_column_selector_dialog)
+        filter_layout.addWidget(self.btn_choose_columns)
+
         # Etykieta "Filtruj po produkcie:"
         self.filter_label = QLabel("Filtruj po produkcie:", self.filter_frame)
         filter_layout.addWidget(self.filter_label)
         
         # Pole tekstowe do wpisywania filtru, o stałej szerokości 200 pikseli
         self.filter_entry = QLineEdit(self.filter_frame)
-        self.filter_entry.setFixedSize(1000,40)
+        self.filter_entry.setFixedSize(600,40)
         filter_layout.addWidget(self.filter_entry)
         
         # Przycisk "Filtruj" – po kliknięciu wywołuje metodę load_data
@@ -206,6 +212,55 @@ class SettingsPage(QFrame):
         # Dodaj panel filtru do głównego layoutu main_frame
         # Załóżmy, że main_frame ma przypisany QGridLayout; przykładowo dodajemy w wierszu 0, kolumnie 0
         self.main_frame.layout().addWidget(self.filter_frame, 0, 0)
+
+    def open_column_selector_dialog(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Wybierz kolumny")
+        layout = QVBoxLayout(dialog)
+        
+        # Lista kolumn – kolejność musi odpowiadać kolejności kolumn w metodzie _create_table
+        columns = [
+            "ID",
+            "Nazwa receptury",
+            "Nr produktu",
+            "Docelowa\nśrednica",
+            "Tolerancja średnicy\npowyżej",
+            "Tolerancja średnicy\nponiżej",
+            "Próg\nwybrzuszeń",
+            "Próg\nwgłębień",
+            "Długość okna\ndefektów",
+            "Maksymalna liczba wybrzuszeń\nw oknie defektów",
+            "Maksymalna liczba wgłębień\nw oknie defektów",
+            "Próg\n pulsacji",
+            "maks. owalność",
+            "maks. odch. standardowe",
+            "Data i godzina\nutworzenia"
+        ]
+        
+        # Słownik przechowujący utworzone checkboxy
+        checkboxes = {}
+        for idx, col_name in enumerate(columns):
+            cb = QCheckBox(col_name)
+            # Ustawiamy stan początkowy na podstawie aktualnej widoczności kolumny
+            cb.setChecked(not self.table.isColumnHidden(idx))
+            checkboxes[idx] = cb
+            layout.addWidget(cb)
+        
+        # Dodajemy przycisk zatwierdzający zmiany
+        confirm_button = QPushButton("Zatwierdź")
+        layout.addWidget(confirm_button)
+        
+        # Po kliknięciu przycisku aktualizujemy widoczność kolumn i zamykamy dialog
+        confirm_button.clicked.connect(lambda: self.apply_column_visibility(checkboxes, dialog))
+        
+        dialog.exec_()
+
+    def apply_column_visibility(self, checkboxes, dialog):
+        # Iterujemy po checkboxach i ustawiamy widoczność kolumn w tabeli
+        for idx, checkbox in checkboxes.items():
+            self.table.setColumnHidden(idx, not checkbox.isChecked())
+        dialog.accept()
+
 
     def clear_filter(self):
         self.filter_entry.clear()  # Use clear() instead of delete(0, "end")
@@ -233,6 +288,8 @@ class SettingsPage(QFrame):
             "Maksymalna liczba wybrzuszeń\nw oknie defektów",
             "Maksymalna liczba wgłębień\nw oknie defektów",
             "Próg\n pulsacji",
+            "maks. owalność",
+            "maks. odch. standardowe",
             "Data i godzina\nutworzenia"
         ]
         
@@ -328,7 +385,7 @@ class SettingsPage(QFrame):
                     SELECT `Id Settings` AS id_settings, `Recipe name`, `Product nr`, `Preset Diameter`, 
                         `Diameter Over tolerance`, `Diameter Under tolerance`, `Lump threshold`, 
                         `Neck threshold`, `Flaw Window`, `Max lumps in flaw window`, 
-                        `Max necks in flaw window`, `Pulsation_threshold`, `created_at` 
+                        `Max necks in flaw window`, `Pulsation_threshold`, `Max_ovality`, `Max_standard_deviation`, `created_at`
                     FROM settings 
                     ORDER BY id_settings DESC
                 """
@@ -337,7 +394,6 @@ class SettingsPage(QFrame):
             rows = cursor.fetchall()
             
             for row in rows:
-                # Pobieramy wartości z wiersza
                 id_val = row.get("id_settings") or row.get("Id Settings")
                 recipe_name = row.get("Recipe name") or ""
                 product_nr = row.get("Product nr") or ""
@@ -350,13 +406,14 @@ class SettingsPage(QFrame):
                 max_lumps_in_flaw_window = row.get("Max lumps in flaw window") or 3
                 max_necks_in_flaw_window = row.get("Max necks in flaw window") or 3
                 pulsation_threshold = row.get("Pulsation_threshold") or 0
+                max_ovality = row.get("Max_ovality") or 0
+                max_standard_deviation = row.get("Max_standard_deviation") or 0
                 created_at = row.get("created_at")
                 if created_at:
                     created_at = created_at.strftime("%Y-%m-%d %H:%M:%S")
                 else:
                     created_at = ""
                 
-                # Wstaw nowy wiersz do QTableWidget
                 current_row = self.table.rowCount()
                 self.table.insertRow(current_row)
                 
@@ -364,13 +421,15 @@ class SettingsPage(QFrame):
                     str(id_val), recipe_name, product_nr, str(preset_diameter),
                     str(diameter_over_tol), str(diameter_under_tol), str(lump_threshold),
                     str(neck_threshold), str(flaw_window), str(max_lumps_in_flaw_window),
-                    str(max_necks_in_flaw_window), str(pulsation_threshold),created_at
+                    str(max_necks_in_flaw_window), str(pulsation_threshold),
+                    str(max_ovality), str(max_standard_deviation), created_at
                 ]
                 
                 for col, value in enumerate(values):
                     item = QTableWidgetItem(value)
                     item.setTextAlignment(Qt.AlignCenter)
                     self.table.setItem(current_row, col, item)
+
             
             if connection and connection.is_connected():
                 connection.close()
@@ -414,6 +473,8 @@ class SettingsPage(QFrame):
         max_lumps_in_flaw_window = self.table.item(row, 9).text() if self.table.item(row, 9) else ""
         max_necks_in_flaw_window = self.table.item(row, 10).text() if self.table.item(row, 10) else ""
         pulsation_threshold = self.table.item(row, 11).text() if self.table.item(row, 11) else ""
+        max_ovality = self.table.item(row, 12).text() if self.table.item(row, 12) else ""
+        max_standard_deviation = self.table.item(row, 13).text() if self.table.item(row, 13) else ""
 
         # Teraz ustawiamy te wartości w lewym panelu strony głównej
         main_page = self.controller.main_page
@@ -428,6 +489,8 @@ class SettingsPage(QFrame):
         main_page.entry_max_lumps.setText(max_lumps_in_flaw_window)
         main_page.entry_max_necks.setText(max_necks_in_flaw_window)
         main_page.entry_pulsation_threshold.setText(pulsation_threshold)
+        main_page.entry_max_ovality.setText(max_ovality)
+        main_page.entry_max_std_dev.setText(max_standard_deviation)
 
         QMessageBox.information(self, "Załadowano", "Ustawienia zostały załadowane do aktualnych nastaw.")
 

@@ -481,38 +481,38 @@ class MainPage(QWidget):
         pulsation_layout.addWidget(self.btn_pulsation_inc_2)
 
         # Label
-        self.label_min_ovality = QLabel("Minimalna owalność:", self.upper_frame)
-        upper_layout.addWidget(self.label_min_ovality, 16, 0, alignment=Qt.AlignCenter)
+        self.label_max_ovality = QLabel("Maksymalna owalność [%]:", self.upper_frame)
+        upper_layout.addWidget(self.label_max_ovality, 16, 0, alignment=Qt.AlignCenter)
 
         # Frame + layout
-        min_ovality_frame = QFrame(self.upper_frame)
-        min_ovality_layout = QHBoxLayout(min_ovality_frame)
-        min_ovality_layout.setContentsMargins(0, 0, 0, 0)
-        min_ovality_frame.setLayout(min_ovality_layout)
-        upper_layout.addWidget(min_ovality_frame, 17, 0, alignment=Qt.AlignCenter)
+        max_ovality_frame = QFrame(self.upper_frame)
+        max_ovality_layout = QHBoxLayout(max_ovality_frame)
+        max_ovality_layout.setContentsMargins(0, 0, 0, 0)
+        max_ovality_frame.setLayout(max_ovality_layout)
+        upper_layout.addWidget(max_ovality_frame, 17, 0, alignment=Qt.AlignCenter)
 
         # Decrease button
-        self.btn_min_ovality_dec = QPushButton("-", min_ovality_frame)
-        self.btn_min_ovality_dec.setFixedWidth(30)
-        self.btn_min_ovality_dec.clicked.connect(lambda: self._adjust_min_ovality(-0.1))
-        min_ovality_layout.addWidget(self.btn_min_ovality_dec)
+        self.btn_max_ovality_dec = QPushButton("-", max_ovality_frame)
+        self.btn_max_ovality_dec.setFixedWidth(30)
+        self.btn_max_ovality_dec.clicked.connect(lambda: self._adjust_max_ovality(-0.1))
+        max_ovality_layout.addWidget(self.btn_max_ovality_dec)
 
         # Input field
-        self.entry_min_ovality = QLineEdit(min_ovality_frame)
-        self.entry_min_ovality.setValidator(QDoubleValidator(0.0, 100.0, 3))
-        self.entry_min_ovality.setPlaceholderText("np.: 0.0")
-        self.entry_min_ovality.setMinimumWidth(220)
-        self.entry_min_ovality.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        min_ovality_layout.addWidget(self.entry_min_ovality)
+        self.entry_max_ovality = QLineEdit(max_ovality_frame)
+        self.entry_max_ovality.setValidator(QDoubleValidator(0.0, 100.0, 3))
+        self.entry_max_ovality.setPlaceholderText("np.: 0.0")
+        self.entry_max_ovality.setMinimumWidth(220)
+        self.entry_max_ovality.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        max_ovality_layout.addWidget(self.entry_max_ovality)
 
         # Increase button
-        self.btn_min_ovality_inc = QPushButton("+", min_ovality_frame)
-        self.btn_min_ovality_inc.setFixedWidth(30)
-        self.btn_min_ovality_inc.clicked.connect(lambda: self._adjust_min_ovality(0.1))
-        min_ovality_layout.addWidget(self.btn_min_ovality_inc)
+        self.btn_max_ovality_inc = QPushButton("+", max_ovality_frame)
+        self.btn_max_ovality_inc.setFixedWidth(30)
+        self.btn_max_ovality_inc.clicked.connect(lambda: self._adjust_max_ovality(0.1))
+        max_ovality_layout.addWidget(self.btn_max_ovality_inc)
 
         # Label
-        self.label_max_std_dev = QLabel("Maksymalne odchylenie standardowe:", self.upper_frame)
+        self.label_max_std_dev = QLabel("Maksymalne odchylenie standardowe [mm]:", self.upper_frame)
         upper_layout.addWidget(self.label_max_std_dev, 18, 0, alignment=Qt.AlignCenter)
 
         # Frame + layout
@@ -525,7 +525,7 @@ class MainPage(QWidget):
         # Decrease button
         self.btn_max_std_dev_dec = QPushButton("-", max_std_dev_frame)
         self.btn_max_std_dev_dec.setFixedWidth(30)
-        self.btn_max_std_dev_dec.clicked.connect(lambda: (self._adjust_max_std_dev(-0.5), self._highlight_flaw_stats_std()))
+        self.btn_max_std_dev_dec.clicked.connect(lambda: (self._adjust_max_std_dev(-0.5)))
         max_std_dev_layout.addWidget(self.btn_max_std_dev_dec)
 
         # Input field
@@ -535,12 +535,12 @@ class MainPage(QWidget):
         self.entry_max_std_dev.setMinimumWidth(220)
         self.entry_max_std_dev.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         max_std_dev_layout.addWidget(self.entry_max_std_dev)
-        self.entry_max_std_dev.textChanged.connect(self._highlight_flaw_stats_std)
+        
 
         # Increase button
         self.btn_max_std_dev_inc = QPushButton("+", max_std_dev_frame)
         self.btn_max_std_dev_inc.setFixedWidth(30)
-        self.btn_max_std_dev_inc.clicked.connect(lambda: (self._adjust_max_std_dev(0.5), self._highlight_flaw_stats_std()))
+        self.btn_max_std_dev_inc.clicked.connect(lambda: (self._adjust_max_std_dev(0.5)))
         max_std_dev_layout.addWidget(self.btn_max_std_dev_inc)
 
         # Wstawiamy poziomą linię:
@@ -781,34 +781,34 @@ class MainPage(QWidget):
 
 
 
-    def _highlight_flaw_stats_std(self):
-        threshold_str = self.entry_max_std_dev.text() or "0"
-        try:
-            threshold = float(threshold_str)
-        except ValueError:
-            threshold = 0.0
+    # def _highlight_flaw_stats_std(self):
+    #     threshold_str = self.entry_max_std_dev.text() or "0"
+    #     try:
+    #         threshold = float(threshold_str)
+    #     except ValueError:
+    #         threshold = 0.0
 
-        for key, label in self.flaw_stats_labels.items():
-            if key.endswith("_std"):
-                try:
-                    value = float(label.text())
-                except ValueError:
-                    value = 0.0
+    #     for key, label in self.flaw_stats_labels.items():
+    #         if key.endswith("_std"):
+    #             try:
+    #                 value = float(label.text())
+    #             except ValueError:
+    #                 value = 0.0
 
-                if value > threshold:
-                    label.setStyleSheet("color: red;")
-                else:
-                    label.setStyleSheet("color: black;")
+    #             if value > threshold:
+    #                 label.setStyleSheet("color: red;")
+    #             else:
+    #                 label.setStyleSheet("color: black;")
 
 
-    def _adjust_min_ovality(self, delta: float):
-        val_str = self.entry_min_ovality.text() or "0"
+    def _adjust_max_ovality(self, delta: float):
+        val_str = self.entry_max_ovality.text() or "0"
         try:
             val = float(val_str)
         except ValueError:
             val = 0.0
         new_val = max(0.0, val + delta)
-        self.entry_min_ovality.setText(f"{new_val:.1f}")
+        self.entry_max_ovality.setText(f"{new_val:.1f}")
 
     def _adjust_max_std_dev(self, delta: float):
         val_str = self.entry_max_std_dev.text() or "0"
@@ -941,7 +941,7 @@ class MainPage(QWidget):
         max_lumps_str = self.entry_max_lumps.text() or "3"
         max_necks_str = self.entry_max_necks.text() or "3"
         pulsation_str = self.entry_pulsation_threshold.text() or "550.0"
-        min_ovality_str = self.entry_min_ovality.text() or "0.0"
+        max_ovality_str = self.entry_max_ovality.text() or "0.0"
         max_std_dev_str = self.entry_max_std_dev.text() or "0.0"
 
         # 2. Konwersje na float/int
@@ -955,8 +955,11 @@ class MainPage(QWidget):
             max_lumps = int(max_lumps_str)
             max_necks = int(max_necks_str)
             pulsation_threshold = float(pulsation_str)
-            min_ovality = float(min_ovality_str)
+            max_ovality = float(max_ovality_str)
             max_std_dev = float(max_std_dev_str)
+            # print max ovality i max std dev
+            # print(f"[GUI] Maksymalna owalność: {max_ovality}")
+            # print(f"[GUI] Maksymalne odchylenie standardowe: {max_std_dev}")
         except ValueError:
             QMessageBox.critical(self, "Błąd", "Błędne dane wejściowe.")
             return None
@@ -980,8 +983,8 @@ class MainPage(QWidget):
             "lump_histeresis": 0.0,
             "neck_histeresis": 0.0,
             "pulsation_threshold": pulsation_threshold,
-            "Min_ovality": min_ovality,
-            "Max_standard_deviation": max_std_dev
+            "max_ovality": max_ovality,
+            "max_standard_deviation": max_std_dev
         }
 
         # 4. Zapis do bazy
@@ -1100,7 +1103,7 @@ class MainPage(QWidget):
                 "entry_max_lumps": "120",
                 "entry_max_necks": "120",
                 "entry_pulsation_threshold": "6500",
-                "entry_min_ovality": "100.0",
+                "entry_max_ovality": "100.0",
                 "entry_max_std_dev": "10.0",
                 }
             
@@ -1527,7 +1530,7 @@ class MainPage(QWidget):
         diameter_preset = float(self.entry_diameter_setpoint.text() or 0.0)
         tolerance_plus = float(self.entry_tolerance_plus.text() or 0.5)
         tolerance_minus = float(self.entry_tolerance_minus.text() or 0.5)
-        min_ovality = float(self.entry_min_ovality.text() or 0.0)
+        max_ovality = float(self.entry_max_ovality.text() or 0.0)
      
         lower = diameter_preset - tolerance_minus
         upper = diameter_preset + tolerance_plus
@@ -1548,7 +1551,7 @@ class MainPage(QWidget):
         self.label_dmin.setText(f"<small>Dmin [mm]:</small><br><span style='font-size: 40px;'>{dmin:.2f}</span>")
         self.label_dmax.setText(f"<small>Dmax [mm]:</small><br><span style='font-size: 40px;'>{dmax:.2f}</span>")
         self.label_dsd.setText(f"<small>dSD [mm]:</small><br><span style='font-size: 28px;'>{dsd:.3f}</span>")
-        color = "black" if dov >= min_ovality else "red"
+        color = "black" if dov >= max_ovality else "red"
         self.label_dov.setText(f"<small>dOV [%]:</small><br><span style='font-size: 28px; color:{color};'>{dov:.2f}</span>")
         
             
@@ -1573,6 +1576,12 @@ class MainPage(QWidget):
             
         except ValueError:
             flaw_window_size = 0.95
+
+        threshold_str = self.entry_max_std_dev.text() or "0"
+        try:
+            threshold = float(threshold_str)
+        except ValueError:
+            threshold = 0.0
         # self.controller.flaw_detector.update_flaw_window_size(flaw_window_size)
         current_x = data.get("xCoord", 0)
         self.current_x = current_x  # zapisujemy do pola, żeby mieć spójność
@@ -1597,6 +1606,12 @@ class MainPage(QWidget):
                     label_key = f"{diameter}_{stat_key}"
                     value = stats.get(label_key, 0)
                     self.flaw_stats_labels[label_key].setText(f"{value:.2f}")
+                    # Jeżeli aktualizujemy odchylenie standardowe, ustaw kolor
+                    if stat_key == "std":
+                        if value > threshold:
+                            self.flaw_stats_labels[label_key].setStyleSheet("color: red;")
+                        else:
+                            self.flaw_stats_labels[label_key].setStyleSheet("color: black;")
 
 
         deviation = davg - diameter_preset
