@@ -78,3 +78,6 @@ rozgranicznie pomiedzy produkcyjnymi nastawami i nieprodukcyjnymi
 filtracja po wiekszej liczbie na stronie nastaw
 dodac gdzie siega okno na wykresach diameter i defekty
 [x]jak ktoras srednica bedzie poza zakresem tolerancji to ma sie swiecic na czerwono (UX)
+
+zrezygnować z window processor 
+zacząć korystać z enqueue

@@ -5,7 +5,6 @@ import time
 import numpy as np
 import multiprocessing as mp
 from multiprocessing import Process, Queue, Event, Value, cpu_count
-from window_fft_analysis import analyze_window_fft
 from scipy.signal import find_peaks
 from PyQt5.QtCore import Qt
 
@@ -162,16 +161,16 @@ class PlotManager:
             
 
 
-    def detect_peaks(self, freqs, amplitudes, threshold=None):
-        """
-        Wyszukuje lokalne maksima (piki) w wektorze amplitudes,
-        zwraca listę indeksów tych pików, które przekraczają zadany próg.
-        """
-        if threshold is None:
-            threshold = self.fft_threshold
-        peak_indices, properties = find_peaks(amplitudes, prominence=100, distance=5)
-        peak_indices_above_thresh = [i for i in peak_indices if amplitudes[i] > threshold]
-        return peak_indices_above_thresh
+    # def detect_peaks(self, freqs, amplitudes, threshold=None):
+    #     """
+    #     Wyszukuje lokalne maksima (piki) w wektorze amplitudes,
+    #     zwraca listę indeksów tych pików, które przekraczają zadany próg.
+    #     """
+    #     if threshold is None:
+    #         threshold = self.fft_threshold
+    #     peak_indices, properties = find_peaks(amplitudes, prominence=100, distance=5)
+    #     peak_indices_above_thresh = [i for i in peak_indices if amplitudes[i] > threshold]
+    #     return peak_indices_above_thresh
 
     def update_fft_plot(self, measurement_data, data_processing_time=0):
         if 'fft' not in self.plot_widgets:

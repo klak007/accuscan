@@ -110,14 +110,15 @@ class App(QMainWindow):
         # Bufor akwizycji
         self.acquisition_buffer = FastAcquisitionBuffer(max_samples=1024)
         self.flaw_detector = FlawDetector()
-        self.alarm_manager = AlarmManager(db_params=self.db_params, plc_client=self.plc_client)
-        self.plc_client = None
         if not OFFLINE_MODE:
-            self.plc_client = connect_plc(PLC_IP, PLC_RACK, PLC_SLOT)
-            if self.plc_client and self.plc_client.get_connected():
-                print("[Main] PLC connected in main process.")
-            else:
-                print("[Main] Failed to connect to PLC in main process.")
+            self.alarm_manager = AlarmManager(db_params=self.db_params, plc_client=self.plc_client)
+        self.plc_client = None
+        # if not OFFLINE_MODE:
+        #     self.plc_client = connect_plc(PLC_IP, PLC_RACK, PLC_SLOT)
+        #     if self.plc_client and self.plc_client.get_connected():
+        #         print("[Main] PLC connected in main process.")
+        #     else:
+        #         print("[Main] Failed to connect to PLC in main process.")
 
         
         # Kontener na strony (MainPage, SettingsPage)

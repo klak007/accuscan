@@ -34,14 +34,11 @@ def init_database(db_params: dict) -> bool:
     print("init_database()")
     connection = None
     try:
-        # Uwaga: klucz w db_params powinien nazywać się "database" zamiast "db"
-        # jeśli stosujemy standardowe argumenty MySQL Connector
         print("db_params:", db_params)
         connection = mysql.connector.connect(**db_params)
         print("Połączono z bazą danych.")
         cursor = connection.cursor()
         
-        # Zatwierdź zmiany
         connection.commit()
         print("init_database() - Inicjalizacja bazy danych zakończona sukcesem.")
         return True
@@ -386,58 +383,58 @@ def load_settings(db_params: dict, settings_id: int) -> dict:
         if connection is not None and connection.is_connected():
             connection.close()
 
-def save_detection_event(db_params: dict, event_data: dict) -> bool:
-    """
-    Zapisuje zdarzenie lumps/necks do tabeli 'events'.
-    Wykorzystuje klucze w event_data: 
-    id_register_settings, date_time, x_coordinate, distance,
-    product, batch, alarm_status_word, D1, D2, D3, D4, lumps, necks, result.
-    Zwraca True jeśli zapis się powiódł, False w przeciwnym przypadku.
-    """
-    if OFFLINE_MODE:
-        return True
-    if not check_database(db_params):
-        return False
+# def save_detection_event(db_params: dict, event_data: dict) -> bool:
+#     """
+#     Zapisuje zdarzenie lumps/necks do tabeli 'events'.
+#     Wykorzystuje klucze w event_data: 
+#     id_register_settings, date_time, x_coordinate, distance,
+#     product, batch, alarm_status_word, D1, D2, D3, D4, lumps, necks, result.
+#     Zwraca True jeśli zapis się powiódł, False w przeciwnym przypadku.
+#     """
+#     if OFFLINE_MODE:
+#         return True
+#     if not check_database(db_params):
+#         return False
 
-    connection = None
-    try:
-        connection = mysql.connector.connect(**db_params)
-        cursor = connection.cursor()
-        sql = """
-        INSERT INTO events (
-            id_register_settings, date_time, x_coordinate, distance,
-            product_nr, batch_nr, alarm_status_word,
-            D1, D2, D3, D4, lumps, necks, result
-        )
-        VALUES (
-            %s, %s, %s, %s,
-            %s, %s, %s,
-            %s, %s, %s, %s, %s, %s, %s
-        )
-        """
-        cursor.execute(sql, (
-            event_data.get("id_register_settings", None),
-            event_data.get("date_time"),
-            event_data.get("x_coordinate", 0.0),
-            event_data.get("distance", 0.0),
-            event_data.get("product_nr", ""),
-            event_data.get("batch_nr", ""),
-            event_data.get("alarm_status_word", 0),
-            event_data.get("D1", 0.0),
-            event_data.get("D2", 0.0),
-            event_data.get("D3", 0.0),
-            event_data.get("D4", 0.0),
-            event_data.get("lumps", 0),
-            event_data.get("necks", 0),
-            event_data.get("result", ""),
-        ))
-        connection.commit()
-        return True
-    except Error as e:
-        print(f"save_detection_event() - Błąd MySQL: {e}")
-        if connection:
-            connection.rollback()
-        return False
-    finally:
-        if connection is not None and connection.is_connected():
-            connection.close()
+#     connection = None
+#     try:
+#         connection = mysql.connector.connect(**db_params)
+#         cursor = connection.cursor()
+#         sql = """
+#         INSERT INTO events (
+#             id_register_settings, date_time, x_coordinate, distance,
+#             product_nr, batch_nr, alarm_status_word,
+#             D1, D2, D3, D4, lumps, necks, result
+#         )
+#         VALUES (
+#             %s, %s, %s, %s,
+#             %s, %s, %s,
+#             %s, %s, %s, %s, %s, %s, %s
+#         )
+#         """
+#         cursor.execute(sql, (
+#             event_data.get("id_register_settings", None),
+#             event_data.get("date_time"),
+#             event_data.get("x_coordinate", 0.0),
+#             event_data.get("distance", 0.0),
+#             event_data.get("product_nr", ""),
+#             event_data.get("batch_nr", ""),
+#             event_data.get("alarm_status_word", 0),
+#             event_data.get("D1", 0.0),
+#             event_data.get("D2", 0.0),
+#             event_data.get("D3", 0.0),
+#             event_data.get("D4", 0.0),
+#             event_data.get("lumps", 0),
+#             event_data.get("necks", 0),
+#             event_data.get("result", ""),
+#         ))
+#         connection.commit()
+#         return True
+#     except Error as e:
+#         print(f"save_detection_event() - Błąd MySQL: {e}")
+#         if connection:
+#             connection.rollback()
+#         return False
+#     finally:
+#         if connection is not None and connection.is_connected():
+#             connection.close()

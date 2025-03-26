@@ -42,8 +42,6 @@ class FlawDetector:
         Returns:
             Dictionary with flaw detection results
         """
-        start_time = time.perf_counter()
-        
         # Extract flaw indicators from data
         lumps = data.get("lumps_delta", 0)
         necks = data.get("necks_delta", 0)
@@ -51,7 +49,6 @@ class FlawDetector:
         # -----------------------------
         # 1) Obsługa dodawania defektów
         # -----------------------------
-        add_start = time.perf_counter()
         
         # Track total counts
         if lumps > 0:
@@ -60,32 +57,22 @@ class FlawDetector:
             self.total_necks_count += necks
         
         # Track flaws in window
-        lumps_add_start = time.perf_counter()
         if lumps > 0:
             self.flaw_lumps_coords.append((current_x, lumps))
             self.flaw_lumps_count += lumps
-        lumps_add_end = time.perf_counter()
-        lumps_add_time = lumps_add_end - lumps_add_start
-        
-        necks_add_start = time.perf_counter()
+
         if necks > 0:
             self.flaw_necks_coords.append((current_x, necks))
             self.flaw_necks_count += necks
-        necks_add_end = time.perf_counter()
-        necks_add_time = necks_add_end - necks_add_start
-        
-        add_end = time.perf_counter()
-        add_time_total = add_end - add_start
-        
+
         # -----------------------------
         # 2) Obsługa usuwania defektów poza oknem
         # -----------------------------
-        removal_start = time.perf_counter()
+
         
         window_start = current_x - self.flaw_window_size
         
         # Usuwanie lumps poza oknem
-        lumps_removal_start = time.perf_counter()
         if self.flaw_lumps_coords and self.flaw_lumps_coords[0][0] < window_start:
             drop_idx = None
             for i, (x, cnt) in enumerate(self.flaw_lumps_coords):
@@ -98,11 +85,10 @@ class FlawDetector:
                 removed = sum(cnt for (_, cnt) in self.flaw_lumps_coords[:drop_idx])
                 self.flaw_lumps_coords = self.flaw_lumps_coords[drop_idx:]
                 self.flaw_lumps_count -= removed
-        lumps_removal_end = time.perf_counter()
-        lumps_removal_time = lumps_removal_end - lumps_removal_start
+
         
         # Usuwanie necks poza oknem
-        necks_removal_start = time.perf_counter()
+
         if self.flaw_necks_coords and self.flaw_necks_coords[0][0] < window_start:
             drop_idx = None
             for i, (x, cnt) in enumerate(self.flaw_necks_coords):
@@ -115,17 +101,11 @@ class FlawDetector:
                 removed = sum(cnt for (_, cnt) in self.flaw_necks_coords[:drop_idx])
                 self.flaw_necks_coords = self.flaw_necks_coords[drop_idx:]
                 self.flaw_necks_count -= removed
-        necks_removal_end = time.perf_counter()
-        necks_removal_time = necks_removal_end - necks_removal_start
-        
-        removal_end = time.perf_counter()
-        removal_time_total = removal_end - removal_start
         
         # -----------------------------
         # 3) Podsumowanie czasu
         # -----------------------------
-        self.processing_time = time.perf_counter() - start_time
-        
+
         # Log (opcjonalny) – jeśli chcesz w konsoli zobaczyć czasy szczegółowe:
         # print(
         #     "[FlawDetector.process_flaws] "

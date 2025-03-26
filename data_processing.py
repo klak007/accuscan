@@ -6,7 +6,6 @@ Handles window calculations and processing of measurement data with multithreadi
 import time
 import threading
 from collections import deque
-from datetime import datetime
 
 
 class FastAcquisitionBuffer:
@@ -197,13 +196,9 @@ class FastAcquisitionBuffer:
             
             return stats
     
-    def get_window_data(self, interpolate_gaps=False):
+    def get_window_data(self):
         """
         Get all data for visualization (thread-safe copy)
-        
-        Args:
-            interpolate_gaps: If True, attempts to fill small gaps in the data
-                              by interpolating missing values for continuity
         """
         with self.lock:
             start_time = time.perf_counter()
@@ -230,7 +225,6 @@ class FastAcquisitionBuffer:
             return window_data
 
 
-# Keep WindowProcessor for backwards compatibility
 class WindowProcessor(FastAcquisitionBuffer):
     """
     Legacy adapter class for backward compatibility.

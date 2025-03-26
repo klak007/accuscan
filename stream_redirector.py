@@ -6,4 +6,4 @@ class EmittingStream(QObject):
         self.textWritten.emit(str(text))
 
     def flush(self):
-        pass  # This method is required for file-like objects, even if not used
+        pass  
